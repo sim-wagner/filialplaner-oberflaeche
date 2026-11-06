@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-06-3">
+<meta name="fassung" content="2026-11-06-4">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -616,6 +616,7 @@ function render(){
   else if (ansicht === "start")       v.appendChild(startseite());
   else if (ansicht === "planen")      v.appendChild(planenAnsicht());
   else if (ansicht === "archiv")      v.appendChild(archivAnsicht());
+  else if (ansicht === "sicherung")   v.appendChild(sicherungsAnsicht());
   else                                v.appendChild(SCHRITT_FN()[schritt]());
 
   pruefePlatz();
@@ -1931,6 +1932,9 @@ function startseite(){
     alt === 0 ? "noch leer" : alt === 1 ? "1 Plan" : alt + " Pläne"}</span></button>`);
   arch.onclick = () => { ansicht = "archiv"; render(); };
   kb.appendChild(arch);
+  const sich = el(`<button class="kachel arch"><b>Sicherung</b><span>speichern oder einlesen</span></button>`);
+  sich.onclick = () => { ansicht = "sicherung"; render(); };
+  kb.appendChild(sich);
 
   p.querySelector("#neuerPlan").onclick = () => { ansicht = "planen"; render(); };
   return p;
@@ -1988,6 +1992,28 @@ function planenAnsicht(){
     await speichere();
     ansicht = "start"; render();
   };
+  return p;
+}
+
+/* ---- Sicherung ---- */
+function sicherungsAnsicht(){
+  const p = el(`<div class="panel">
+    <div class="head"><span class="eyebrow">Sicherung</span>
+      <h1 style="margin-top:4px">Daten sichern und zurückholen</h1>
+      <p class="lede">Die Sicherung enthält alle Filialen dieses Geräts mit Stammdaten,
+      Standardwochen und dem gesamten Planarchiv — eine einzige Datei. Beim Einlesen wird
+      nur übernommen, was neuer ist als das, was schon da ist.</p></div>
+    <div id="knoepfe"></div>
+    <div id="orte"></div>
+    <div class="actions"><button class="btn ghost" id="zurueck">Zurück</button></div>
+  </div>`);
+  p.querySelector("#knoepfe").appendChild(sicherungsKnoepfe());
+  p.querySelector("#orte").appendChild(el(inApp
+    ? `<p class="hint" style="margin-top:16px">Zusätzlich legt die App bei jeder Änderung
+       eine Tageskopie an und behält sie vier Monate lang — auch von gelöschten Filialen.</p>`
+    : `<p class="hint" style="margin-top:16px">Im Browser liegen die Daten nur in diesem
+       Browser auf diesem Gerät. Eine Sicherung von Zeit zu Zeit ist hier besonders ratsam.</p>`));
+  p.querySelector("#zurueck").onclick = () => { ansicht = "start"; render(); };
   return p;
 }
 
