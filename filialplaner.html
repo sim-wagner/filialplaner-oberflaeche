@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-06-5">
+<meta name="fassung" content="2026-11-06-6">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -2008,6 +2008,13 @@ function sicherungsAnsicht(){
     <div class="actions"><button class="btn ghost" id="zurueck">Zurück</button></div>
   </div>`);
   p.querySelector("#knoepfe").appendChild(sicherungsKnoepfe());
+  (async () => {
+    const liste = inApp ? await bekannteFilialen() : lokaleFilialen();
+    const plaene = Object.keys(state.plaene || {}).length;
+    p.querySelector("#knoepfe").appendChild(el(`<p class="hint" style="margin-top:10px">
+      Gerade gespeichert: ${liste.length} ${liste.length === 1 ? "Filiale" : "Filialen"},
+      in dieser ${plaene} ${plaene === 1 ? "Wochenplan" : "Wochenpläne"}.</p>`));
+  })();
   p.querySelector("#orte").appendChild(el(inApp
     ? `<p class="hint" style="margin-top:16px">Zusätzlich legt die App bei jeder Änderung
        eine Tageskopie an und behält sie vier Monate lang — auch von gelöschten Filialen.</p>`
