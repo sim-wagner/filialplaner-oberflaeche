@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
+<meta name="fassung" content="2026-11-06-3">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -617,7 +618,21 @@ function render(){
   else if (ansicht === "archiv")      v.appendChild(archivAnsicht());
   else                                v.appendChild(SCHRITT_FN()[schritt]());
 
+  pruefePlatz();
   window.scrollTo({top:0, behavior:"instant"});
+}
+
+// Meldet die App, dass iCloud eng wird, steht es über der Seite statt nirgends
+let platzGeprueft = 0;
+async function pruefePlatz(){
+  if (!inApp || Date.now() - platzGeprueft < 20000) return;
+  platzGeprueft = Date.now();
+  const text = await appRuf("hinweis", {});
+  const alt = document.getElementById("platzhinweis");
+  if (alt) alt.remove();
+  if (!text) return;
+  document.getElementById("view").prepend(el(
+    `<div class="note warn" id="platzhinweis" style="margin-bottom:14px"><span class="ic">!</span><span>${esc(text)}</span></div>`));
 }
 
 // Fußzeile der Schritte — in der Einrichtung mit Überspringen, sonst mit Fertig
@@ -759,6 +774,7 @@ function anmeldung(){
       tb.appendChild(tr);
     });
     box.appendChild(tab);
+    box.appendChild(sicherungsKnoepfe());
   };
 
   umschalten("anmelden");
@@ -788,6 +804,63 @@ function lokaleFilialen(){
   } catch(e){}
   bekannteLesen().forEach(x => merke(x.nr, x.ort));
   return [...nach.values()].sort((a,b) => String(a.nr).localeCompare(String(b.nr)));
+}
+
+/* --------- Sicherung --------- */
+// In der App übernimmt das die Brücke (Teilen- bzw. Sichern-Dialog, Dateiauswahl).
+// Im Browser wird dieselbe Datei als Download angeboten und über ein Dateifeld gelesen.
+function sicherungsKnoepfe(){
+  const k = el(`<div style="margin-top:16px;display:flex;gap:9px;flex-wrap:wrap;align-items:center">
+    <button class="btn ghost small" id="sichAus">Sicherung speichern</button>
+    <button class="btn ghost small" id="sichEin">Sicherung einlesen</button>
+    <span class="hint" id="sichHinweis"></span>
+  </div>`);
+  const sagen = t => k.querySelector("#sichHinweis").textContent = t;
+
+  k.querySelector("#sichAus").onclick = async () => {
+    if (inApp){ await appRuf("sicherungSpeichern", {}); return; }
+    const paket = {art:"filialplaner-sicherung", erstellt:new Date().toISOString(), filialen:{}};
+    lokaleFilialen().forEach(f => {
+      const roh = localStorage.getItem(LS + key(f.nr));
+      if (roh){ try { paket.filialen[key(f.nr)] = JSON.parse(roh); } catch(e){} }
+    });
+    const name = "Filialplaner-Sicherung-" + new Date().toISOString().slice(0,10) + ".json";
+    anbieten(new Blob([JSON.stringify(paket, null, 2)], {type:"application/json"}), name);
+    sagen(Object.keys(paket.filialen).length + " Filialen gespeichert.");
+  };
+
+  k.querySelector("#sichEin").onclick = async () => {
+    if (inApp){
+      const zahl = await appRuf("sicherungEinlesen", {});
+      if (zahl > 0){ sagen(zahl + " Filialen eingelesen."); k.closest("#liste").innerHTML = ""; render(); }
+      else if (zahl === 0) sagen("Nichts übernommen — die Sicherung war nicht neuer.");
+      return;
+    }
+    const feld = el(`<input type="file" accept="application/json,.json" hidden>`);
+    document.body.appendChild(feld);
+    feld.onchange = async () => {
+      const datei = feld.files && feld.files[0];
+      feld.remove();
+      if (!datei) return;
+      try {
+        const paket = JSON.parse(await datei.text());
+        if (paket.art !== "filialplaner-sicherung") return sagen("Das ist keine Filialplaner-Sicherung.");
+        let n = 0;
+        for (const [id, inhalt] of Object.entries(paket.filialen || {})){
+          const da = localStorage.getItem(LS + id);
+          const neuer = !da || (inhalt.geaendert || "") > (JSON.parse(da).geaendert || "");
+          if (!neuer) continue;
+          localStorage.setItem(LS + id, JSON.stringify(inhalt));
+          merkeZugang(inhalt.nr || id.slice(1), inhalt.ort || "", inhalt.pw || "");
+          n++;
+        }
+        sagen(n ? n + " Filialen eingelesen." : "Nichts übernommen — die Sicherung war nicht neuer.");
+        if (n) render();
+      } catch(e){ sagen("Die Datei ließ sich nicht lesen."); }
+    };
+    feld.click();
+  };
+  return k;
 }
 
 /* --------- 2 Filiale --------- */
