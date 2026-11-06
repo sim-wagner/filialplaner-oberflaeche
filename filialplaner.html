@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-06-4">
+<meta name="fassung" content="2026-11-06-5">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -2377,7 +2377,10 @@ document.getElementById("abmelden").onclick = () => {
 
 /* Nachgeladene Oberfläche: Fassung anzeigen und auf Neuladungen reagieren */
 if (inApp && window.appFassung){
-  document.getElementById("fuss").textContent += " · Fassung " + window.appFassung;
+  // 2026-11-06-4 → „Fassung vom 6.11.2026“
+  const t = /^(\d{4})-(\d{2})-(\d{2})/.exec(window.appFassung);
+  document.getElementById("fuss").textContent += " · Fassung "
+    + (t ? "vom " + (+t[3]) + "." + (+t[2]) + "." + t[1] : window.appFassung);
 }
 window.appNeueFassung = function(name){
   // Steht noch niemand mitten in einer Eingabe, gleich neu laden
