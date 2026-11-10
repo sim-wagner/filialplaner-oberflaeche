@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-10-1",
+  "fassung": "2026-11-10-2",
   "datei": "filialplaner.html",
-  "pruefsumme": "744d2bf93b57ab049ebae1d5d1d09ac41c2615f595f8055fba9ea6893fc4487b",
-  "hinweis": "RR-Schein, Uhrzeiten je Tag, Pausen nach Gesetz, Stundenliste je KW, ausgleichende Planung, Plan von Hand änderbar"
+  "pruefsumme": "4e9d0eb66c20492ceb718fd23fc11d625c6f0a8e06d3ba5db430a045ab077392",
+  "hinweis": "Planer verschwendet keine Stunden mehr, Pausen versetzt, Stundenkonto buchen, Fehler aus der Durchsicht behoben"
 }

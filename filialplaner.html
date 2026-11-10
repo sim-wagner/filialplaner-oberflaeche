@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-10-1">
+<meta name="fassung" content="2026-11-10-2">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -417,6 +417,13 @@ function normalisiere(s){
   if (!s.plaene) s.plaene = {};
   if (!s.abwesend) s.abwesend = {};
   if (!s.listen) s.listen = {};
+  // Vor dem 10.11.2026 gab es nur eine Stundenliste ohne Woche — sie wird zur
+  // Liste der laufenden Woche, statt unsichtbar liegen zu bleiben
+  if (s.budget && s.budget.stunden && Object.values(s.budget.stunden).some(v => hat(v))
+      && !Object.keys(s.listen).length){
+    s.listen[wochenSchluessel(aktuellerMontag())] = JSON.parse(JSON.stringify(s.budget));
+  }
+  if (s.archivGewarnt === true) s.archivGewarnt = {};   // früher ein einziger Schalter
   // Filialen von vor dem RR-Schein kennen die neue Aufgabe noch nicht
   if (s.aufgaben) WAREN.forEach(w => {
     if (!s.aufgaben[w.id]) s.aufgaben[w.id] = {aktiv:false, tage:[], zeitArt:"fest", zeit:"",
@@ -1498,16 +1505,24 @@ function stundenliste(){
 /* Aus einer Tabelle die sechs Tageswerte fischen: gesucht wird eine Zeile, die
    mit „Stunden" beginnt (bzw. „Umsatz"), und darin die ersten sechs Zahlen. */
 function ausZeilen(zeilen){
+  // Excel liefert echte Zahlen (25.5), CSV liefert Text („25,5", „1.234,5", „25.5")
   const zahl = v => {
     if (v === null || v === undefined || v === "") return null;
-    const n = parseFloat(String(v).replace(/\./g, "").replace(",", "."));
-    return isFinite(n) ? n : null;
+    if (typeof v === "number") return isFinite(v) ? v : null;
+    let t = String(v).trim().replace(/\s|€|h$/gi, "");
+    if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");   // deutsch
+    else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");  // 12.000
+    const n = parseFloat(t);
+    return isFinite(n) && /^-?[\d.]+$/.test(t) ? n : null;
   };
+  const text = v => v && typeof v === "object" && v.richText
+    ? v.richText.map(r => r.text).join("") : String(v ?? "");
   const finde = muster => {
     for (const z of zeilen){
-      const erste = String(z[0] ?? "").toLowerCase();
-      if (!muster.test(erste)) continue;
-      const werte = z.slice(1).map(zahl).filter(x => x !== null);
+      // Die Beschriftung steht nicht immer in Spalte A — die erste Textzelle nehmen
+      const k = z.findIndex(v => v !== null && v !== undefined && v !== "" && zahl(v) === null);
+      if (k < 0 || !muster.test(text(z[k]).toLowerCase())) continue;
+      const werte = z.slice(k + 1).map(zahl).filter(x => x !== null);
       if (werte.length >= 6) return werte.slice(0, 6);
       if (werte.length) return werte.concat(Array(6 - werte.length).fill(null));
     }
@@ -1662,6 +1677,7 @@ function istFeiertag(d){
 }
 function montagDer(iso){
   const d = iso ? new Date(iso + "T12:00:00") : new Date();
+  d.setHours(12, 0, 0, 0);       // mittags — sonst rutscht das Datum nachts über die Zeitzone
   const wt = (d.getDay() + 6) % 7;            // Mo = 0
   d.setDate(d.getDate() - wt);
   return d;
@@ -1669,7 +1685,10 @@ function montagDer(iso){
 function naechsterMontag(){
   const d = montagDer(null); d.setDate(d.getDate() + 7); return d;
 }
-const isoVon = d => d.toISOString().slice(0,10);
+// In Ortszeit. toISOString() rechnet in UTC: Montag 00:30 wäre dort noch Sonntag,
+// und nachts erstellt wäre der Plan für die falsche Woche entstanden.
+const isoVon = d => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0")
+                  + "-" + String(d.getDate()).padStart(2,"0");
 const deVon  = d => d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
 function kwVon(d){
   const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -1698,17 +1717,33 @@ function aufgabenAmTag(tag, tagVon, tagBis){
     }
   });
 
-  // Flexible Aufgaben hintereinander legen, statt sie alle auf den frühesten Start
-  // zu schieben — sonst bräuchte man zur selben Zeit mehrere Leute.
-  flex.sort((x,y) => (x.fBis ?? 99999) - (y.fBis ?? 99999) || x.fVon - y.fVon);
-  let zeiger = {};
+  // Flexible Aufgaben dorthin legen, wo am wenigsten los ist. Früher kamen sie an den
+  // Tagesbeginn — genau auf die Lieferungen —, und morgens standen sieben Leute im
+  // Laden, nachmittags zwei. Jetzt wird für jede Aufgabe die Zeit gesucht, in der sie
+  // die wenigsten zusätzlichen Leute verlangt.
+  const SL = 30, last = {};
+  const offen = m => m >= tagVon && m < tagBis;
+  const bedarfBei = (m, extra) => {
+    const auf = (last[m] || 0) + extra;
+    return offen(m) ? Math.max(MIN_BESETZUNG, auf + 1) : auf;
+  };
+  const eintragen = a => { for (let m = a.von; m < a.bis; m += SL) last[m] = (last[m] || 0) + a.pers; };
+  fest.forEach(eintragen);
+
+  // Lange und personalintensive Aufgaben zuerst, sie haben am wenigsten Spielraum
+  flex.sort((x,y) => (y.dauer * y.pers) - (x.dauer * x.pers));
   flex.forEach(a => {
-    const spur = a.pers > 1 ? "mehr" : "eine";       // Aufgaben für mehrere Leute nicht stapeln
-    let start = a.fVon;
-    if (spur === "eine" && zeiger[spur] !== undefined) start = Math.max(start, zeiger[spur]);
-    if (a.fBis !== null && start + a.dauer > a.fBis) start = Math.max(a.fVon, a.fBis - a.dauer);
-    a.von = start; a.bis = start + a.dauer;
-    if (spur === "eine") zeiger[spur] = a.bis;
+    // „Uhrzeit egal" heißt: irgendwann während der Öffnung
+    const frueh = a.fBis === null ? Math.max(a.fVon, tagVon) : a.fVon;
+    const spaet = (a.fBis === null ? tagBis : a.fBis) - a.dauer;
+    let beste = frueh, besteKosten = Infinity;
+    for (let st = Math.ceil(frueh/SL)*SL; st <= spaet; st += SL){
+      let k = 0;
+      for (let m = st; m < st + a.dauer; m += SL) k += bedarfBei(m, a.pers) - bedarfBei(m, 0);
+      if (k < besteKosten - 0.001){ besteKosten = k; beste = st; }
+    }
+    a.von = beste; a.bis = beste + a.dauer;
+    eintragen(a);
   });
 
   return fest.concat(flex).sort((x,y) => x.von - y.von);
@@ -1757,6 +1792,7 @@ function baueWoche(montagISO, rnd){
 
     const auf = aufgabenAmTag(key, offenVon, offenBis);
     tag.aufgaben = auf;
+    const vortagEnde = letztesEnde.slice();     // für die Ruhezeit, wenn Schichten wachsen
     const tagVon = Math.min(offenVon, ...auf.map(a => a.von));
     const tagBis = Math.max(offenBis, ...auf.map(a => a.bis));
 
@@ -1842,11 +1878,110 @@ function baueWoche(montagISO, rnd){
         pBis = pVon + laenge;
       }
       const erste = !schichtenVon(i).length;
-      belegt.push({mi:i, von, bis, pVon, pBis, rollen: rolle ? [rolle] : []});
+      belegt.push({mi:i, von, bis, pVon, pBis, rollen: rolle ? [rolle] : [],
+                   zaehlt: zaehlen !== false, fest: rolle === "Standard"});
       if (zaehlen !== false) rest[i] -= anw - pz;
       if (erste) tageGearbeitet[i]++;      // ein geteilter Tag bleibt ein Arbeitstag
       letztesEnde[i] = Math.max(letztesEnde[i] ?? -Infinity, ti*24*60 + bis);
     };
+    // --- Bestehende Schichten verlängern oder kürzen ---------------------
+    const arbeitVon = b => (b.bis - b.von)/60 - (b.pVon === null ? 0 : (b.pBis - b.pVon)/60);
+    const pauseLegen = b => {
+      const pz = pauseFuer(ms[b.mi], (b.bis - b.von)/60);
+      if (pz > 0){
+        const laenge = pz*60;
+        let pv = Math.round((b.von + (b.bis - b.von)/2 - laenge/2)/15)*15;
+        pv = Math.max(b.von + 60, Math.min(pv, b.bis - 60 - laenge));
+        if (pv < b.von) pv = b.von + Math.round((b.bis - b.von - laenge)/2/15)*15;
+        b.pVon = pv; b.pBis = pv + laenge;
+      } else { b.pVon = null; b.pBis = null; }
+    };
+    // Zeitraum ändern: Stunden umbuchen, Pause neu legen
+    const umbauen = (b, von, bis) => {
+      if (b.zaehlt) rest[b.mi] += arbeitVon(b);
+      b.von = von; b.bis = bis; pauseLegen(b);
+      if (b.zaehlt) rest[b.mi] -= arbeitVon(b);
+      letztesEnde[b.mi] = Math.max(vortagEnde[b.mi] ?? -Infinity,
+        ...schichtenVon(b.mi).map(x => ti*24*60 + x.bis));
+    };
+    // Wie viele Halbstunden-Mängel hat der Tag gerade? Maß dafür, ob ein Umbau hilft
+    const mangelZahl = () => {
+      let n = 0;
+      for (let m = tagVon; m < tagBis; m += SLOT)
+        for (const art of ["fuehrung","kasse","aufgabe","anzahl"]) if (mangel(m, art)) n++;
+      return n;
+    };
+    // Darf Schicht b auf von–bis wachsen?
+    const dehnbar = (b, von, bis) => {
+      const i = b.mi, m = ms[i];
+      if (b.fest) return false;                         // Standardwochen bleiben, wie sie sind
+      if (!darfArbeiten(i, key, von, bis)) return false;
+      const minder = alter(m.geb) !== null && alter(m.geb) < 18;
+      if (minder && bis > 20*60) return false;
+      const andere = schichtenVon(i).filter(x => x !== b);
+      if (andere.some(x => !(von >= x.bis + 60 || bis + 60 <= x.von))) return false;
+      const anw = (bis - von)/60;
+      const sonst = andere.reduce((x,y) => x + arbeitVon(y), 0);
+      if (sonst + anw - pauseFuer(m, anw) > MAXARBEIT + 0.01) return false;
+      if (vortagEnde[i] !== null && (ti*24*60 + von - vortagEnde[i])/60 < (minder ? 12 : 11) - 0.01) return false;
+      return true;
+    };
+    // Eine Lücke schließen, indem eine angrenzende Schicht wächst — statt für eine
+    // Stunde Bedarf eine neue Vier-Stunden-Schicht aufzumachen
+    const verlaengern = (lVon, lBis, f) => {
+      const passt = b => f.art === "fuehrung" ? fuehrt(b.mi, f.qual)
+                       : f.art === "anzahl" ? true : kann(b.mi, f.qual);
+      const vorher = mangelZahl();
+      const kand = belegt.filter(b => passt(b) && (
+          (b.bis >= lVon - 60 && b.bis < lBis && b.von < lVon) ||    // endet kurz davor
+          (b.von <= lBis + 60 && b.von > lVon && b.bis > lBis)));    // beginnt kurz danach
+      // wem anteilig am meisten Stunden fehlen, zuerst
+      kand.sort((x,y) => (rest[y.mi] / (soll[y.mi] || 1)) - (rest[x.mi] / (soll[x.mi] || 1)));
+      for (const b of kand){
+        const von = Math.min(b.von, lVon), bis = Math.max(b.bis, lBis);
+        if (!dehnbar(b, von, bis)) continue;
+        const alt = {von:b.von, bis:b.bis};
+        umbauen(b, von, bis);
+        if (mangelZahl() < vorher) return true;
+        umbauen(b, alt.von, alt.bis);
+      }
+      return false;
+    };
+
+    // Pausen so legen, dass nicht alle gleichzeitig weg sind. Bei gleichen
+    // Schichten landeten sie sonst alle genau in der Mitte — und die Kasse war leer.
+    // Erlaubt ist jede Lage, bei der vorher und nachher höchstens sechs Stunden
+    // am Stück gearbeitet wird (§ 4 ArbZG), unter 18 höchstens viereinhalb (§ 11 JArbSchG).
+    const pausenVersetzen = () => {
+      for (let runde = 0; runde < 2; runde++){
+        if (!mangelZahl()) return;
+        for (const b of belegt){
+          if (b.pVon === null) continue;
+          const laenge = b.pBis - b.pVon;
+          // Nur Pausen anfassen, die überhaupt etwas ausmachen: ändert sich nichts,
+          // wenn die Person gar keine Pause hätte, bleibt sie, wo sie ist.
+          {
+            const mit = mangelZahl(), alt = b.pVon;
+            b.pVon = null; const ohne = mangelZahl(); b.pVon = alt;
+            if (ohne === mit) continue;
+          }
+          const minder = alter(ms[b.mi].geb) !== null && alter(ms[b.mi].geb) < 18;
+          const amStueck = (minder ? 4.5 : 6) * 60;
+          const mitte = b.von + (b.bis - b.von)/2 - laenge/2;
+          let besteLage = b.pVon, besteZahl = mangelZahl(), besteAbstand = Math.abs(b.pVon - mitte);
+          for (let pv = b.von + 60; pv + laenge <= b.bis - 60; pv += 15){
+            if (pv - b.von > amStueck || b.bis - (pv + laenge) > amStueck) continue;
+            b.pVon = pv; b.pBis = pv + laenge;
+            const z = mangelZahl(), ab = Math.abs(pv - mitte);
+            if (z < besteZahl || (z === besteZahl && ab < besteAbstand - 0.1)){
+              besteLage = pv; besteZahl = z; besteAbstand = ab;
+            }
+          }
+          b.pVon = besteLage; b.pBis = besteLage + laenge;
+        }
+      }
+    };
+
     let mehrarbeit = false;
     const waehle = (von, bis, q, fuehrung) => {
       let k = ms.map((m,i) => i).filter(i => regelOk(i, von, bis));
@@ -1898,7 +2033,10 @@ function baueWoche(montagISO, rnd){
       const s = schicht(m, key);
       if (!s) return;
       if (!darfArbeiten(i, key, s.von, s.bis)){
-        meldungen.push({art:"warn", text:`${label}: ${m.name} fällt aus (${grundText(eintrag(i, key))}) — die Standardschicht entfällt und wird anders besetzt.`});
+        // Den Grund (krank, Urlaub …) nicht in die Meldung: sie landet in der Excel-Datei,
+        // und Krankheit ist ein Gesundheitsdatum (Art. 9 DSGVO)
+        const e = eintrag(i, key);
+        meldungen.push({art:"warn", text:`${label}: ${m.name} ${typeof e === "string" ? "fällt aus" : "ist nur eingeschränkt da (" + grundText(e) + ")"} — die Standardschicht entfällt und wird anders besetzt.`});
         return;
       }
       const minder = (alter(m.geb) !== null && alter(m.geb) < 18);
@@ -1909,6 +2047,7 @@ function baueWoche(montagISO, rnd){
 
     // 2) Lücken im Zeitraster schließen
     const gemeldet = new Set();
+    const offeneLuecken = [];
     const ARTEN = ["fuehrung","kasse","aufgabe","anzahl"];
     for (let runde = 0; runde < 80; runde++){
       let lVon = null, f = null;
@@ -1926,10 +2065,15 @@ function baueWoche(montagISO, rnd){
         if (!x || x.art !== f.art) break;
         lBis += SLOT;
       }
+      // Kurze Lücke: erst versuchen, eine Nachbarschicht wachsen zu lassen
+      if (lBis - lVon < MINSCHICHT*60 && verlaengern(lVon, lBis, f)) continue;
+
       let von = lVon, bis = Math.max(lBis, von + MINSCHICHT*60);
       bis = Math.min(bis, tagBis);
       if (bis - von > 8.5*60) bis = von + 8.5*60;
       let i = waehle(von, bis, f.art === "anzahl" ? null : f.qual, f.art === "fuehrung" ? f.qual : null);
+      // Niemand mehr frei: auch längere Lücken durch Verlängern versuchen
+      if (i < 0 && verlaengern(lVon, lBis, f)) continue;
 
       // Schicht ausdehnen, aber nur so weit, wie die Person noch Stunden braucht —
       // sonst wächst der Stundenverbrauch, statt die Zerstückelung zu beenden
@@ -1945,11 +2089,7 @@ function baueWoche(montagISO, rnd){
       }
       if (i < 0){
         for (let m = lVon; m < lBis; m += SLOT) gemeldet.add(f.art + "@" + m);
-        const was = f.art === "anzahl" ? "die Mindestbesetzung"
-                  : f.art === "kasse" ? "die Kasse"
-                  : f.art === "fuehrung" ? "die Schichtführung"
-                  : f.art.replace("aufgabe:","");
-        meldungen.push({art:"bad", text:`${label} ${hhmm(lVon)}–${hhmm(lBis)}: Für ${was} ist niemand verfügbar, der einsetzbar wäre.`});
+        offeneLuecken.push({art:f.art, von:lVon, bis:lBis});
         continue;
       }
       const rolle = f.art === "anzahl" ? "Fläche"
@@ -1960,6 +2100,108 @@ function baueWoche(montagISO, rnd){
       if (mehrarbeit){
         belegt[belegt.length-1].mehrarbeit = true;
         meldungen.push({art:"warn", text:`${label} ${hhmm(von)}–${hhmm(bis)}: ${ms[i].name} ist über die Vertragsstunden hinaus eingeplant — ohne Mehrarbeit wäre ${rolle === "Fläche" ? "die Mindestbesetzung" : rolle} hier unbesetzt.`});
+      }
+    }
+
+    pausenVersetzen();
+
+    // 2a) Was niemand mehr übernehmen konnte, weil alle schon eingeteilt sind:
+    //     eine Schicht aus einer überbesetzten Zeit dorthin verschieben. Typisch
+    //     sind sieben Leute am Morgen und abends einer — jeder kommt nur einmal am Tag.
+    {
+      const segmente = () => {
+        const raus = [];
+        for (const art of ARTEN){
+          let start = null, fall = null;
+          // Das Tagesende liegt nicht immer im Halbstundenraster (z. B. 21:15) —
+          // deshalb einen Schritt darüber hinaus laufen, sonst bleibt die letzte
+          // Lücke offen und wird weder repariert noch gemeldet.
+          for (let m = tagVon; ; m += SLOT){
+            const x = m < tagBis ? mangel(m, art) : null;
+            if (x && start === null){ start = m; fall = x; }
+            if ((!x || (fall && x.art !== fall.art)) && start !== null){
+              raus.push({von:start, bis:Math.min(m, tagBis), f:fall}); start = null; fall = null;
+              if (x){ start = m; fall = x; }
+            }
+            if (m >= tagBis) break;
+          }
+        }
+        return raus;
+      };
+      let schutz = 0, geholfen = true;
+      while (geholfen && schutz++ < 25){
+        geholfen = false;
+        const vorher = mangelZahl();
+        if (!vorher) break;
+        for (const lu of segmente()){
+          const f = lu.f;
+          // Erst die einfache Lösung: eine Nachbarschicht ein Stück länger
+          if (verlaengern(lu.von, lu.bis, f)){ geholfen = true; break; }
+          const passt = b => f.art === "fuehrung" ? fuehrt(b.mi, f.qual)
+                           : f.art === "anzahl" ? true : kann(b.mi, f.qual);
+          const kand = belegt.filter(b => !b.fest && passt(b) && (b.bis <= lu.von || b.von >= lu.bis));
+          for (const b of kand){
+            const laenge = Math.max(b.bis - b.von, lu.bis - lu.von, MINSCHICHT*60);
+            let von = lu.von, bis = lu.von + laenge;
+            if (bis > tagBis){ bis = tagBis; von = Math.max(tagVon, bis - laenge); }
+            if (!dehnbar(b, von, bis)) continue;
+            const alt = {von:b.von, bis:b.bis, rollen:b.rollen.slice()};
+            umbauen(b, von, bis);
+            if (mangelZahl() < vorher){
+              b.rollen = [f.art === "anzahl" ? "Fläche" : f.art === "kasse" ? "Kasse"
+                : f.art === "fuehrung" ? (f.qual === "frueh" ? "Führung früh" : "Führung spät")
+                : f.art.replace("aufgabe:","")];
+              geholfen = true; break;
+            }
+            umbauen(b, alt.von, alt.bis); b.rollen = alt.rollen;
+          }
+          if (geholfen) break;
+        }
+      }
+    }
+
+    // 2b) Überhang abbauen. Jede kurze Aufgabe hat eine eigene Schicht von
+    //     mindestens vier Stunden aufgemacht; danach stehen morgens sechs Leute
+    //     im Laden, die keiner braucht. Gekürzt wird nur bei denen, die schon über
+    //     ihrem Vertrag liegen, und nur so weit, dass kein neuer Mangel entsteht.
+    {
+      const grenze = mangelZahl();
+      let weiter = true, schutz = 0;
+      while (weiter && schutz++ < 40){
+        weiter = false;
+        const reihe = belegt.filter(b => !b.fest && b.zaehlt && rest[b.mi] < -0.01)
+          .sort((x,y) => (rest[x.mi] / (soll[x.mi] || 1)) - (rest[y.mi] / (soll[y.mi] || 1)));
+        for (const b of reihe){
+          for (const seite of ["ende", "anfang"]){
+            if (rest[b.mi] >= -0.01) break;
+            if (b.bis - b.von - SLOT < MINSCHICHT*60) break;
+            const alt = {von:b.von, bis:b.bis};
+            if (seite === "ende") umbauen(b, b.von, b.bis - SLOT);
+            else umbauen(b, b.von + SLOT, b.bis);
+            if (mangelZahl() > grenze) umbauen(b, alt.von, alt.bis);
+            else weiter = true;
+          }
+        }
+      }
+    }
+
+    pausenVersetzen();
+
+    // 2c) Was jetzt noch fehlt, ist wirklich nicht zu besetzen — erst jetzt melden
+    {
+      const was = a => a === "anzahl" ? "die Mindestbesetzung" : a === "kasse" ? "die Kasse"
+                     : a === "fuehrung" ? "die Schichtführung" : a.replace("aufgabe:","");
+      for (const art of ARTEN){
+        let start = null, fall = null;
+        for (let m = tagVon; ; m += SLOT){
+          const x = m < tagBis ? mangel(m, art) : null;
+          if (x && start === null){ start = m; fall = x; }
+          if (!x && start !== null){
+            meldungen.push({art:"bad", text:`${label} ${hhmm(start)}–${hhmm(Math.min(m, tagBis))}: Für ${was(fall.art)} ist niemand verfügbar, der einsetzbar wäre.`});
+            start = null;
+          }
+          if (m >= tagBis) break;
+        }
       }
     }
 
@@ -2008,6 +2250,42 @@ ausgewogenste wird genommen und danach noch einmal nachgebessert, indem ganze
 Schichten von den Überbuchten zu den Unterbuchten wandern.
 -------------------------------------------------------------------------- */
 
+/* Zählt die Halbstunden, in denen ein Tag nicht richtig besetzt ist — nach
+   denselben Regeln wie der Bauschritt, aber auf dem fertigen Plan. Damit prüfen
+   der Ausgleich und die Gütezahl, statt sich auf Meldungen zu verlassen. */
+function tagesMaengel(plan, ti){
+  const t = plan.tage[ti];
+  if (!t || t.feiertag) return 0;
+  const ms = state.mitarbeiter;
+  const offenVon = hatZeit(state.von) ? minuten(state.von) : 8*60;
+  const offenBis = hatZeit(state.bis) ? minuten(state.bis) : 21*60;
+  const wechsel  = hatZeit(state.wechsel) ? minuten(state.wechsel) : Math.round((offenVon + offenBis)/2);
+  const aussen   = state.allein ? 1 : MIN_BESETZUNG;
+  const auf = t.aufgaben || [];
+  const tagVon = Math.min(offenVon, ...auf.map(a => a.von));
+  const tagBis = Math.max(offenBis, ...auf.map(a => a.bis));
+  const kann   = (s,q) => !q || (ms[s.mi].qual || []).includes(q);
+  const fuehrt = (s,q) => ms[s.mi].typ === "Filialleitung" || (ms[s.mi].qual || []).includes(q);
+  let n = 0;
+  for (let m = tagVon; m < tagBis; m += 30){
+    const da = t.schichten.filter(s => s.von <= m && s.bis > m);
+    const fl = da.filter(s => !(s.pauseVon !== null && s.pauseVon !== undefined && s.pauseVon <= m && s.pauseBis > m));
+    const drin = m >= offenVon && m < offenBis;
+    if (!da.some(s => fuehrt(s, m < wechsel ? "frueh" : "spaet"))) n++;
+    if (drin && !fl.some(s => kann(s, "kasse"))) n++;
+    for (const a of auf){
+      if (a.von > m || a.bis <= m) continue;
+      const br = (WAREN.find(w => w.id === a.id) || {}).braucht;
+      if (br && fl.filter(s => kann(s, br)).length < a.pers){ n++; break; }
+    }
+    let aufPers = 0;
+    auf.forEach(a => { if (a.von <= m && a.bis > m) aufPers += a.pers; });
+    if (da.length < (drin ? Math.max(MIN_BESETZUNG, aufPers + 1) : Math.max(aussen, aufPers))) n++;
+  }
+  return n;
+}
+function planMaengel(plan){ return plan.tage.reduce((x,t,ti) => x + tagesMaengel(plan, ti), 0); }
+
 const ENTWUERFE = 24;        // so viele Varianten werden durchgerechnet
 
 function wuerfel(saat){
@@ -2042,7 +2320,7 @@ function guete(plan){
     const rel = (ist - ziel) / Math.max(ziel, 4);
     f += rel * rel * (ist > ziel ? ueberGewicht(m) : 2) * 100;
   });
-  f += plan.meldungen.filter(x => x.art === "bad").length * 400;
+  f += planMaengel(plan) * 150;       // jede unbesetzte halbe Stunde wiegt schwer
   f += plan.tage.reduce((s,t) => s + t.schichten.length, 0) * 0.4;
   return f;
 }
@@ -2083,9 +2361,20 @@ function ausgleichen(plan){
   };
   const minderj = i => { const a = alter(ms[i].geb); return a !== null && a < 18; };
 
+  const fest = sch => (sch.rollen || []).includes("Standard");
+  // Ruhezeit zu Vor- und Folgetag, wenn i am Tag ti von–bis arbeitet
+  const ruheOk = (i, ti, von, bis) => {
+    const noetig = (minderj(i) ? 12 : 11) * 60;
+    const vortag = ti > 0 ? plan.tage[ti-1].schichten.filter(x => x.mi === i) : [];
+    const folgetag = ti < plan.tage.length-1 ? plan.tage[ti+1].schichten.filter(x => x.mi === i) : [];
+    if (vortag.some(x => (24*60 - x.bis + von) < noetig - 0.5)) return false;
+    if (folgetag.some(x => (24*60 - bis + x.von) < noetig - 0.5)) return false;
+    return true;
+  };
   // Darf i die Schicht sch am Tag ti übernehmen?
   const uebernehmbar = (i, ti, sch) => {
     const tag = TAGE[ti][0];
+    if (fest(sch)) return false;
     if (!kannRollen(i, sch.rollen)) return false;
     if (!darf(i, tag, sch.von, sch.bis)) return false;
     if (minderj(i) && sch.bis > 20*60) return false;
@@ -2094,13 +2383,7 @@ function ausgleichen(plan){
     if (tage >= (minderj(i) ? 5 : 6)) return false;
     const anw = (sch.bis - sch.von)/60;
     if (anw - pauseFuer(ms[i], anw) > MAXARBEIT + 0.01) return false;
-    // Ruhezeit zu den Nachbartagen
-    const noetig = (minderj(i) ? 12 : 11) * 60;
-    const vortag = ti > 0 ? plan.tage[ti-1].schichten.filter(x => x.mi === i) : [];
-    const folgetag = ti < plan.tage.length-1 ? plan.tage[ti+1].schichten.filter(x => x.mi === i) : [];
-    if (vortag.some(x => (24*60 - x.bis + sch.von) < noetig - 0.5)) return false;
-    if (folgetag.some(x => (24*60 - sch.bis + x.von) < noetig - 0.5)) return false;
-    return true;
+    return ruheOk(i, ti, sch.von, sch.bis);
   };
 
   // Pause und Arbeitszeit einer Schicht neu rechnen, nachdem sie die Person gewechselt hat
@@ -2128,12 +2411,15 @@ function ausgleichen(plan){
                          pauseVon:sch.pauseVon, pauseBis:sch.pauseBis};
       const zurueck = () => Object.assign(sch, sicherung);
 
+      if (fest(sch)) return;
+      const lueckenVorher = tagesMaengel(plan, ti);
+
       // a) Schicht ganz abgeben
       ms.forEach((m, i) => {
         if (i === a || !hat(istAzubi(m) ? m.betrieb : m.vertrag)) return;
         if (!uebernehmbar(i, ti, sch)) return;
         probe(sch, i);
-        const g = guete(plan);
+        const g = tagesMaengel(plan, ti) > lueckenVorher ? Infinity : guete(plan);
         zurueck();
         if (g < bestG - 0.001){ bestG = g; bestZug = {art:"geben", ti, si, i}; }
       });
@@ -2143,15 +2429,23 @@ function ausgleichen(plan){
       t.schichten.forEach((zwei, sj) => {
         if (sj <= si) return;
         const b = zwei.mi;
-        if (b === a) return;
+        if (b === a || fest(zwei)) return;
         if (!kannRollen(b, sch.rollen) || !kannRollen(a, zwei.rollen)) return;
+        if (!ruheOk(b, ti, sch.von, sch.bis) || !ruheOk(a, ti, zwei.von, zwei.bis)) return;
+        // wer geteilt arbeitet, hat am selben Tag noch eine Schicht — dann nicht tauschen
+        if (t.schichten.filter(x => x.mi === a).length > 1 || t.schichten.filter(x => x.mi === b).length > 1) return;
+        {
+          const anwB = (sch.bis - sch.von)/60, anwA = (zwei.bis - zwei.von)/60;
+          if (anwB - pauseFuer(ms[b], anwB) > MAXARBEIT + 0.01) return;
+          if (anwA - pauseFuer(ms[a], anwA) > MAXARBEIT + 0.01) return;
+        }
         if (!darf(b, TAGE[ti][0], sch.von, sch.bis) || !darf(a, TAGE[ti][0], zwei.von, zwei.bis)) return;
         if (minderj(b) && sch.bis > 20*60) return;
         if (minderj(a) && zwei.bis > 20*60) return;
         const sich2 = {mi:zwei.mi, pause:zwei.pause, arbeit:zwei.arbeit,
                        pauseVon:zwei.pauseVon, pauseBis:zwei.pauseBis};
         probe(sch, b); probe(zwei, a);
-        const g = guete(plan);
+        const g = tagesMaengel(plan, ti) > lueckenVorher ? Infinity : guete(plan);
         zurueck(); Object.assign(zwei, sich2);
         if (g < bestG - 0.001){ bestG = g; bestZug = {art:"tausch", ti, si, sj}; }
       });
@@ -2188,13 +2482,19 @@ function nachrechnen(plan){
       plan.meldungen.push({art:"bad", text:`${m.name} ist Minijob mit ${h1(soll)} h und hier mit ${h1(ist)} h eingeplant — das sprengt auf den Monat gerechnet die 603-€-Grenze.`});
   });
   if (mehr >= 3){
+    // Ehrlich unterscheiden: Verlangen schon die Regeln mehr Stunden, als die
+    // Verträge hergeben (dann fehlt Personal), oder plant der Plan mehr als nötig?
     const vertraglich = ms.reduce((x,m) => x + (hat(istAzubi(m) ? m.betrieb : m.vertrag) ? zielStunden(m) : 0), 0);
     const geplant = plan.konto.reduce((x,k) => x + k.ist, 0);
-    plan.meldungen.unshift({art:"bad", text:`${mehr} Personen liegen über ihren Vertragsstunden. `
-      + `Die Woche braucht ${h1(geplant)} h, die Verträge geben ${h1(vertraglich)} h her — `
-      + `${h1(geplant - vertraglich)} h mehr, als vorhanden sind. Gleichmäßiger lässt sich das `
-      + `nicht verteilen: Ruhezeiten, Tageshöchstzeiten und die festen Standardwochen setzen die Grenze. `
-      + `Das ist keine Frage der Planung, sondern der Besetzung.`});
+    const mindest = auswertung().bedarf;
+    const text = mindest !== null && mindest > vertraglich
+      ? `${mehr} Personen liegen über ihren Vertragsstunden. Schon der Mindestbedarf der Woche liegt bei `
+        + `${h1(mindest)} h, die Verträge geben ${h1(vertraglich)} h her — es fehlen rund `
+        + `${h1(mindest - vertraglich)} h Personal. Geplant sind ${h1(geplant)} h; der Unterschied zum `
+        + `Mindestbedarf entsteht, weil Schichten nicht beliebig kurz und nicht beliebig zerstückelt sein können.`
+      : `${mehr} Personen liegen über ihren Vertragsstunden: geplant ${h1(geplant)} h bei `
+        + `${h1(vertraglich)} h laut Vertrag${mindest !== null ? " und einem Mindestbedarf von " + h1(mindest) + " h" : ""}.`;
+    plan.meldungen.unshift({art:"bad", text});
   }
 
   // Gegen die Stundenliste der Woche halten, wenn es eine gibt
@@ -2239,7 +2539,12 @@ function planSummen(plan){
 const ABW = [["","verfügbar"],["nicht","kann nicht"],["krank","krank"],["urlaub","Urlaub"],
              ["schule","Berufsschule"],["nur","nur von–bis"],["ohne","nicht von–bis"]];
 
-function wochenSchluessel(d){ return d.getFullYear() + "-KW" + String(kwVon(d)).padStart(2,"0"); }
+// Jahr der Kalenderwoche ist das Jahr ihres Donnerstags — sonst hieße der
+// 30.12.2030 (KW 1 von 2031) „2030-KW01" und kollidierte mit dem Januar 2030
+function wochenSchluessel(d){
+  const do_ = new Date(d); do_.setDate(d.getDate() - ((d.getDay() + 6) % 7) + 3);
+  return do_.getFullYear() + "-KW" + String(kwVon(d)).padStart(2,"0");
+}
 
 // Welche Woche gehört heute nach oben? Ab Sonntag die kommende.
 function aktuellerMontag(){
@@ -2279,8 +2584,41 @@ function planLaden(kurz){
     mo: new Date(kurz.mo + "T12:00:00"),
     meldungen: kurz.meldungen || [],
     konto: kurz.konto || [],
+    // ohne diese drei gingen Notizen, Handänderungen und Buchung beim Laden verloren
+    notizen: kurz.notizen || {},
+    geaendertVonHand: !!kurz.geaendertVonHand,
+    gebucht: kurz.gebucht || null,
     tage: (kurz.tage || []).map(tg => Object.assign({}, tg, {datum: new Date(tg.datum + "T12:00:00")}))
   };
+}
+
+/* ---- Stundenkonto ----------------------------------------------------------
+   Ist minus Vertrag wandert ins Konto jedes Mitarbeiters. Das ging beim Umbau am
+   06.11.2026 verloren — seitdem blieben Über- und Minusstunden stehen, und die
+   Planung glich nichts mehr aus. Jede Woche lässt sich genau einmal buchen und
+   wieder zurücknehmen; gemerkt wird, wer wie viel bekommen hat. */
+function wocheBuchen(sl){
+  const kurz = state.plaene[sl];
+  if (!kurz || kurz.gebucht) return;
+  const plan = planLaden(kurz);
+  const buchungen = {};
+  state.mitarbeiter.forEach((m, i) => {
+    if (!hat(istAzubi(m) ? m.betrieb : m.vertrag)) return;
+    const d = Math.round((istStunden(plan, i) - stunden(m)) * 4) / 4;   // auf Viertelstunden
+    if (Math.abs(d) < 0.01) return;
+    m.saldo = Math.round((saldoVon(m) + d) * 4) / 4;
+    buchungen[m.name] = d;
+  });
+  kurz.gebucht = {am: new Date().toISOString(), buchungen};
+}
+function buchungZuruecknehmen(sl){
+  const kurz = state.plaene[sl];
+  if (!kurz || !kurz.gebucht) return;
+  Object.entries(kurz.gebucht.buchungen || {}).forEach(([name, d]) => {
+    const m = state.mitarbeiter.find(x => x.name === name);
+    if (m) m.saldo = Math.round((saldoVon(m) - d) * 4) / 4;
+  });
+  delete kurz.gebucht;
 }
 
 /* ---- Der Plan im Raster des Filialformulars ---- */
@@ -2289,7 +2627,7 @@ function planTabelle(plan, bearbeitbar){
   const sl = wochenSchluessel(plan.mo);
   const bb = bearbeitbar ? ' contenteditable="plaintext-only" spellcheck="false"' : "";
 
-  const kopf = `<tr><th class="ecke">Lieferung</th><th class="stdkopf">Std.</th>${
+  const kopf = `<tr><th class="ecke">Lieferung</th><th class="stdkopf">Std.<br><span class="klein">Monat</span></th>${
     r.datum.map(d => `<th colspan="2" class="tagkopf">${esc(d)}</th>`).join("")
   }<th>Stunden<br><span class="klein">Pause</span></th><th>Kontrolle<br><span class="klein">Bereichsleiter</span></th></tr>`;
 
@@ -2356,35 +2694,89 @@ function planTabelle(plan, bearbeitbar){
 function uebernimmZeit(sl, td, wrap){
   const kurz = state.plaene[sl];
   if (!kurz) return;
+  if (kurz.gebucht){
+    alert("Diese Woche ist schon ins Stundenkonto gebucht. Erst die Buchung zurücknehmen, dann ändern.");
+    render(); return;
+  }
   const ti = +td.dataset.ti, mi = +td.dataset.mi, feld = td.dataset.f;
   const tag = kurz.tage[ti];
-  const sch = tag.schichten.filter(x => x.mi === mi).sort((a,b) => a.von - b.von)[0];
-  if (!sch) return;
+  const eigene = tag.schichten.filter(x => x.mi === mi).sort((a,b) => a.von - b.von);
+  if (!eigene.length) return;
+  // Bei geteilter Schicht steht in der unteren Zeile die zweite Schicht, keine Pause
+  const geteilt = eigene.length > 1;
+  const sch = (geteilt && (feld === "pVon" || feld === "pBis")) ? eigene[1] : eigene[0];
+  const zeitFeld = geteilt && feld === "pVon" ? "von" : geteilt && feld === "pBis" ? "bis" : feld;
 
   const text = td.textContent.trim();
   const neu = text === "" ? null : zeitAusText(text);
   if (text !== "" && neu === null){ td.classList.add("fehlerhaft"); return; }
   td.classList.remove("fehlerhaft");
+  const m = state.mitarbeiter[mi];
 
-  if (feld === "von" || feld === "bis"){
+  if (zeitFeld === "von" || zeitFeld === "bis"){
     if (neu === null) return;
-    sch[feld] = neu;
+    sch[zeitFeld] = neu;
     if (sch.bis <= sch.von) sch.bis = sch.von + 60;
+    // Die Pause richtet sich nach der neuen Länge — so, wie das Gesetz es verlangt
+    const pz = pauseFuer(m, (sch.bis - sch.von)/60);
+    if (pz === 0){ sch.pauseVon = null; sch.pauseBis = null; }
+    else {
+      const laenge = pz * 60;
+      let pv = sch.pauseVon;
+      if (pv === null || pv < sch.von + 30 || pv + laenge > sch.bis - 30)
+        pv = Math.round((sch.von + (sch.bis - sch.von)/2 - laenge/2) / 15) * 15;
+      sch.pauseVon = pv; sch.pauseBis = pv + laenge;
+    }
   } else {
-    // Pausenzeiten
+    // Pausenzeit von Hand
     if (neu === null){ sch.pauseVon = null; sch.pauseBis = null; }
-    else sch[feld === "pVon" ? "pauseVon" : "pauseBis"] = neu;
+    else {
+      sch[zeitFeld === "pVon" ? "pauseVon" : "pauseBis"] = neu;
+      if (sch.pauseVon !== null && sch.pauseBis === null) sch.pauseBis = sch.pauseVon + 30;
+      if (sch.pauseBis !== null && sch.pauseVon === null) sch.pauseVon = sch.pauseBis - 30;
+    }
   }
-  // Arbeitszeit neu rechnen
   const anw = (sch.bis - sch.von)/60;
   const pz = (sch.pauseVon === null || sch.pauseBis === null) ? 0
            : Math.max(0, (sch.pauseBis - sch.pauseVon)/60);
   sch.pause = pz; sch.arbeit = Math.max(0, anw - pz);
   kurz.geaendertVonHand = true;
   speichere();
-  // Tabelle neu zeichnen, damit die Summen stimmen
-  const frisch = planTabelle(planLaden(kurz), true);
-  wrap.replaceWith(frisch);
+  // Ganze Startseite neu zeichnen — Summen, Hinweise und Prüfung stimmen dann —
+  // ohne dass die Seite nach oben springt
+  const y = window.scrollY;
+  render();
+  window.scrollTo(0, y);
+}
+
+// Was eine Änderung von Hand verletzt — wird unter dem Plan angezeigt, verhindert
+// aber nichts: Am Ende entscheidet die Filialleitung.
+function handPruefung(plan){
+  const ms = state.mitarbeiter, raus = [];
+  plan.tage.forEach((t, ti) => {
+    if (t.feiertag) return;
+    t.schichten.forEach(s => {
+      const m = ms[s.mi]; if (!m) return;
+      const a = alter(m.geb), minder = a !== null && a < 18;
+      const anw = (s.bis - s.von)/60;
+      if (s.arbeit > (minder ? 8 : 10) + 0.01)
+        raus.push(`${t.label}: ${m.name} arbeitet ${h1(s.arbeit)} h — mehr als das Gesetz zulässt.`);
+      else if (s.arbeit > 8.01)
+        raus.push(`${t.label}: ${m.name} arbeitet ${h1(s.arbeit)} h — über 8 h nur mit Ausgleich.`);
+      if (s.pause + 0.01 < pauseFuer(m, anw))
+        raus.push(`${t.label}: ${m.name} hat ${h1(s.pause*60/60)} h Pause, nötig sind ${h1(pauseFuer(m, anw))} h.`);
+      if (minder && s.bis > 20*60)
+        raus.push(`${t.label}: ${m.name} ist unter 18 und arbeitet bis ${hhmm(s.bis)} Uhr.`);
+      if (ti > 0) plan.tage[ti-1].schichten.filter(x => x.mi === s.mi).forEach(x => {
+        const ruhe = (24*60 - x.bis + s.von)/60;
+        if (ruhe < (minder ? 12 : 11) - 0.01)
+          raus.push(`${t.label}: ${m.name} hat nur ${h1(ruhe)} h Ruhezeit seit dem Vortag.`);
+      });
+    });
+    const luecken = tagesMaengel(plan, ti);
+    if (luecken) raus.push(`${t.label}: ${luecken} halbe Stunde(n) nicht richtig besetzt.`);
+  });
+  return raus;
 }
 
 // „6:30", „0630", „6.30", „6" → Minuten seit Mitternacht; sonst null
@@ -2448,10 +2840,19 @@ function startseite(){
   const inhalt = p.querySelector("#planInhalt");
   const knoepfe = p.querySelector("#planKnoepfe");
   if (plan){
-    inhalt.appendChild(planTabelle(plan, true));
-    inhalt.appendChild(el(`<p class="hint" style="margin-top:8px">Arbeitszeiten, Pausen und die
-      Zeile unter den Lieferungen lassen sich hier direkt überschreiben — einfach hineinklicken.
-      Die Stundensummen rechnen sich mit.</p>`));
+    inhalt.appendChild(planTabelle(plan, !gespeichert.gebucht));
+    inhalt.appendChild(el(`<p class="hint" style="margin-top:8px">${gespeichert.gebucht
+      ? "Diese Woche ist ins Stundenkonto gebucht — zum Ändern erst die Buchung zurücknehmen."
+      : "Arbeitszeiten, Pausen und die Zeile unter den Lieferungen lassen sich hier direkt überschreiben — einfach hineinklicken. Die Stundensummen rechnen sich mit."}</p>`));
+    // Nach Änderungen von Hand: sofort sagen, was dabei verletzt wurde
+    if (gespeichert.geaendertVonHand){
+      const probleme = handPruefung(plan);
+      inhalt.appendChild(probleme.length
+        ? el(`<div class="note bad" style="margin-top:10px"><span class="ic">§</span><span>
+            <b>Nach den Änderungen von Hand:</b><br>${probleme.map(esc).join("<br>")}</span></div>`)
+        : el(`<div class="note ok" style="margin-top:10px"><span class="ic">✓</span>
+            <span>Die Änderungen von Hand halten Gesetz und Besetzung ein.</span></div>`));
+    }
     const s = planSummen(plan);
     inhalt.appendChild(el(`<p class="hint" style="margin-top:10px">${h1(s.bezahlt)} Stunden gesamt,
       davon ${h1(s.wirk)} leistungswirksam${gespeichert.erstellt ?
@@ -2471,6 +2872,25 @@ function startseite(){
     const neu = el(`<button class="btn ghost small">neu erstellen</button>`);
     neu.onclick = () => { planWoche = isoVon(mo); ansicht = "planen"; render(); };
     knoepfe.appendChild(pdf); knoepfe.appendChild(xls); knoepfe.appendChild(neu);
+
+    // Stundenkonto: sobald die Woche begonnen hat, lassen sich die Stunden buchen
+    if (mo <= new Date()){
+      const konto = el(`<button class="btn ghost small">${gespeichert.gebucht
+        ? "Buchung zurücknehmen" : "ins Stundenkonto buchen"}</button>`);
+      konto.title = gespeichert.gebucht
+        ? "gebucht am " + new Date(gespeichert.gebucht.am).toLocaleDateString("de-DE")
+        : "Überstunden und Minusstunden dieser Woche bei jedem Mitarbeiter verbuchen";
+      konto.onclick = async () => {
+        if (gespeichert.gebucht) buchungZuruecknehmen(sl);
+        else {
+          if (!confirm(`Die Stunden von KW ${kw} so verbuchen, wie sie im Plan stehen — `
+            + `inklusive der Änderungen von Hand? Danach ist der Plan gesperrt, bis die Buchung zurückgenommen wird.`)) return;
+          wocheBuchen(sl);
+        }
+        await speichere(); render();
+      };
+      knoepfe.appendChild(konto);
+    }
   } else {
     inhalt.appendChild(el(`<p class="empty">Für diese Woche gibt es noch keinen Plan.<br>
       <span class="hint">Oben rechts auf „Plan erstellen“ — Abwesenheiten lassen sich dabei eintragen.</span></p>`));
@@ -2587,6 +3007,14 @@ function planenAnsicht(){
   p.querySelector("#zurueck").onclick = () => { ansicht = "start"; render(); };
   p.querySelector("#erzeugen").onclick = async () => {
     if (!state.mitarbeiter.length){ alert("Ohne Personal lässt sich kein Plan erzeugen."); return; }
+    const da = state.plaene[sl];
+    if (da && da.gebucht){
+      alert(`KW ${kwVon(mo)} ist schon ins Stundenkonto gebucht. Erst auf der Startseite die Buchung zurücknehmen.`);
+      return;
+    }
+    if (da && !confirm(da.geaendertVonHand || da.notizen
+        ? `Für KW ${kwVon(mo)} gibt es schon einen Plan mit Änderungen von Hand. Neu erzeugen und die Änderungen verwerfen?`
+        : `Für KW ${kwVon(mo)} gibt es schon einen Plan. Neu erzeugen?`)) return;
     planEntwurf = erzeugePlan(isoVon(mo));
     planSpeichern(planEntwurf);
     await speichere();
@@ -2715,13 +3143,23 @@ function archivFaellig(){
   return {bald, weg};
 }
 
-// Aufräumen passiert erst, nachdem einmal gewarnt wurde
+// Gelöscht wird nur, worauf vorher einzeln hingewiesen wurde. Wer die App zwei
+// Wochen nicht öffnet, verliert also nichts ungesehen.
 function archivAufraeumen(){
+  const gewarnt = state.archivGewarnt || {};
   const {weg} = archivFaellig();
-  if (!weg.length || !state.archivGewarnt) return 0;
-  weg.forEach(x => { if (x.art === "plan") delete state.plaene[x.sl]; else delete state.listen[x.sl]; });
-  speichere();
-  return weg.length;
+  const loeschen = weg.filter(x => gewarnt[x.art + ":" + x.sl]);
+  loeschen.forEach(x => {
+    if (x.art === "plan") delete state.plaene[x.sl]; else delete state.listen[x.sl];
+    delete gewarnt[x.art + ":" + x.sl];
+  });
+  // Abwesenheiten (darunter Krankheitstage) nicht länger aufheben als den Plan
+  const jetzt = aktuellerMontag();
+  Object.keys(state.abwesend || {}).forEach(sl => {
+    if ((jetzt - montagAusSchluessel(sl)) / (7*864e5) > ARCHIV_WOCHEN) delete state.abwesend[sl];
+  });
+  if (loeschen.length) speichere();
+  return loeschen.length;
 }
 
 // Der Hinweis, der auf der Startseite steht, solange etwas abzulaufen droht
@@ -2729,20 +3167,21 @@ function archivHinweis(){
   const {bald, weg} = archivFaellig();
   if (!bald.length && !weg.length) return null;
   const box = el(`<div class="note warn" style="margin-bottom:14px"><span class="ic">!</span>
-    <span><b>Das Archiv wird aufgeräumt.</b> ${weg.length
-      ? `${weg.length} ${weg.length === 1 ? "Eintrag ist" : "Einträge sind"} älter als ${ARCHIV_WOCHEN} Wochen und
-         ${weg.length === 1 ? "wird" : "werden"} beim nächsten Öffnen gelöscht.`
-      : `${bald.length} ${bald.length === 1 ? "Eintrag" : "Einträge"} werden in
-         ${Math.min(...bald.map(x => x.wochen))} Woche(n) gelöscht.`}
-    Wer sie behalten will, sichert sie vorher.
+    <span><b>Das Archiv wird aufgeräumt.</b>
+    ${weg.length ? `Älter als ${ARCHIV_WOCHEN} Wochen: ${[...new Set(weg.map(x => "KW " + x.sl.slice(-2)))].join(", ")}
+       — wird gelöscht, sobald du „verstanden" tippst. ` : ""}
+    ${bald.length ? `Demnächst fällig: ${[...new Set(bald.map(x => "KW " + x.sl.slice(-2)))].join(", ")}
+       — in ${Math.min(...bald.map(x => x.wochen))} Woche(n). ` : ""}
+    Was du behalten willst, sicherst du vorher.
     <span class="knopfreihe"></span></span></div>`);
   const reihe = box.querySelector(".knopfreihe");
   const sichern = el(`<button class="btn ghost small">Archiv sichern</button>`);
   sichern.onclick = () => archivSichern();
   const ok = el(`<button class="btn ghost small">verstanden</button>`);
   ok.onclick = async () => {
-    state.archivGewarnt = true;
-    const n = archivAufraeumen();
+    state.archivGewarnt = state.archivGewarnt || {};
+    bald.concat(weg).forEach(x => state.archivGewarnt[x.art + ":" + x.sl] = true);
+    archivAufraeumen();
     await speichere();
     render();
   };
@@ -2856,7 +3295,7 @@ function planRaster(plan){
     const kurz = w.kurz || w.name;
     const zeit = a.jeTag ? "je Tag"
                : a.zeitArt === "fest" && hatZeit(a.zeit) ? a.zeit + " Uhr"
-               : a.zeitArt === "spanne" && hatZeit(a.fVon) ? a.fVon + "–" + (a.fBis || "") + " h"
+               : a.zeitArt === "spanne" && hatZeit(a.fVon) ? a.fVon + "–" + (a.fBis || "")
                : "";
     return {name:kurz, zeit, tage: plan.tage.map(t => {
       if (t.feiertag || !a.tage.includes(t.key)) return "";
@@ -2885,7 +3324,8 @@ function planRaster(plan){
     });
     const soll = hat(istAzubi(m) ? m.betrieb : m.vertrag) ? stunden(m) : null;
     const titel = m.name + "   " + (istAzubi(m) ? `Azubi ${m.lehrjahr}. Jahr` : m.typ);
-    return {titel, std: soll === null ? "" : h1(soll), arbeit, pause, wo, wopause, leistung: wo * faktor(m)};
+    // Monatsstunden laut Vertrag: Wochenstunden × 13 ÷ 3 (der übliche Faktor 4,33)
+    return {titel, std: soll === null ? "" : h1(soll * 13 / 3), arbeit, pause, wo, wopause, leistung: wo * faktor(m)};
   });
 
   return {
@@ -2914,7 +3354,7 @@ async function planExcel(plan){
   const TAGSPALTEN = [[4,5],[6,7],[8,9],[10,11],[12,13],[14,15]];
   const O = 16, P = 17;
 
-  ws.getColumn(1).width = 30; ws.getColumn(STD).width = 7; ws.getColumn(LABEL).width = 12.5;
+  ws.getColumn(1).width = 30; ws.getColumn(STD).width = 8; ws.getColumn(LABEL).width = 12.5;
   TAGSPALTEN.flat().forEach(c => ws.getColumn(c).width = 8.5);
   ws.getColumn(O).width = 8.5; ws.getColumn(P).width = 11;
 
@@ -2936,7 +3376,7 @@ async function planExcel(plan){
   // Zeile 4: Tagesköpfe
   const kopf = ws.getRow(4); kopf.height = 28;
   ws.getCell("A4").value = "Lieferung";
-  ws.getCell(4, STD).value = "Std.";
+  ws.getCell(4, STD).value = "Std.\nMonat";
   TAGSPALTEN.forEach(([a,b], i) => {
     ws.mergeCells(4, a, 4, b);
     ws.getCell(4, a).value = r.datum[i];
@@ -3048,7 +3488,7 @@ async function planPDF(plan){
   doc.text(`Jahr: ${r.jahr}`, 90, 16.5);
 
   const head = [[{content:"Lieferung", styles:{halign:"center"}},
-    {content:"Std.", styles:{halign:"center"}}, "",
+    {content:"Std.\nMonat", styles:{halign:"center"}}, "",
     ...r.datum.map(d => ({content:d, colSpan:2, styles:{halign:"center"}})),
     {content:"Stunden\nPause", styles:{halign:"center"}},
     {content:"Kontrolle\nBereichsleiter", styles:{halign:"center"}}]];
@@ -3076,7 +3516,7 @@ async function planPDF(plan){
     {content:h1(r.summeLeistung), styles:{halign:"center", fontStyle:"bold"}}]);
 
   const breiteTag = 14.6;
-  const spalten = {0:{cellWidth:42}, 1:{cellWidth:9}, 2:{cellWidth:18}, 15:{cellWidth:14}, 16:{cellWidth:19}};
+  const spalten = {0:{cellWidth:42}, 1:{cellWidth:10}, 2:{cellWidth:17}, 15:{cellWidth:14}, 16:{cellWidth:19}};
   for (let i = 3; i <= 14; i++) spalten[i] = {cellWidth:breiteTag};
 
   doc.autoTable({startY:19, head, body, theme:"grid",
@@ -3084,19 +3524,11 @@ async function planPDF(plan){
     headStyles:{fillColor:[255,255,255], textColor:[0,0,0], fontStyle:"bold", fontSize:7, lineWidth:0.2},
     columnStyles:spalten, margin:{left:10, right:10}});
 
-  let y = doc.lastAutoTable.finalY + 5;
-  if (plan.meldungen.length){
-    doc.setFont("helvetica","bold"); doc.setFontSize(8); doc.text("Hinweise", 10, y); y += 4;
-    doc.setFont("helvetica","normal"); doc.setFontSize(7);
-    plan.meldungen.slice(0,10).forEach(m => {
-      doc.splitTextToSize((m.art === "bad" ? "! " : "- ") + m.text, 270).forEach(zz => {
-        if (y > 196){ doc.addPage(); y = 15; }
-        doc.text(zz, 10, y); y += 3.3;
-      });
-    });
-  }
+  // Das PDF ist zum Aushängen und Weiterschicken an alle gedacht — die Hinweise
+  // des Planers (Mehrstunden einzelner, Minijob-Grenze, Ausfälle) gehören nicht
+  // hinein. Sie stehen in der App und in der Excel-Datei.
   doc.setFontSize(6.5); doc.setTextColor(120);
-  doc.text(`Entwurf, erzeugt am ${new Date().toLocaleDateString("de-DE")} — vor dem Aushang prüfen.`, 10, 202);
+  doc.text(`Stand ${new Date().toLocaleDateString("de-DE")} · N ${state.nr}`, 10, 202);
 
   await anbieten(doc.output("blob"), `Arbeitsplan_N${state.nr}_KW${r.kw}.pdf`);
 }
@@ -3162,7 +3594,7 @@ function beispiel(){
 /* ---------------- Start ---------------- */
 document.getElementById("abmelden").onclick = () => {
   state = leer(); ansicht = "anmeldung"; schritt = 0; maxSchritt = 0; fehler = "";
-  planEntwurf = null; render();
+  planEntwurf = null; planWoche = null; zeigeWoche = null; listenWoche = null; render();
 };
 
 /* Nachgeladene Oberfläche: Fassung anzeigen und auf Neuladungen reagieren */
