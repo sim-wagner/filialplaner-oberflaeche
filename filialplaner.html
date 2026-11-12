@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-12-4">
+<meta name="fassung" content="2026-11-12-5">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -273,6 +273,8 @@ table.plan td.stunden{background:var(--surface-2)}
 input.kurzzahl{width:70px;padding:4px 6px;font:inherit;text-align:right}
 .tag.phase{background:var(--warn-soft, #FFF4E5);border-color:var(--warn);color:var(--warn);vertical-align:middle}
 .kachelknoepfe{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.linkbox{margin-top:10px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.linkbox textarea{width:100%;font-size:.78rem;resize:none}
 .termin-wege{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch}
 @media(max-width:700px){.termin-wege{grid-template-columns:1fr}}
 .termin-wege .ablage{justify-content:center;min-height:150px}
@@ -3523,12 +3525,25 @@ function planenAnsicht(){
       ? `<button class="btn ghost small" id="termineLink">Link für Mitarbeiter</button>` : ""}</div></div>`));
   tk.querySelector("#termineEin").onclick = () => { ansicht = "termine"; render(); };
   tk.querySelector("#termineVorlage").onclick = () => terminVorlage();
+  // Den Link zeigen statt nur zu kopieren: In der App klappt die Zwischenablage nicht
+  // überall, und so sieht man, was man weitergibt.
   const tl = tk.querySelector("#termineLink");
-  if (tl) tl.onclick = async () => {
+  if (tl) tl.onclick = () => {
+    const alt = tk.querySelector(".linkbox");
+    if (alt){ alt.remove(); return; }
     const text = `Bitte trag deine Termine (Urlaub, freie Tage, Berufsschule) hier ein und schick sie mir: ${TERMIN_SEITE}`;
-    if (inApp){ await appRuf("teilen", {name:"Termine-melden.txt", inhalt: btoa(unescape(encodeURIComponent(text)))}); return; }
-    try { await navigator.clipboard.writeText(TERMIN_SEITE); alert("Link kopiert:\n" + TERMIN_SEITE); }
-    catch(e){ prompt("Link zum Weitergeben:", TERMIN_SEITE); }
+    const box = el(`<div class="linkbox"><textarea readonly rows="4">${esc(text)}</textarea>
+      <button class="btn small">Kopieren</button><span class="hint"></span></div>`);
+    const feld = box.querySelector("textarea");
+    feld.onfocus = () => feld.select();
+    box.querySelector("button").onclick = async () => {
+      feld.focus(); feld.select();
+      let ok = false;
+      try { await navigator.clipboard.writeText(text); ok = true; } catch(e){ try { ok = document.execCommand("copy"); } catch(e2){} }
+      box.querySelector(".hint").textContent = ok ? " Kopiert — jetzt in die WhatsApp-Gruppe einfügen."
+                                                  : " Der Text ist markiert — bitte kopieren (⌘C bzw. lange drücken).";
+    };
+    tk.appendChild(box);
   };
 
   const tb = p.querySelector("#abwBody");
@@ -3682,7 +3697,7 @@ function wochenAuswahl(gewaehlt){
 
 // Die Seite, auf der Mitarbeiter ihre Termine melden. Erst sichtbar, wenn sie online steht.
 const TERMIN_SEITE = "https://sim-wagner.github.io/filialplaner-oberflaeche/termine.html";
-const TERMIN_SEITE_ONLINE = false;
+const TERMIN_SEITE_ONLINE = true;
 const TERMIN_ARTEN = [
   ["nicht",  "kann nicht"],
   ["urlaub", "Urlaub"],
