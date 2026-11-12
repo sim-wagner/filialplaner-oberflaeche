@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-12-5">
+<meta name="fassung" content="2026-11-12-6">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -273,6 +273,13 @@ table.plan td.stunden{background:var(--surface-2)}
 input.kurzzahl{width:70px;padding:4px 6px;font:inherit;text-align:right}
 .tag.phase{background:var(--warn-soft, #FFF4E5);border-color:var(--warn);color:var(--warn);vertical-align:middle}
 .kachelknoepfe{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.onlinekarte{margin-bottom:6px}
+.onlinekopf{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.codefeld{text-align:right}
+.codefeld b{display:block;font-family:var(--mono);font-size:1.5rem;letter-spacing:.12em;color:var(--blau-800)}
+details.anderewege{margin-top:18px}
+details.anderewege summary{cursor:pointer;font-weight:700;color:var(--blau-900);margin-bottom:12px}
+.warnzeile{color:var(--warn);font-weight:700}
 .linkbox{margin-top:10px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 .linkbox textarea{width:100%;font-size:.78rem;resize:none}
 .termin-wege{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch}
@@ -554,6 +561,9 @@ async function ladeFiliale(nr){
 }
 async function speichere(){
   if (!state.nr) return;
+  // Ändert sich das Personal, erfährt es der Server — sonst könnte sich jemand Neues
+  // nicht anmelden, und wer gegangen ist, weiterhin abgeben
+  if (ONLINE_BEREIT && state.online) onlinePersonal().catch(() => {});
   const id = key(state.nr);
   const body = JSON.parse(JSON.stringify(state));
   body.geaendert = new Date().toISOString();
@@ -3511,40 +3521,33 @@ function planenAnsicht(){
       ? "Der Plan wird dagegen gehalten."
       : "Ohne Vorgabe entsteht der Plan genauso — nur ohne Vergleich."}</p></div>`));
 
-  // Terminliste: Termine der Mitarbeiter einlesen statt abtippen
+  // Zeiten der Mitarbeiter: online abgegeben oder als Liste eingelesen statt abgetippt
   const tk = p.querySelector("#terminKachel");
   const eingetragen = Object.values(abw).reduce((x, t) => x + Object.keys(t || {}).length, 0);
-  const imp = state.terminImport;
-  tk.appendChild(el(`<div><span class="eyebrow">Terminliste</span>
-    <div style="font-weight:700;margin-top:4px">${eingetragen
-      ? eingetragen + (eingetragen === 1 ? " Termin" : " Termine") + " in dieser Woche" : "noch keine Termine"}</div>
-    <p class="sub" style="margin-top:4px">${imp ? "zuletzt eingelesen am " + new Date(imp.am).toLocaleDateString("de-DE")
-      : "Urlaub und freie Tage einlesen statt abtippen."}</p>
-    <div class="kachelknoepfe"><button class="btn small" id="termineEin">Einlesen</button>
-      <button class="btn ghost small" id="termineVorlage">Vorlage</button>${TERMIN_SEITE_ONLINE
-      ? `<button class="btn ghost small" id="termineLink">Link für Mitarbeiter</button>` : ""}</div></div>`));
+  const online = ONLINE_BEREIT && state.online;
+  tk.appendChild(el(`<div><span class="eyebrow">Zeiten der Mitarbeiter</span>
+    <div style="font-weight:700;margin-top:4px" id="abgKurz">${online ? "Abgaben werden geladen …"
+      : eingetragen ? eingetragen + (eingetragen === 1 ? " Eintrag" : " Einträge") + " in dieser Woche" : "noch nichts eingetragen"}</div>
+    <p class="sub" style="margin-top:4px" id="abgSub">${online ? "" : ONLINE_BEREIT
+      ? "Mitarbeiter können ihre Zeiten selbst abgeben — einmal einrichten." : "Urlaub und freie Tage einlesen statt abtippen."}</p>
+    <div class="kachelknoepfe"><button class="btn small" id="termineEin">${online ? "Abgaben ansehen" : ONLINE_BEREIT ? "Einrichten" : "Einlesen"}</button>
+      ${online ? `<button class="btn ghost small" id="termineLink">Link für Mitarbeiter</button>`
+               : `<button class="btn ghost small" id="termineVorlage">Vorlage</button>`}</div></div>`));
   tk.querySelector("#termineEin").onclick = () => { ansicht = "termine"; render(); };
-  tk.querySelector("#termineVorlage").onclick = () => terminVorlage();
-  // Den Link zeigen statt nur zu kopieren: In der App klappt die Zwischenablage nicht
-  // überall, und so sieht man, was man weitergibt.
+  const tv = tk.querySelector("#termineVorlage");
+  if (tv) tv.onclick = () => terminVorlage();
   const tl = tk.querySelector("#termineLink");
-  if (tl) tl.onclick = () => {
-    const alt = tk.querySelector(".linkbox");
-    if (alt){ alt.remove(); return; }
-    const text = `Bitte trag deine Termine (Urlaub, freie Tage, Berufsschule) hier ein und schick sie mir: ${TERMIN_SEITE}`;
-    const box = el(`<div class="linkbox"><textarea readonly rows="4">${esc(text)}</textarea>
-      <button class="btn small">Kopieren</button><span class="hint"></span></div>`);
-    const feld = box.querySelector("textarea");
-    feld.onfocus = () => feld.select();
-    box.querySelector("button").onclick = async () => {
-      feld.focus(); feld.select();
-      let ok = false;
-      try { await navigator.clipboard.writeText(text); ok = true; } catch(e){ try { ok = document.execCommand("copy"); } catch(e2){} }
-      box.querySelector(".hint").textContent = ok ? " Kopiert — jetzt in die WhatsApp-Gruppe einfügen."
-                                                  : " Der Text ist markiert — bitte kopieren (⌘C bzw. lange drücken).";
-    };
-    tk.appendChild(box);
-  };
+  if (tl) tl.onclick = () => linkKasten(tk);
+  if (online) abgabenHolen(sl).then(antwort => {
+    const echte = antwort.abgaben.filter(a => !a.auto).length, offen = abgabenOffen(antwort).length;
+    tk.querySelector("#abgKurz").textContent = antwort.vorbei
+      ? `Frist vorbei · ${echte} abgegeben` : `${echte} von ${echte + antwort.fehlen.length} abgegeben`;
+    tk.querySelector("#abgSub").textContent = offen
+      ? `${offen} ${offen === 1 ? "Abgabe ist" : "Abgaben sind"} noch nicht übernommen.`
+      : antwort.vorbei ? "Alles übernommen; wer nichts abgegeben hat, ist frei verfügbar."
+      : `Abgabe bis ${fristText(antwort.frist)}.`;
+    if (offen) tk.querySelector("#abgSub").classList.add("warnzeile");
+  }).catch(e => { tk.querySelector("#abgKurz").textContent = "Abgaben nicht erreichbar"; tk.querySelector("#abgSub").textContent = e.message; });
 
   const tb = p.querySelector("#abwBody");
   if (!state.mitarbeiter.length){
@@ -3618,6 +3621,24 @@ function planenAnsicht(){
   p.querySelector("#kw").onchange = e => { planWoche = e.target.value; render(); };
   p.querySelector("#zurueck").onclick = () => { ansicht = "start"; render(); };
   p.querySelector("#erzeugen").onclick = async () => {
+    // Bevor geplant wird: Sind die Abgaben der Mitarbeiter da und übernommen?
+    if (ONLINE_BEREIT && state.online && state.mitarbeiter.length){
+      let antwort = null;
+      try { antwort = await Promise.race([abgabenHolen(sl), new Promise((_, nein) => setTimeout(() => nein(new Error("Zeitüberschreitung")), 8000))]); }
+      catch(e){
+        if (!confirm(`Die Abgaben der Mitarbeiter ließen sich nicht prüfen (${e.message}). Plan trotzdem erstellen?`)) return;
+      }
+      if (antwort){
+        const offen = abgabenOffen(antwort);
+        if (offen.length){
+          if (confirm(`${offen.length} ${offen.length === 1 ? "Abgabe ist" : "Abgaben sind"} noch nicht übernommen (${offen.map(a => a.name).join(", ")}). `
+              + `Jetzt ansehen und übernehmen? (Abbrechen = Plan ohne sie erstellen)`)){ ansicht = "termine"; render(); return; }
+        } else if (!antwort.vorbei && antwort.fehlen.length){
+          if (!confirm(`Die Abgabe läuft noch bis ${fristText(antwort.frist)} — ${antwort.fehlen.length} haben noch nicht abgegeben `
+              + `(${antwort.fehlen.join(", ")}). Plan trotzdem jetzt erstellen?`)) return;
+        }
+      }
+    }
     if (!state.mitarbeiter.length){ alert("Ohne Personal lässt sich kein Plan erzeugen."); return; }
     const da = state.plaene[sl];
     if (ph.art === "sparen" && ph.sparArt === "stunden" && !(nz(ph.stunden) > 0)){
@@ -3695,10 +3716,10 @@ function wochenAuswahl(gewaehlt){
    Kommen die Meldungen später einmal direkt über einen Server, ändert sich nur
    die Quelle — Prüfung und Vorschau bleiben dieselben. */
 
-// Die Seite, auf der Mitarbeiter ihre Termine melden. Erst sichtbar, wenn sie online steht.
+// Die Seite „Meine Zeiten“, auf der die Mitarbeiter ihre Zeiten abgeben
 const TERMIN_SEITE = "https://sim-wagner.github.io/filialplaner-oberflaeche/termine.html";
-const TERMIN_SEITE_ONLINE = true;
 const TERMIN_ARTEN = [
+  ["frei",   "frei verfügbar"],
   ["nicht",  "kann nicht"],
   ["urlaub", "Urlaub"],
   ["krank",  "krank"],
@@ -3840,7 +3861,7 @@ function termineVorbereiten(eintraege){
     return {i:-1, grund: teil.length > 1 ? "Name passt auf mehrere" : "Name nicht im Personal"};
   };
   eintraege.forEach(e => {
-    const basis = {quelle:e.quelle, nameRoh:e.name, art:e.art, zVon:e.zVon, zBis:e.zBis};
+    const basis = {quelle:e.quelle, nameRoh:e.name, art:e.art, zVon:e.zVon, zBis:e.zBis, online:!!e.online};
     const zu = wer(e.name);
     const fehler = t => zeilen.push(Object.assign({}, basis, {status:"fehler", grund:t, datum:e.von, i:zu.i}));
     if (e.filiale && state.nr && key(e.filiale) !== key(state.nr)) return fehler(`gehört zu Filiale ${e.filiale}`);
@@ -3871,6 +3892,18 @@ function terminVergleichen(z){
   const sl = wochenSchluessel(z.datum), tag = TAGE[(z.datum.getDay() + 6) % 7][0];
   const neu = (z.art === "nur" || z.art === "ohne") ? {a:z.art, von:z.zVon, bis:z.zBis} : z.art;
   const alt = (((state.abwesend || {})[sl] || {})[z.i] || {})[tag];
+  // „frei verfügbar“ aus einer Online-Abgabe: einen Tag nur dann leeren, wenn dort
+  // steht, was eine frühere Abgabe hineingeschrieben hat. Was du von Hand eingetragen
+  // hast, wird angezeigt, aber nicht vorausgewählt.
+  if (z.art === "frei"){
+    const plan = !!state.plaene[sl];
+    if (!alt) return Object.assign(z, {sl, tag, neu:null, status:"gleich", grund:"frei verfügbar", plan});
+    const altText = typeof alt === "string" ? terminArtText(alt) : terminArtText(alt.a, alt.von, alt.bis);
+    const vorher = (((state.onlineStand || {})[sl] || {})[z.i] || {})[tag];
+    const vonAbgabe = vorher !== undefined && JSON.stringify(vorher) === JSON.stringify(alt);
+    return Object.assign(z, {sl, tag, neu:null, status:"ersetzt", an: vonAbgabe, plan,
+      grund: vonAbgabe ? `wird wieder frei (vorher „${altText}“)` : `laut Abgabe frei — von Hand steht „${altText}“`});
+  }
   const gleich = alt && JSON.stringify(alt) === JSON.stringify(neu);
   const altText = !alt ? "" : typeof alt === "string" ? terminArtText(alt) : terminArtText(alt.a, alt.von, alt.bis);
   return Object.assign(z, {sl, tag, neu, status: gleich ? "gleich" : alt ? "ersetzt" : "ok",
@@ -3884,7 +3917,13 @@ function termineUebernehmen(zeilen, quelle){
     state.abwesend[z.sl] = state.abwesend[z.sl] || {};
     const w = state.abwesend[z.sl][z.i] = state.abwesend[z.sl][z.i] || {};
     rueck.push({sl:z.sl, i:z.i, name:state.mitarbeiter[z.i].name, tag:z.tag, vorher: w[z.tag] === undefined ? null : w[z.tag]});
-    w[z.tag] = z.neu;
+    if (z.neu === null) delete w[z.tag]; else w[z.tag] = z.neu;
+    if (z.online){
+      // merken, was die Abgabe hineingeschrieben hat — beim nächsten Abholen zählt das
+      state.onlineStand = state.onlineStand || {};
+      const o = ((state.onlineStand[z.sl] = state.onlineStand[z.sl] || {})[z.i] = state.onlineStand[z.sl][z.i] || {});
+      if (z.neu === null) delete o[z.tag]; else o[z.tag] = z.neu;
+    }
   });
   const wochen = [...new Set(zeilen.map(z => z.sl))].sort();
   state.terminImport = {am: new Date().toISOString(), quelle, anzahl: zeilen.length, wochen, rueck};
@@ -3939,15 +3978,122 @@ async function terminVorlage(){
                  `Terminliste_Vorlage_N${state.nr}.xlsx`);
 }
 
+/* ---- Online-Abgabe der Mitarbeiter ----------------------------------------
+   Die Mitarbeiter geben ihre Zeiten auf der Seite „Meine Zeiten“ ab (Filiale,
+   Filial-Code, Name). Die Abgaben liegen auf dem Server, bis die App sie holt.
+   Der Server setzt die Frist durch — Mittwoch 23:59 Uhr vor der Planwoche — und
+   legt danach für jeden, der nichts abgegeben hat, eine leere Abgabe an: frei
+   verfügbar. Die App gleicht dafür die Namen des Personals mit dem Server ab.
+   Abgeholte Abgaben laufen durch dieselbe Vorschau wie jede Terminliste. */
+const ABGABE_SERVER = "https://nduzeascvtjkdknhyzwe.supabase.co";
+const ABGABE_SCHLUESSEL = "sb_publishable_ZSvBat1AEEvtUbpykTCrjw_FSPRl6H1";
+const ONLINE_BEREIT = !ABGABE_SERVER.startsWith("__");
+
+async function abgabeRuf(fn, daten){
+  let r;
+  try {
+    r = await fetch(ABGABE_SERVER + "/rest/v1/rpc/" + fn, {method:"POST",
+      headers:{"Content-Type":"application/json", apikey:ABGABE_SCHLUESSEL},
+      body: JSON.stringify(daten)});
+  } catch(e){ throw new Error("Keine Verbindung zum Server — ist das Gerät online?"); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.message || "Der Server hat nicht geantwortet.");
+  if (j && j.fehler) throw new Error(j.fehler);
+  return j;
+}
+function zufall(laenge, zeichen){
+  const z = new Uint32Array(laenge);
+  crypto.getRandomValues(z);
+  return [...z].map(x => zeichen[x % zeichen.length]).join("");
+}
+async function onlineEinrichten(){
+  const schluessel = zufall(40, "abcdefghijkmnopqrstuvwxyz23456789");
+  const code = zufall(6, "0123456789");
+  await abgabeRuf("termine_filiale", {p_nr: state.nr, p_schluessel: schluessel, p_code: code});
+  state.online = {schluessel, code, seit: new Date().toISOString(), personal: ""};
+  await speichere();
+  await onlinePersonal(true);
+}
+async function onlineCodeAendern(){
+  const code = zufall(6, "0123456789");
+  await abgabeRuf("termine_filiale", {p_nr: state.nr, p_schluessel: state.online.schluessel, p_code: code});
+  state.online.code = code;
+  await speichere();
+}
+// Wer sich anmelden darf: genau das Personal der App. Nur schicken, wenn sich etwas geändert hat.
+async function onlinePersonal(erzwingen){
+  if (!ONLINE_BEREIT || !state.online) return;
+  const namen = state.mitarbeiter.map(m => m.name).filter(Boolean).sort();
+  const stand = JSON.stringify(namen);
+  if (!erzwingen && state.online.personal === stand) return;
+  await abgabeRuf("termine_personal", {p_nr: state.nr, p_schluessel: state.online.schluessel, p_namen: namen});
+  state.online.personal = stand;
+  sichern();
+}
+async function abgabenHolen(sl){
+  await onlinePersonal();
+  return abgabeRuf("termine_abholen", {p_nr: state.nr, p_schluessel: state.online.schluessel, p_woche: sl});
+}
+// Abgaben → Einträge für die Vorschau. Auch „frei verfügbar“ zählt: Hat jemand
+// vorher etwas abgegeben und es zurückgenommen, wird der Tag wieder frei.
+function abgabenAlsEintraege(antwort){
+  const mo = montagAusSchluessel(antwort.woche);
+  const raus = [];
+  antwort.abgaben.forEach(a => TAGE.forEach(([k], ti) => {
+    const v = (a.eintraege || {})[k];
+    const d = new Date(mo); d.setDate(mo.getDate() + ti); d.setHours(12, 0, 0, 0);
+    const art = v ? v.art : "frei";
+    raus.push({quelle: a.auto ? "keine Abgabe = frei verfügbar" : "Online-Abgabe", online: true, name: a.name, filiale: "",
+               von: d, bis: null, art, artText: art, zVon: v && v.von || "", zBis: v && v.bis || "", mitZeit: art === "nur",
+               abgegeben: a.abgegeben, auto: a.auto});
+  }));
+  return raus;
+}
+// Welche Abgaben sind neu oder geändert, seit sie zuletzt übernommen wurden?
+function abgabenOffen(antwort){
+  const gesehen = ((state.onlineImport || {})[antwort.woche]) || {};
+  return antwort.abgaben.filter(a => !a.auto && gesehen[a.name] !== a.abgegeben);
+}
+const fristText = iso => {
+  const d = new Date(new Date(iso).getTime() - 60000);
+  return d.toLocaleDateString("de-DE", {weekday:"long", day:"2-digit", month:"2-digit"}) + ", 23:59 Uhr";
+};
+
+// Den Text für die WhatsApp-Gruppe zeigen statt nur zu kopieren: In der App klappt die
+// Zwischenablage nicht überall, und so sieht man, was man weitergibt.
+function linkKasten(wohin){
+  const alt = wohin.querySelector(".linkbox");
+  if (alt){ alt.remove(); return; }
+  const text = `Bitte tragt bis Mittwoch 23:59 Uhr eure Zeiten für den nächsten Arbeitsplan ein: ${TERMIN_SEITE}`
+    + `\nFiliale: ${state.nr} · Filial-Code: ${state.online.code}`;
+  const box = el(`<div class="linkbox"><textarea readonly rows="4">${esc(text)}</textarea>
+    <button class="btn small">Kopieren</button><span class="hint"></span></div>`);
+  const feld = box.querySelector("textarea");
+  feld.onfocus = () => feld.select();
+  box.querySelector("button").onclick = async () => {
+    feld.focus(); feld.select();
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch(e){ try { ok = document.execCommand("copy"); } catch(e2){} }
+    box.querySelector(".hint").textContent = ok ? " Kopiert — jetzt in die WhatsApp-Gruppe einfügen."
+                                                : " Der Text ist markiert — bitte kopieren (⌘C bzw. lange drücken).";
+  };
+  wohin.appendChild(box);
+}
+
 let terminVorschau = null;     // Zeilen der laufenden Prüfung
 
 function termineAnsicht(){
   const p = el(`<div class="panel">
     <div class="head"><span class="eyebrow">Terminliste</span>
-      <h1 style="margin-top:4px">Termine der Mitarbeiter einlesen</h1>
-      <p class="lede">Hier kommen Urlaub, freie Tage und Zeiten, zu denen jemand nur oder gar nicht
-      kann, in den Plan — ohne Abtippen. Erst siehst du eine Vorschau, übernommen wird nur, was du
+      <h1 style="margin-top:4px">Zeiten der Mitarbeiter</h1>
+      <p class="lede">Hier kommen Urlaub, Krankheit und Zeiten, zu denen jemand nur bestimmt kann,
+      in den Plan — ohne Abtippen. Erst siehst du eine Vorschau, übernommen wird nur, was du
       bestätigst.</p></div>
+    <div id="online"></div>
+    <div id="vorschau"></div>
+    <div id="letzter"></div>
+    <details class="anderewege"${ONLINE_BEREIT && state.online ? "" : " open"}>
+    <summary>${ONLINE_BEREIT && state.online ? "Andere Wege: Excel-Datei oder Nachricht einlesen" : "Excel-Datei oder Nachricht einlesen"}</summary>
     <div class="termin-wege">
       <div class="ablage" id="ablage" tabindex="0" role="button">
         <b>Datei hierher ziehen</b>
@@ -3961,13 +4107,78 @@ function termineAnsicht(){
     </div>
     <input type="file" id="datei" accept=".xlsx,.csv,.txt,text/plain" multiple hidden>
     <p class="err" id="lesefehler"></p>
-    <div id="vorschau"></div>
-    <div id="letzter"></div>
+    </details>
     <div class="actions"><button class="btn ghost" id="zurueck">Zurück zum Plan</button></div>
   </div>`);
 
   const sagen = t => p.querySelector("#lesefehler").textContent = t;
-  const zeigen = (zeilen, quelle) => { terminVorschau = {zeilen, quelle}; vorschau(); };
+  const zeigen = (zeilen, quelle, antwort) => { terminVorschau = {zeilen, quelle, antwort}; vorschau(); };
+
+  // --- Online-Abgabe ---
+  const ob = p.querySelector("#online");
+  async function online(){
+    ob.innerHTML = "";
+    if (!ONLINE_BEREIT) return;
+    if (!state.online){
+      const k = el(`<div class="tile onlinekarte"><span class="eyebrow">Online-Abgabe</span>
+        <h3 style="margin:4px 0 6px">Mitarbeiter geben ihre Zeiten selbst ab</h3>
+        <p class="sub">Jeder meldet sich auf seinem Handy mit Filiale, Filial-Code und Namen an und trägt
+        für jeden Tag ein: frei verfügbar, nur bestimmte Zeiten, krank oder Urlaub. Abgabe bis Mittwoch
+        23:59 Uhr vor der Planwoche; wer nichts abgibt, gilt als frei verfügbar. Die Abgaben siehst du
+        hier, sobald sie abgeschickt sind.</p>
+        <button class="btn small" id="einrichten" style="margin-top:10px">Online-Abgabe einrichten</button>
+        <p class="err" id="onlineFehler"></p></div>`);
+      k.querySelector("#einrichten").onclick = async () => {
+        const b = k.querySelector("#einrichten"); b.disabled = true; b.textContent = "Wird eingerichtet …";
+        try { await onlineEinrichten(); online(); }
+        catch(e){ k.querySelector("#onlineFehler").textContent = e.message; b.disabled = false; b.textContent = "Online-Abgabe einrichten"; }
+      };
+      ob.appendChild(k);
+      return;
+    }
+    const mo = montagDer(planWoche || isoVon(aktuellerMontag()));
+    const sl = wochenSchluessel(mo);
+    const k = el(`<div class="tile onlinekarte">
+      <div class="onlinekopf">
+        <div><span class="eyebrow">Online-Abgabe · KW ${kwVon(mo)}</span>
+          <h3 style="margin:4px 0 0" id="abgStand">wird geladen …</h3>
+          <p class="sub" id="abgFrist"></p></div>
+        <div class="codefeld"><span class="eyebrow">Filial-Code</span><b>${esc(state.online.code)}</b></div>
+      </div>
+      <div id="abgListe"></div>
+      <div class="kachelknoepfe">
+        <button class="btn small" id="abgPruefen" disabled>Abgaben prüfen und übernehmen</button>
+        <button class="btn ghost small" id="abgLink">Link und Code weitergeben</button>
+        <button class="btn ghost small" id="abgCode">Code ändern</button>
+      </div>
+      <p class="err" id="onlineFehler"></p></div>`);
+    ob.appendChild(k);
+    k.querySelector("#abgLink").onclick = () => linkKasten(k);
+    k.querySelector("#abgCode").onclick = async () => {
+      if (!confirm("Neuen Filial-Code erzeugen? Der alte gilt dann nicht mehr — alle Mitarbeiter brauchen den neuen.")) return;
+      try { await onlineCodeAendern(); online(); } catch(e){ k.querySelector("#onlineFehler").textContent = e.message; }
+    };
+    let antwort;
+    try { antwort = await abgabenHolen(sl); }
+    catch(e){ k.querySelector("#abgStand").textContent = "Abgaben nicht erreichbar"; k.querySelector("#onlineFehler").textContent = e.message; return; }
+    const echte = antwort.abgaben.filter(a => !a.auto), auto = antwort.abgaben.filter(a => a.auto);
+    const offen = abgabenOffen(antwort);
+    k.querySelector("#abgStand").textContent = antwort.vorbei
+      ? `Frist vorbei · ${echte.length} abgegeben, ${auto.length} ohne Abgabe (= frei verfügbar)`
+      : `${echte.length} von ${echte.length + antwort.fehlen.length} haben abgegeben`;
+    k.querySelector("#abgFrist").textContent = antwort.vorbei
+      ? `Abgabe war bis ${fristText(antwort.frist)}.`
+      : `Abgabe läuft bis ${fristText(antwort.frist)}. Danach gilt jeder ohne Abgabe als frei verfügbar.`;
+    const liste = k.querySelector("#abgListe");
+    if (!antwort.vorbei && antwort.fehlen.length)
+      liste.appendChild(el(`<p class="sub" style="margin-top:6px">Noch offen: ${antwort.fehlen.map(esc).join(", ")}</p>`));
+    if (offen.length)
+      liste.appendChild(el(`<p class="sub" style="margin-top:6px"><b>${offen.length} ${offen.length === 1 ? "Abgabe ist" : "Abgaben sind"} neu oder geändert</b> und noch nicht übernommen.</p>`));
+    const b = k.querySelector("#abgPruefen");
+    b.disabled = !antwort.abgaben.length;
+    b.onclick = () => zeigen(termineVorbereiten(abgabenAlsEintraege(antwort)), `der Online-Abgabe KW ${kwVon(mo)}`, antwort);
+  }
+  online();
 
   // --- Dateien ---
   const ablage = p.querySelector("#ablage"), feld = p.querySelector("#datei");
@@ -4026,12 +4237,14 @@ function termineAnsicht(){
     const wochen = [...new Set(nutzbar.map(x => x.sl))].sort();
     const mitPlan = wochen.filter(sl => state.plaene[sl]);
     nutzbar.forEach(x => { if (x.an === undefined) x.an = true; });
+    // freie Tage ohne Änderung zählen nicht als „erledigt“ — sonst stünde dort jede Woche eine große Zahl
+    const erledigt = z.filter(x => x.status === "gleich" && x.art !== "frei").length;
 
     const kopf = el(`<div class="note ${fehler.length ? "warn" : "ok"}" style="margin-top:16px"><span class="ic">${fehler.length ? "!" : "✓"}</span>
       <span><b>${nutzbar.length} ${nutzbar.length === 1 ? "Tag" : "Tage"} zum Übernehmen</b>${wochen.length
         ? ` in ${wochen.map(sl => "KW " + sl.slice(-2)).join(", ")}` : ""}${fehler.length
         ? ` · <b>${fehler.length} ${fehler.length === 1 ? "Zeile" : "Zeilen"} mit Problem</b> — ${fehler.length === 1 ? "sie wird" : "sie werden"} nicht übernommen` : ""}${
-        z.length - nutzbar.length - fehler.length ? ` · ${z.length - nutzbar.length - fehler.length} schon erledigt oder übersprungen` : ""}.</span></div>`);
+        erledigt ? ` · ${erledigt} schon erledigt oder übersprungen` : ""}.</span></div>`);
     box.appendChild(kopf);
 
     // Unbekannte Namen gleich hier zuordnen — wird gemerkt
@@ -4058,7 +4271,13 @@ function termineAnsicht(){
       box.appendChild(zu);
     }
 
-    const sortiert = z.slice().sort((a,b) => (a.i - b.i) || ((a.datum || 0) - (b.datum || 0)));
+    // Tage ohne Einschränkung aus der Online-Abgabe nicht einzeln zeigen, sondern zusammengefasst
+    const nurFrei = x => x.art === "frei" && x.status === "gleich";
+    const ganzFrei = [...new Set(z.filter(x => x.online && x.i >= 0).map(x => x.i))]
+      .filter(i => z.filter(x => x.i === i).every(nurFrei));
+    if (ganzFrei.length) box.appendChild(el(`<p class="sub" style="margin-top:10px">Die ganze Woche frei verfügbar:
+      ${ganzFrei.map(i => esc(state.mitarbeiter[i].name)).join(", ")}</p>`));
+    const sortiert = z.filter(x => !nurFrei(x)).sort((a,b) => (a.i - b.i) || ((a.datum || 0) - (b.datum || 0)));
     const tab = el(`<div class="tablewrap" style="margin-top:10px"><table class="termintabelle"><thead><tr>
       <th></th><th>Mitarbeiter</th><th>Tag</th><th>Termin</th><th>Hinweis</th></tr></thead><tbody></tbody></table></div>`);
     sortiert.forEach(x => {
@@ -4095,11 +4314,18 @@ function termineAnsicht(){
       const ersetzt = wahl.filter(x => x.status === "ersetzt").length;
       if (ersetzt && !confirm(`${ersetzt} schon eingetragene ${ersetzt === 1 ? "Angabe wird" : "Angaben werden"} überschrieben. Weiter?`)) return;
       const wo = termineUebernehmen(wahl, terminVorschau.quelle);
+      // Online-Abgaben als übernommen merken — auch die, bei denen sich nichts geändert hat
+      const antwort = terminVorschau.antwort;
+      if (antwort){
+        state.onlineImport = state.onlineImport || {};
+        const g = state.onlineImport[antwort.woche] = state.onlineImport[antwort.woche] || {};
+        antwort.abgaben.forEach(a => g[a.name] = a.abgegeben);
+      }
       terminVorschau = null;
       await speichere();
       const plaeneDa = wo.filter(sl => state.plaene[sl]);
       p.querySelector("#text").value = "";
-      vorschau(); letzter();
+      vorschau(); letzter(); online();
       p.querySelector("#letzter").prepend(el(`<div class="note ok" style="margin-top:14px"><span class="ic">✓</span><span>
         <b>${wahl.length} ${wahl.length === 1 ? "Tag" : "Tage"} übernommen.</b>${plaeneDa.length
           ? ` Für ${plaeneDa.map(sl => "KW " + sl.slice(-2)).join(", ")} gibt es schon einen Plan — damit die Termine
@@ -4224,6 +4450,8 @@ function archivAufraeumen(){
     if (zuAlt(sl)){ bisInStandUebernehmen(sl); delete state.abwesend[sl]; geaendert++; }
   });
   Object.keys(state.phasen || {}).forEach(sl => { if (zuAlt(sl)){ delete state.phasen[sl]; geaendert++; } });
+  ["onlineStand", "onlineImport"].forEach(f => Object.keys(state[f] || {}).forEach(sl => {
+    if (zuAlt(sl)){ delete state[f][sl]; geaendert++; } }));
   if (geaendert) speichere();
   return loeschen.length;
 }

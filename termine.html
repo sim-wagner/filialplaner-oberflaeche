@@ -5,180 +5,350 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex">
-<title>Termine melden</title>
+<title>Meine Zeiten</title>
 <style>
 :root{
-  --bg:#F4F6FA; --surface:#fff; --line:#D9DFEA; --ink:#14213D; --muted:#5B6782;
-  --blau:#1D4ED8; --blau-dunkel:#1E3A8A; --blau-hell:#E8EEFC; --bad:#B32320; --bad-soft:#FBEAEA;
-  --ok:#1F7A45; --ok-soft:#E5F4EA;
+  --bg:#F3F5F9; --surface:#fff; --line:#D8DEE9; --ink:#14213D; --muted:#5B6782;
+  --blau:#1D4ED8; --blau-hell:#E8EEFC;
+  --gruen:#1F7A45; --gruen-hell:#E3F3E8; --rot:#B32320; --rot-hell:#FBEAEA;
+  --gelb:#9A5B00; --gelb-hell:#FFF3DC; --lila:#6D28D9; --lila-hell:#F0E9FD;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
   --bg:#0E1422; --surface:#161E30; --line:#2A3550; --ink:#E6EBF5; --muted:#9AA6C0;
-  --blau:#7EA2F7; --blau-dunkel:#B9CBFA; --blau-hell:#1E2A48; --bad:#F09090; --bad-soft:#3A1E22;
-  --ok:#7FC395; --ok-soft:#14301F; } }
+  --blau:#8AAEFA; --blau-hell:#1E2A48; --gruen:#7FC395; --gruen-hell:#13301F;
+  --rot:#F09090; --rot-hell:#3A1E22; --gelb:#E9B45E; --gelb-hell:#33270F; --lila:#B79BF5; --lila-hell:#2A1F45; } }
 :root[data-theme="dark"]{
   --bg:#0E1422; --surface:#161E30; --line:#2A3550; --ink:#E6EBF5; --muted:#9AA6C0;
-  --blau:#7EA2F7; --blau-dunkel:#B9CBFA; --blau-hell:#1E2A48; --bad:#F09090; --bad-soft:#3A1E22;
-  --ok:#7FC395; --ok-soft:#14301F; }
+  --blau:#8AAEFA; --blau-hell:#1E2A48; --gruen:#7FC395; --gruen-hell:#13301F;
+  --rot:#F09090; --rot-hell:#3A1E22; --gelb:#E9B45E; --gelb-hell:#33270F; --lila:#B79BF5; --lila-hell:#2A1F45; }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-.wrap{max-width:560px;margin:0 auto;padding:18px 16px 40px}
-h1{font-size:1.4rem;margin:4px 0 2px}
-.lede{color:var(--muted);margin:0 0 16px;font-size:.95rem}
+.wrap{max-width:560px;margin:0 auto;padding:16px 16px 48px}
+h1{font-size:1.45rem;margin:6px 0 4px}
+.lede{color:var(--muted);margin:0 0 16px}
 .karte{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
-label{display:block;font-size:.85rem;font-weight:600;color:var(--muted);margin-bottom:10px}
-input,select{display:block;width:100%;margin-top:4px;font:inherit;font-size:16px;color:var(--ink);background:var(--surface);
-  border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;min-height:46px}
-input:focus,select:focus{outline:2px solid var(--blau);outline-offset:1px}
-.zwei{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.termin{position:relative}
-.termin .weg{position:absolute;top:8px;right:8px;border:0;background:none;color:var(--muted);font-size:1.4rem;line-height:1;padding:6px 10px;cursor:pointer}
-.termin h2{font-size:.95rem;margin:0 0 10px}
-.schalter{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);margin:2px 0 10px}
-.schalter input{width:20px;height:20px;min-height:0;margin:0}
-.btn{display:block;width:100%;font:inherit;font-weight:700;border-radius:12px;padding:13px;border:1.5px solid var(--blau);
-  background:var(--blau);color:#fff;cursor:pointer;min-height:48px}
+label.f{display:block;font-size:.88rem;font-weight:600;color:var(--muted);margin-bottom:12px}
+input[type=text],input[type=time],input:not([type]){display:block;width:100%;margin-top:4px;font:inherit;font-size:17px;color:var(--ink);
+  background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;min-height:48px}
+input:focus,button:focus-visible{outline:2px solid var(--blau);outline-offset:2px}
+.btn{display:block;width:100%;font:inherit;font-weight:700;border-radius:12px;padding:14px;border:1.5px solid var(--blau);
+  background:var(--blau);color:#fff;cursor:pointer;min-height:52px;font-size:1.02rem}
+.btn:disabled{opacity:.55;cursor:default}
 .btn.zweit{background:transparent;color:var(--blau)}
-.btn + .btn{margin-top:10px}
-.fehler{background:var(--bad-soft);color:var(--bad);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:.9rem}
-.fehler:empty{display:none}
-.ok{background:var(--ok-soft);color:var(--ok);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:.9rem}
-pre{white-space:pre-wrap;background:var(--blau-hell);border-radius:10px;padding:12px;font-size:.85rem;margin:10px 0}
-.hint{color:var(--muted);font-size:.82rem;font-weight:400}
-.feld-fehler{border-color:var(--bad)}
+.link{background:none;border:0;color:var(--blau);font:inherit;text-decoration:underline;cursor:pointer;padding:6px 0}
+.hint{color:var(--muted);font-size:.84rem;font-weight:400}
+.meldung{border-radius:12px;padding:12px 14px;margin:0 0 12px;font-size:.95rem}
+.meldung b{display:block;margin-bottom:2px}
+.m-info{background:var(--blau-hell);color:var(--ink)}
+.m-ok{background:var(--gruen-hell);color:var(--gruen)}
+.m-warn{background:var(--gelb-hell);color:var(--gelb)}
+.m-bad{background:var(--rot-hell);color:var(--rot)}
+.m-ok b,.m-warn b,.m-bad b{color:inherit}
+.kopf .kw{font-size:.82rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.kopf .zeitraum{font-size:1.25rem;font-weight:800;margin-top:2px}
+.kopf .wer{color:var(--muted);font-size:.9rem;margin-top:4px}
+.frist{display:flex;gap:10px;align-items:flex-start}
+.frist .uhr{font-size:1.6rem;line-height:1}
+.tag h2{font-size:1rem;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline}
+.tag h2 span{font-weight:500;color:var(--muted);font-size:.88rem}
+.wahl{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.wahl button{font:inherit;font-size:.95rem;font-weight:600;min-height:52px;border-radius:12px;border:2px solid var(--line);
+  background:var(--surface);color:var(--ink);cursor:pointer;padding:8px 6px;line-height:1.2}
+.wahl button[aria-pressed="true"].frei{background:var(--gruen-hell);border-color:var(--gruen);color:var(--gruen)}
+.wahl button[aria-pressed="true"].nur{background:var(--blau-hell);border-color:var(--blau);color:var(--blau)}
+.wahl button[aria-pressed="true"].krank{background:var(--rot-hell);border-color:var(--rot);color:var(--rot)}
+.wahl button[aria-pressed="true"].urlaub{background:var(--lila-hell);border-color:var(--lila);color:var(--lila)}
+.wahl button[aria-pressed="true"]::before{content:"✓ "}
+.zeiten{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.zeiten label.f{margin:0}
+.geschlossen{color:var(--muted);font-weight:600}
+.fehlerfeld{border-color:var(--rot)!important}
+.feldfehler{color:var(--rot);font-size:.88rem;margin-top:8px}
+.laden{opacity:.6;pointer-events:none}
+#senden{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom,0px));box-shadow:0 6px 18px rgba(20,33,61,.18)}
+.fuss{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Termine melden</h1>
-  <p class="lede">Trag ein, wann du nicht arbeiten kannst. Am Ende schickst du die Liste
-  an deine Filialleitung — per WhatsApp, Mail oder wie ihr es gewohnt seid.
-  Diese Seite speichert nichts im Internet.</p>
-
-  <div class="karte">
-    <label>Dein Name <span class="hint">(Vor- und Nachname)</span>
-      <input id="name" autocomplete="name" placeholder="z. B. Petra Naumann"></label>
-    <label style="margin-bottom:0">Filiale <span class="hint">(Nummer, z. B. 540)</span>
-      <input id="filiale" inputmode="numeric" pattern="[0-9]*" placeholder="z. B. 540"></label>
-  </div>
-
-  <div id="termine"></div>
-  <button class="btn zweit" id="dazu">+ Termin hinzufügen</button>
-
-  <p class="fehler" id="fehler"></p>
-  <div id="fertigBox"></div>
-  <button class="btn" id="senden" style="margin-top:16px">Fertig — an die Filialleitung schicken</button>
-  <p class="hint" style="margin-top:14px">Krank? Bitte wie gewohnt anrufen — das gehört nicht hierher.</p>
-</div>
+<div class="wrap" id="app" aria-live="polite"></div>
 
 <script>
 "use strict";
-const ARTEN = [
-  ["nicht",  "kann nicht arbeiten"],
-  ["urlaub", "Urlaub (genehmigt)"],
-  ["schule", "Berufsschule"],
-  ["nur",    "kann nur von … bis …"],
-  ["ohne",   "kann von … bis … nicht"]
-];
-const WT = ["So","Mo","Di","Mi","Do","Fr","Sa"];
-const termine = [];
+// Supabase-Projekt der Filialplaner-Abgabe. Der Schlüssel ist der öffentliche „anon“-Schlüssel —
+// er erlaubt nur die Funktionen, die selbst prüfen, wer fragt.
+const SERVER = "https://nduzeascvtjkdknhyzwe.supabase.co";
+const SCHLUESSEL = "sb_publishable_ZSvBat1AEEvtUbpykTCrjw_FSPRl6H1";
+
+const TAGE = [["mo","Montag"],["di","Dienstag"],["mi","Mittwoch"],["do","Donnerstag"],["fr","Freitag"],["sa","Samstag"]];
+const ARTEN = [["frei","Frei verfügbar"],["nur","Nur bestimmte Zeiten"],["krank","Krank"],["urlaub","Urlaub"]];
+const FEIERTAGE_BW = {
+  2026:["01-01","01-06","04-03","04-06","05-01","05-14","05-25","06-04","10-03","11-01","12-25","12-26"],
+  2027:["01-01","01-06","03-26","03-29","05-01","05-06","05-17","05-27","10-03","11-01","12-25","12-26"]
+};
 const $ = s => document.querySelector(s);
-const merke = (k, v) => { try { localStorage.setItem("termine:" + k, v); } catch(e){} };
-const hole = k => { try { return localStorage.getItem("termine:" + k) || ""; } catch(e){ return ""; } };
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const lies = k => { try { return JSON.parse(localStorage.getItem("zeiten:" + k) || "null"); } catch(e){ return null; } };
+const merke = (k, v) => { try { v === null ? localStorage.removeItem("zeiten:" + k) : localStorage.setItem("zeiten:" + k, JSON.stringify(v)); } catch(e){} };
 
-$("#name").value = hole("name");
-$("#filiale").value = hole("filiale");
-$("#name").oninput = e => merke("name", e.target.value.trim());
-$("#filiale").oninput = e => merke("filiale", e.target.value.replace(/\D/g, ""));
+let zugang = lies("zugang");          // {nr, code, name}
+let woche = null;                     // Antwort des Servers: woche, montag, frist, abgabe, abgegeben
+let entwurf = null;                   // {mo:{art,von,bis}, …}
+let abstand = 0;                      // Serverzeit minus Gerätezeit — falsch gestellte Handys zählen nicht
+let uhr = null;
 
-const morgen = () => { const d = new Date(); d.setDate(d.getDate() + 1); return iso(d); };
-const iso = d => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
-const ausIso = s => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ""); return m ? new Date(+m[1], +m[2]-1, +m[3], 12) : null; };
-const de = d => WT[d.getDay()] + " " + String(d.getDate()).padStart(2,"0") + "." + String(d.getMonth()+1).padStart(2,"0") + "." + d.getFullYear();
+async function rufe(fn, daten){
+  let r;
+  try {
+    r = await fetch(SERVER + "/rest/v1/rpc/" + fn, {method:"POST",
+      headers:{"Content-Type":"application/json", apikey:SCHLUESSEL},
+      body: JSON.stringify(daten)});
+  } catch(e){ throw new Error("Keine Verbindung zum Internet. Deine Angaben bleiben auf diesem Handy gespeichert — bitte gleich noch einmal versuchen."); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.message || "Der Server hat nicht geantwortet. Bitte gleich noch einmal versuchen.");
+  if (j && j.fehler) throw new Error(j.fehler);
+  return j;
+}
 
-function neuerTermin(){ termine.push({datum:"", mehrere:false, bis:"", art:"nicht", von:"", bisZeit:""}); zeichnen(); }
+const tagDatum = (montag, i) => { const d = new Date(montag + "T12:00:00"); d.setDate(d.getDate() + i); return d; };
+const kurz = d => d.toLocaleDateString("de-DE", {day:"2-digit", month:"2-digit"});
+const lang = d => d.toLocaleDateString("de-DE", {day:"2-digit", month:"2-digit", year:"numeric"});
+const istFeiertag = d => (FEIERTAGE_BW[d.getFullYear()] || []).includes(
+  String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"));
+const jetzt = () => new Date(Date.now() + abstand);
+const kwNr = sl => String(sl).slice(-2).replace(/^0/, "");
 
-function zeichnen(){
-  const box = $("#termine");
+/* ---------- Anmelden ---------- */
+function anmeldung(fehler){
+  clearInterval(uhr);
+  $("#app").innerHTML = `
+    <h1>Meine Zeiten</h1>
+    <p class="lede">Hier trägst du für den nächsten Arbeitsplan ein, wann du arbeiten kannst.
+    Melde dich einmal an — dein Handy merkt sich das.</p>
+    ${fehler ? `<div class="meldung m-bad">${esc(fehler)}</div>` : ""}
+    <form class="karte" id="form" novalidate>
+      <label class="f">Filiale <span class="hint">(Nummer, z. B. 540)</span>
+        <input id="nr" inputmode="numeric" autocomplete="off" value="${esc(zugang && zugang.nr || "")}"></label>
+      <label class="f">Filial-Code <span class="hint">(bekommst du von deiner Filialleitung)</span>
+        <input id="code" inputmode="numeric" autocomplete="off" value="${esc(zugang && zugang.code || "")}"></label>
+      <label class="f">Dein Name <span class="hint">(Vor- und Nachname, wie im Dienstplan)</span>
+        <input id="name" autocomplete="name" value="${esc(zugang && zugang.name || "")}"></label>
+      <button class="btn" type="submit">Anmelden</button>
+    </form>`;
+  $("#form").onsubmit = async e => {
+    e.preventDefault();
+    const z = {nr: $("#nr").value.replace(/\D/g, ""), code: $("#code").value.trim(), name: $("#name").value.trim()};
+    if (!z.nr || !z.code || !z.name) return anmeldung("Bitte alle drei Felder ausfüllen.");
+    await laden(z);
+  };
+}
+
+async function laden(z){
+  $("#app").classList.add("laden");
+  try {
+    const w = await rufe("termine_anmelden", {p_nr:z.nr, p_code:z.code, p_name:z.name});
+    zugang = {nr:z.nr, code:z.code, name:w.name};
+    merke("zugang", zugang);
+    abstand = new Date(w.jetzt) - Date.now();
+    // Liegt noch ein Entwurf für eine Woche herum, deren Frist vorbei ist? Dann sagen.
+    const alt = lies("entwurf");
+    let verpasst = null;
+    if (alt && alt.woche !== w.woche && alt.nr === z.nr && alt.name === w.name && alt.ungesendet)
+      verpasst = {woche: alt.woche, gesendet: alt.gesendet || null};
+    woche = w;
+    if (alt && alt.woche === w.woche && alt.nr === z.nr && alt.name === w.name) entwurf = alt.tage;
+    else entwurf = w.abgabe ? ausServer(w.abgabe) : leererEntwurf();
+    if (verpasst || (alt && alt.woche !== w.woche)) merke("entwurf", null);
+    zeigen(verpasst);
+  } catch(e){
+    $("#app").classList.remove("laden");
+    anmeldung(e.message);
+    return;
+  }
+  $("#app").classList.remove("laden");
+}
+
+const leererEntwurf = () => Object.fromEntries(TAGE.map(([k]) => [k, {art:"frei", von:"", bis:""}]));
+function ausServer(a){
+  const e = leererEntwurf();
+  Object.entries(a || {}).forEach(([k, v]) => { if (e[k]) e[k] = {art:v.art, von:v.von || "", bis:v.bis || ""}; });
+  return e;
+}
+// Was zum Server geht: nur die Tage, die nicht „frei verfügbar“ sind
+function fuerServer(){
+  const raus = {};
+  TAGE.forEach(([k], i) => {
+    if (istFeiertag(tagDatum(woche.montag, i))) return;
+    const t = entwurf[k];
+    if (t.art === "frei") return;
+    raus[k] = t.art === "nur" ? {art:"nur", von:t.von, bis:t.bis} : {art:t.art};
+  });
+  return raus;
+}
+const gesendetGleich = () => woche.abgegeben && JSON.stringify(fuerServer()) === JSON.stringify(ausServerKurz(woche.abgabe));
+function ausServerKurz(a){
+  const raus = {};
+  TAGE.forEach(([k]) => { const v = (a || {})[k]; if (v) raus[k] = v.art === "nur" ? {art:"nur", von:v.von, bis:v.bis} : {art:v.art}; });
+  return raus;
+}
+function sichern(){
+  merke("entwurf", {nr:zugang.nr, name:zugang.name, woche:woche.woche, tage:entwurf,
+                     ungesendet: !gesendetGleich(), gesendet: woche.abgegeben || null});
+}
+
+/* ---------- Die Woche ---------- */
+function zeigen(verpasst){
+  clearInterval(uhr);
+  const mo = tagDatum(woche.montag, 0), sa = tagDatum(woche.montag, 5);
+  const frist = new Date(woche.frist), fristTag = new Date(frist.getTime() - 60000);   // Mittwoch 23:59
+  $("#app").innerHTML = `
+    <div class="karte kopf">
+      <div class="kw">Arbeitsplan KW ${esc(woche.woche.slice(-2).replace(/^0/, ""))}</div>
+      <div class="zeitraum">${kurz(mo)} – ${lang(sa)}</div>
+      <div class="wer">Angemeldet als <b>${esc(zugang.name)}</b> · Filiale ${esc(zugang.nr)}</div>
+    </div>
+    ${verpasst ? `<div class="meldung m-warn"><b>${verpasst.gesendet
+        ? `Deine letzten Änderungen für KW ${esc(kwNr(verpasst.woche))} kamen zu spät.`
+        : `Für KW ${esc(kwNr(verpasst.woche))} hast du nichts abgeschickt.`}</b>${verpasst.gesendet
+        ? `Es gilt, was du am ${new Date(verpasst.gesendet).toLocaleString("de-DE", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"})} Uhr geschickt hast.`
+        : "Die Frist ist vorbei — dort giltst du als frei verfügbar."} Jetzt geht es um die nächste Woche.</div>` : ""}
+    <div id="status"></div>
+    <div id="tage"></div>
+    <p class="feldfehler" id="fehler" role="alert"></p>
+    <button class="btn" id="senden"></button>
+    <div class="fuss">
+      <button class="link" id="kalender">Erinnerung in meinen Kalender</button>
+      <button class="link" id="abmelden">Abmelden</button>
+    </div>`;
+  zeichneTage();
+  status();
+  uhr = setInterval(status, 30000);
+  $("#senden").onclick = senden;
+  $("#abmelden").onclick = () => { merke("zugang", null); merke("entwurf", null); zugang = null; anmeldung(); };
+  $("#kalender").onclick = kalender;
+
+  function status(){
+    const rest = frist - jetzt();
+    const box = $("#status");
+    if (!box) return;
+    const fristText = `Mittwoch, ${lang(fristTag)}, 23:59 Uhr`;
+    if (rest <= 0){
+      clearInterval(uhr);
+      box.innerHTML = `<div class="meldung m-bad"><b>Die Abgabe ist geschlossen.</b>Die Frist (${fristText}) ist abgelaufen.
+        <button class="link" id="neu">Nächste Woche öffnen</button></div>`;
+      $("#neu").onclick = () => laden(zugang);
+      $("#senden").disabled = true;
+      return;
+    }
+    const tage = Math.floor(rest / 864e5), std = Math.floor(rest % 864e5 / 36e5), min = Math.floor(rest % 36e5 / 6e4);
+    const noch = tage >= 1 ? `noch ${tage} ${tage === 1 ? "Tag" : "Tage"}${std ? " und " + std + (std === 1 ? " Stunde" : " Stunden") : ""}`
+               : std >= 1 ? `noch ${std} ${std === 1 ? "Stunde" : "Stunden"} und ${min} ${min === 1 ? "Minute" : "Minuten"}`
+               : `noch ${min} ${min === 1 ? "Minute" : "Minuten"}`;
+    const gesendet = woche.abgegeben ? new Date(woche.abgegeben) : null;
+    const gleich = gesendetGleich();
+    let art, titel, text;
+    if (gesendet && gleich){
+      art = "m-ok"; titel = "✓ Abgeschickt";
+      text = `am ${gesendet.toLocaleString("de-DE", {weekday:"short", day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"})} Uhr.
+        Du kannst bis ${fristText} noch etwas ändern (${noch}).`;
+    } else if (gesendet){
+      art = "m-warn"; titel = "Deine Änderungen sind noch nicht abgeschickt";
+      text = `Unten auf „Änderungen abschicken“ tippen — sonst gilt, was du vorher geschickt hast. Frist: ${fristText} (${noch}).`;
+    } else {
+      art = rest < 2 * 864e5 ? "m-warn" : "m-info";
+      titel = rest < 2 * 864e5 ? "⏰ Erinnerung: Bitte bis Mittwoch abschicken" : "Noch nicht abgeschickt";
+      text = `Abgabe bis <b style="display:inline">${fristText}</b> — ${noch}. Wenn du nichts abschickst,
+        giltst du die ganze Woche als frei verfügbar.`;
+    }
+    box.innerHTML = `<div class="meldung ${art} frist"><span class="uhr" aria-hidden="true">${art === "m-ok" ? "" : "🕒"}</span>
+      <span><b>${titel}</b>${text}</span></div>`;
+    const knopf = $("#senden");
+    knopf.disabled = !!(gesendet && gleich);
+    knopf.textContent = gesendet ? (gleich ? "Abgeschickt ✓" : "Änderungen abschicken") : "Abschicken";
+  }
+  zeigen.status = status;
+}
+
+function zeichneTage(){
+  const box = $("#tage");
   box.innerHTML = "";
-  termine.forEach((t, n) => {
-    const k = document.createElement("div");
-    k.className = "karte termin";
-    const zeit = t.art === "nur" || t.art === "ohne";
-    k.innerHTML = `<h2>Termin ${n + 1}</h2>
-      <button class="weg" aria-label="Termin ${n + 1} entfernen">×</button>
-      <label>${t.mehrere ? "Erster Tag" : "Tag"}<input type="date" data-f="datum" min="${iso(new Date())}" value="${t.datum}"></label>
-      <label class="schalter"><input type="checkbox" data-f="mehrere"${t.mehrere ? " checked" : ""}> mehrere Tage am Stück</label>
-      ${t.mehrere ? `<label>Letzter Tag<input type="date" data-f="bis" min="${t.datum || iso(new Date())}" value="${t.bis}"></label>` : ""}
-      <label>Was ist?<select data-f="art">${ARTEN.map(([v,l]) => `<option value="${v}"${t.art === v ? " selected" : ""}>${l}</option>`).join("")}</select></label>
-      ${zeit ? `<div class="zwei"><label>von<input type="time" data-f="von" value="${t.von}"></label>
-                <label>bis<input type="time" data-f="bisZeit" value="${t.bisZeit}"></label></div>` : ""}`;
-    k.querySelector(".weg").onclick = () => { termine.splice(n, 1); if (!termine.length) neuerTermin(); else zeichnen(); };
-    k.querySelectorAll("[data-f]").forEach(f => {
-      f.onchange = () => {
-        t[f.dataset.f] = f.type === "checkbox" ? f.checked : f.value;
-        // Felder, die erscheinen oder verschwinden, brauchen ein neues Bild
-        if (["mehrere","art"].includes(f.dataset.f)) zeichnen();
-        $("#fehler").textContent = ""; $("#fertigBox").innerHTML = "";
-      };
+  TAGE.forEach(([k, name], i) => {
+    const d = tagDatum(woche.montag, i);
+    const karte = document.createElement("div");
+    karte.className = "karte tag";
+    if (istFeiertag(d)){
+      karte.innerHTML = `<h2>${name} <span>${kurz(d)}</span></h2><div class="geschlossen">Feiertag — die Filiale ist geschlossen.</div>`;
+      box.appendChild(karte); return;
+    }
+    const t = entwurf[k];
+    karte.innerHTML = `<h2>${name} <span>${kurz(d)}</span></h2>
+      <div class="wahl" role="group" aria-label="${name}">${ARTEN.map(([a, l]) =>
+        `<button type="button" class="${a}" data-a="${a}" aria-pressed="${t.art === a}">${l}</button>`).join("")}</div>
+      ${t.art === "nur" ? `<div class="zeiten">
+        <label class="f">Ich kann von<input type="time" data-z="von" value="${esc(t.von)}"></label>
+        <label class="f">bis<input type="time" data-z="bis" value="${esc(t.bis)}"></label></div>` : ""}`;
+    karte.querySelectorAll("[data-a]").forEach(b => b.onclick = () => {
+      t.art = b.dataset.a;
+      sichern(); zeichneTage(); zeigen.status();
+      if (t.art === "nur") { const f = box.querySelectorAll(".tag")[i].querySelector("[data-z=von]"); if (f && !t.von) f.focus(); }
     });
-    box.appendChild(k);
+    karte.querySelectorAll("[data-z]").forEach(f => f.oninput = () => {
+      t[f.dataset.z] = f.value; f.classList.remove("fehlerfeld"); sichern(); zeigen.status();
+    });
+    box.appendChild(karte);
   });
 }
 
-// Alles prüfen, bevor etwas verschickt wird — lieber hier ein Hinweis als später ein falscher Plan
-function pruefen(){
-  const name = $("#name").value.trim(), fil = $("#filiale").value.replace(/\D/g, "");
-  if (name.split(/\s+/).length < 2) return {fehler:"Bitte deinen Vor- und Nachnamen eintragen."};
-  if (!fil) return {fehler:"Bitte die Filialnummer eintragen."};
-  const zeilen = [];
-  const heute = new Date(); heute.setHours(0,0,0,0);
-  for (let n = 0; n < termine.length; n++){
-    const t = termine[n], wo = `Termin ${n + 1}: `;
-    const d = ausIso(t.datum);
-    if (!d) return {fehler: wo + "Bitte den Tag auswählen."};
-    if (d < heute) return {fehler: wo + "Der Tag liegt in der Vergangenheit."};
-    let b = null;
-    if (t.mehrere){
-      b = ausIso(t.bis);
-      if (!b) return {fehler: wo + "Bitte den letzten Tag auswählen."};
-      if (b < d) return {fehler: wo + "Der letzte Tag liegt vor dem ersten."};
-      if ((b - d) / 864e5 > 62) return {fehler: wo + "Mehr als zwei Monate am Stück — bitte aufteilen."};
-    } else if (d.getDay() === 0) return {fehler: wo + "Sonntags ist die Filiale geschlossen."};
-    let was = (ARTEN.find(a => a[0] === t.art) || [])[0];
-    if (t.art === "nur" || t.art === "ohne"){
-      if (!t.von || !t.bisZeit) return {fehler: wo + "Bitte beide Uhrzeiten eintragen."};
-      if (t.bisZeit <= t.von) return {fehler: wo + "Die zweite Uhrzeit muss nach der ersten liegen."};
-      was = (t.art === "nur" ? "nur " : "nicht ") + t.von + "–" + t.bisZeit;
-    } else was = {nicht:"kann nicht", urlaub:"Urlaub", schule:"Berufsschule"}[t.art];
-    zeilen.push({d, text: de(d) + (b && iso(b) !== iso(d) ? " bis " + de(b) : "") + ": " + was});
+async function senden(){
+  const fehler = $("#fehler");
+  fehler.textContent = "";
+  // Uhrzeiten prüfen, bevor etwas rausgeht
+  for (const [k, name] of TAGE){
+    const t = entwurf[k];
+    if (t.art !== "nur") continue;
+    if (!t.von || !t.bis || t.bis <= t.von){
+      const i = TAGE.findIndex(x => x[0] === k);
+      const karte = document.querySelectorAll(".tag")[i];
+      karte.querySelectorAll("[data-z]").forEach(f => f.classList.add("fehlerfeld"));
+      karte.scrollIntoView({behavior:"smooth", block:"center"});
+      fehler.textContent = !t.von || !t.bis ? `${name}: Bitte beide Uhrzeiten eintragen.`
+                                            : `${name}: Die zweite Uhrzeit muss nach der ersten liegen.`;
+      return;
+    }
   }
-  if (!zeilen.length) return {fehler:"Bitte mindestens einen Termin eintragen."};
-  zeilen.sort((x, y) => x.d - y.d);
-  return {text: ["Filialplaner – Termine", "Name: " + name, "Filiale: " + fil, ...zeilen.map(z => z.text)].join("\n")};
+  const knopf = $("#senden");
+  knopf.disabled = true; knopf.textContent = "Wird abgeschickt …";
+  try {
+    const r = await rufe("termine_abgeben", {p_nr:zugang.nr, p_code:zugang.code, p_name:zugang.name,
+                                             p_woche:woche.woche, p_eintraege:fuerServer()});
+    woche.abgegeben = r.abgegeben;
+    woche.abgabe = fuerServer();
+    sichern();
+    zeigen.status();
+    window.scrollTo({top:0, behavior:"smooth"});
+  } catch(e){
+    fehler.textContent = e.message;
+    zeigen.status();
+    if (/geschlossen/i.test(e.message)) setTimeout(() => laden(zugang), 2500);
+  }
 }
 
-$("#dazu").onclick = neuerTermin;
-$("#senden").onclick = async () => {
-  const r = pruefen();
-  $("#fehler").textContent = r.fehler || "";
-  const box = $("#fertigBox");
-  box.innerHTML = "";
-  if (r.fehler) return;
-  // Teilen-Menü des Handys; geht das nicht, in die Zwischenablage
-  if (navigator.share){
-    try { await navigator.share({text: r.text}); box.innerHTML = `<p class="ok">Verschickt — danke!</p>`; return; }
-    catch(e){ if (e && e.name === "AbortError") return; }
-  }
-  const pre = document.createElement("pre"); pre.textContent = r.text;
-  let kopiert = false;
-  try { await navigator.clipboard.writeText(r.text); kopiert = true; } catch(e){}
-  box.innerHTML = `<p class="ok">${kopiert ? "Kopiert. Jetzt in WhatsApp oder in eine Mail an deine Filialleitung einfügen."
-    : "Bitte diesen Text markieren, kopieren und an deine Filialleitung schicken:"}</p>`;
-  box.appendChild(pre);
-};
+// Wiederkehrende Erinnerung: jeden Mittwoch um 18 Uhr — die Datei öffnet der Kalender des Handys
+function kalender(){
+  const d = new Date(woche.frist); d.setDate(d.getDate() - 1);         // Mittwoch dieser Abgabe
+  const tag = d.getFullYear() + String(d.getMonth()+1).padStart(2,"0") + String(d.getDate()).padStart(2,"0");
+  const ics = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Filialplaner//Zeiten//DE","BEGIN:VEVENT",
+    "UID:zeiten-" + tag + "@filialplaner", "DTSTAMP:" + new Date().toISOString().replace(/[-:]/g,"").slice(0,15) + "Z",
+    "DTSTART;TZID=Europe/Berlin:" + tag + "T180000", "DURATION:PT15M", "RRULE:FREQ=WEEKLY;BYDAY=WE",
+    "SUMMARY:Zeiten für den Arbeitsplan abgeben (bis 23:59 Uhr)", "URL:" + location.href.split("?")[0],
+    "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:Zeiten abgeben","TRIGGER:PT0M","END:VALARM",
+    "END:VEVENT","END:VCALENDAR"].join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([ics], {type:"text/calendar"}));
+  a.download = "Erinnerung-Zeiten.ics";
+  document.body.appendChild(a); a.click(); a.remove();
+}
 
-neuerTermin();
+if (zugang) laden(zugang); else anmeldung();
 </script>
 </body>
 </html>
