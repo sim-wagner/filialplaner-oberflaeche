@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-12-1">
+<meta name="fassung" content="2026-11-12-2">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -127,7 +127,8 @@ input.num,input[type=number],input[type=time]{font-family:var(--mono);font-varia
 /* ---------- Aufgabenkarten ---------- */
 .task{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface-2)}
 .task + .task{margin-top:9px}
-.task.off{opacity:.5}
+.task.off{opacity:.72}
+.tag.neu{background:var(--blau-700);border-color:var(--blau-700);color:#fff;vertical-align:middle}
 .task-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .task-top h3{margin-right:auto}
 .days{display:flex;gap:5px;flex-wrap:wrap;margin:11px 0 3px}
@@ -426,10 +427,17 @@ function normalisiere(s){
   if (s.archivGewarnt === true) s.archivGewarnt = {};   // früher ein einziger Schalter
   // Filialen von vor dem RR-Schein kennen die neue Aufgabe noch nicht
   if (s.aufgaben) WAREN.forEach(w => {
-    if (!s.aufgaben[w.id]) s.aufgaben[w.id] = {aktiv:false, tage:[], zeitArt:"fest", zeit:"",
+    if (!s.aufgaben[w.id]) s.aufgaben[w.id] = {aktiv:true, neu:true, tage:[], zeitArt:"fest", zeit:"",
                                                fVon:"", fBis:"", dauer:"", personen:"",
                                                jeTag:false, zeiten:{}};
   });
+  // Bis 12.11.2026 kam der RR-Schein in bestehende Filialen ausgeschaltet und blass
+  // hinein — leicht zu übersehen. Unberührt? Dann einschalten und als neu zeigen.
+  const rr = s.aufgaben && s.aufgaben.rr;
+  if (rr && !s.rrSichtbar){
+    if (!rr.aktiv && !rr.tage.length && !rr.zeit && !rr.dauer){ rr.aktiv = true; rr.neu = true; }
+    s.rrSichtbar = true;
+  }
   if (s.eingerichtet === undefined) s.eingerichtet = !!(s.mitarbeiter && s.mitarbeiter.length);
   WAREN.forEach(w => {
     const a = s.aufgaben && s.aufgaben[w.id];
@@ -987,7 +995,7 @@ function warentage(){
   WAREN.forEach(w => {
     const a = state.aufgaben[w.id];
     const t = el(`<div class="task${a.aktiv ? "" : " off"}">
-      <div class="task-top"><h3>${w.name}</h3>
+      <div class="task-top"><h3>${w.name}${a.neu ? ' <span class="tag neu">neu</span>' : ""}</h3>
         <label class="switch"><input type="checkbox" ${a.aktiv ? "checked" : ""}> gibt es hier</label></div>
       <div class="body">
         <div class="days" role="group" aria-label="Wochentage ${w.name}"></div>
@@ -1058,6 +1066,7 @@ function warentage(){
     };
 
     const frisch = () => {
+      if (a.neu && (a.tage.length || a.zeit || a.dauer || !a.aktiv)) delete a.neu;
       const bekannt = a.aktiv && a.tage.length && hat(a.dauer) && hat(a.personen);
       out.textContent = bekannt ? h1(nz(a.dauer) * nz(a.personen) * a.tage.length) : "?";
       t.classList.toggle("off", !a.aktiv);
