@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-12-7">
+<meta name="fassung" content="2026-11-12-8">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -327,6 +327,13 @@ table.plan .ue-aend{font-size:.62rem;font-weight:700}
 .vorschlag ul{margin:4px 0 2px 18px;padding:0;font-size:.82rem}
 .vorschlag .hint{display:block;margin-top:2px}
 .vorschlag-rechts{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
+
+/* ---------- Urlaub & Krankheit ---------- */
+.ereignisliste b{display:block;margin-bottom:2px}
+.ereignisse-tab td{vertical-align:middle}
+.tag.krank{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.tag.urlaub{background:var(--blau-50);border-color:var(--blau-600);color:var(--blau-700)}
+.ereignis-vorbei td{color:var(--muted)}
 </style>
 
 <div class="topbar"><div class="topbar-in">
@@ -2469,6 +2476,7 @@ function archivAufraeumen(){
     if (zuAlt(sl)){ bisInStandUebernehmen(sl); delete state.abwesend[sl]; geaendert++; }
   });
   Object.keys(state.phasen || {}).forEach(sl => { if (zuAlt(sl)){ delete state.phasen[sl]; geaendert++; } });
+  geaendert += ereignisseAufraeumen();
   ["onlineStand", "onlineImport"].forEach(f => Object.keys(state[f] || {}).forEach(sl => {
     if (zuAlt(sl)){ delete state[f][sl]; geaendert++; } }));
   if (geaendert) speichere();
@@ -3087,8 +3095,11 @@ const tagesStunden = (plan, ti) => plan.tage[ti].schichten.reduce((s, x) => s + 
 /* Alle Wege, die Lücken eines Tages zu schließen. weg: die Zeit, die frei geworden ist
    (für „ganz übernehmen“). tiefe 0 erlaubt zusätzlich: jemand, der da ist, übernimmt die
    frei gewordene Schicht, und seine eigene wird ihrerseits gefüllt. */
-function luekenSchliessen(basis, ti, weg, tiefe){
-  const luecke = fehlzeiten(basis, ti);
+function luekenSchliessen(basis, ti, weg, tiefe, ziel){
+  // ziel: so viele Mängel hatte der Tag schon vor dem Ausfall — besser als vorher muss
+  // eine Lösung nicht sein (eine knapp besetzte Filiale hat vielleicht schon Lücken)
+  ziel = ziel || {maengel: 0, punkte: []};
+  const luecke = fehlzeiten(basis, ti).filter(m => !ziel.punkte.includes(m));
   if (!luecke.length) return [{aenderungen: [], teile: []}];
   const g0 = Math.min(...luecke), g1 = Math.max(...luecke) + 30;
   const tag = basis.tage[ti], r = tagesRaster(tag);
@@ -3099,7 +3110,7 @@ function luekenSchliessen(basis, ti, weg, tiefe){
       if (a.art === "neu" && !ausfallErlaubt(plan, planPlatz(plan, a.i), ti, a.von, a.bis)) throw "nein";
     });
     aenderungenAnwenden(plan, ti, aenderungen);
-    if (tagesMaengel(plan, ti) === 0) raus.push({aenderungen, teile});
+    if (tagesMaengel(plan, ti) <= ziel.maengel) raus.push({aenderungen, teile});
   };
   const versuch = (aenderungen, teile) => { try { probe(aenderungen, teile); } catch(e){ if (e !== "nein") throw e; } };
   const frei = state.mitarbeiter.map((m, i) => i).filter(i => {
@@ -3154,7 +3165,7 @@ function luekenSchliessen(basis, ti, weg, tiefe){
     const tausch = {art: "aendern", i: p.i, alt: [s0.von, s0.bis], von: weg.von, bis: weg.bis};
     const plan = kopie(basis); plan.mo = basis.mo;
     aenderungenAnwenden(plan, ti, [tausch]);
-    luekenSchliessen(plan, ti, {von: s0.von, bis: s0.bis}, 1).slice(0, 4).forEach(w => raus.push({
+    luekenSchliessen(plan, ti, {von: s0.von, bis: s0.bis}, 1, ziel).slice(0, 4).forEach(w => raus.push({
       aenderungen: [tausch].concat(w.aenderungen),
       teile: [`${p.name} übernimmt ${hhmm(weg.von)}–${hhmm(weg.bis)} statt ${hhmm(s0.von)}–${hhmm(s0.bis)}`].concat(w.teile)}));
   });
@@ -3169,6 +3180,7 @@ function ausfallVorschlaege(gespeichert, j0, ti, grund){
   const tag = basis.tage[ti];
   const weg = tag.schichten.find(x => x.mi === j0);
   if (!weg) return {schicht: null, vorschlaege: []};
+  const ziel = {maengel: tagesMaengel(gespeichert, ti), punkte: fehlzeiten(gespeichert, ti)};
   tag.schichten = tag.schichten.filter(x => x !== weg);
   // Fürs Konto zählt der Grund: krank und Urlaub sind bezahlt — solange gerechnet wird,
   // steht der Ausfall vorläufig in den Abwesenheiten
@@ -3180,7 +3192,7 @@ function ausfallVorschlaege(gespeichert, j0, ti, grund){
   state.abwesend[sl][i0] = Object.assign({}, state.abwesend[sl][i0], {[TAGE[ti][0]]: grund});
   let vorschlaege = [];
   try {
-    const wege = luekenSchliessen(basis, ti, {von: weg.von, bis: weg.bis}, 0);
+    const wege = luekenSchliessen(basis, ti, {von: weg.von, bis: weg.bis}, 0, ziel);
     const vorher = tagesStunden(basis, ti);
     vorschlaege = wege.map(w => {
       const plan = kopie(basis); plan.mo = basis.mo;
@@ -3204,7 +3216,8 @@ function ausfallVorschlaege(gespeichert, j0, ti, grund){
       return w.aenderungen.length
         ? {titel: w.teile.join(", "), details: details + (pausen.length ? ` · Pause verschoben: ${pausen.join(", ")}` : ""),
            mehr, aenderungen: w.aenderungen, punkte}
-        : {titel: "Ohne Ersatz", details: "Die Besetzung reicht auch so — es fehlt keine halbe Stunde.",
+        : {titel: "Ohne Ersatz", details: ziel.maengel ? "Durch den Ausfall entsteht keine neue Lücke."
+                                                      : "Die Besetzung reicht auch so — es fehlt keine halbe Stunde.",
            mehr: 0, aenderungen: [], punkte: -100};
     });
   } finally {
@@ -3214,7 +3227,7 @@ function ausfallVorschlaege(gespeichert, j0, ti, grund){
   const beste = vorschlaege.sort((a, b) => a.punkte - b.punkte)
     .filter(v => !gesehen.has(v.titel) && gesehen.add(v.titel)).slice(0, 3);
   return {schicht: {von: weg.von, bis: weg.bis, arbeit: weg.arbeit}, vorschlaege: beste,
-          luecken: fehlzeiten(basis, ti)};
+          luecken: fehlzeiten(basis, ti).filter(m => !ziel.punkte.includes(m))};
 }
 
 /* Einen Vorschlag in den gespeicherten Plan schreiben und den Ausfall eintragen.
@@ -3234,6 +3247,11 @@ function ausfallAnwenden(gespeichert, j0, ti, grund, vorschlag){
   const {i: i0, name} = planPerson(gespeichert, j0);
   state.abwesend[sl] = state.abwesend[sl] || {};
   if (i0 >= 0) state.abwesend[sl][i0] = Object.assign({}, state.abwesend[sl][i0], {[TAGE[ti][0]]: grund});
+  // Krankheit und Urlaub erscheinen auch unter „Urlaub & Krankheit“
+  const datum = isoVon(new Date(mo.getTime() + ti * 864e5));
+  if ((grund === "krank" || grund === "urlaub") && name)
+    (state.ereignisse = state.ereignisse || []).push({id: "e" + Date.now().toString(36) + ti, name, art: grund,
+      von: datum, bis: datum, angelegt: new Date().toISOString(), ausfall: true});
   gespeichert.geaendertVonHand = true;
   // Nachvollziehbar bleiben: was wann umgeplant wurde — ohne den Grund (Gesundheitsdaten)
   (gespeichert.ausfaelle = gespeichert.ausfaelle || []).push({am: new Date().toISOString(), wer: name,
@@ -3264,7 +3282,8 @@ async function ausfallUmplanen(gespeichert, j0, ti, grund, abTag){
     const modell = wochenModell(mo, vorgabe, "plan", null, {vorhanden, nurVorhandenVor: Math.min(abTag || 0, ti), behalten: 15});
     // Die Aufgaben des gespeicherten Plans gelten weiter (sie könnten von Hand angepasst sein)
     const erg = loese(highs, modell);
-    if (!erg || erg.schlupf.length) return null;
+    ausfallUmplanen.grund = "";
+    if (!erg){ ausfallUmplanen.grund = "keine Lösung"; return null; }
     // Neue Schichten je Tag, mit Pausen, die die Besetzung halten
     const neu = kopie(gespeichert); neu.mo = gespeichert.mo;
     const geaendert = {};
@@ -3299,17 +3318,114 @@ async function ausfallUmplanen(gespeichert, j0, ti, grund, abTag){
       neu.tage[k].schichten.forEach(s => { if (s._neu){ delete s._neu; schichtSetzen(neu, k, s, s.von, s.bis); } });
       neu.tage[k].schichten.sort((a, b) => a.von - b.von || a.mi - b.mi);
       pausenNachbessern(neu, k);
-      if (tagesMaengel(neu, k) > 0) throw new Error("Lücke");
+      // nicht schlechter als vor dem Ausfall (eine knappe Filiale hat vielleicht schon Lücken)
+      if (tagesMaengel(neu, k) > tagesMaengel(gespeichert, k))
+        throw new Error(`Lücke ${TAGE[k][1]}: ${tagesMaengel(neu, k)} statt ${tagesMaengel(gespeichert, k)} (Schlupf im Modell: ${erg.schlupf.filter(x => x.ti === k).length})`);
       aenderungen[0].tage[k] = neu.tage[k].schichten;
     });
-    if (!zeilen.length) return null;
+    if (!zeilen.length){ ausfallUmplanen.grund = "keine Änderung"; return null; }
     aenderungen[0].namen = neu.namen;
     const mehr = neu.tage.reduce((s, t) => s + t.schichten.reduce((a, x) => a + x.arbeit, 0), 0)
                - gespeichert.tage.reduce((s, t, k) => s + t.schichten.filter(x => !(k === ti && x.mi === j0)).reduce((a, x) => a + x.arbeit, 0), 0);
     return {titel: "Umplanen über mehrere Tage", details: zeilen.join(" · "), zeilen, mehr, aenderungen, punkte: 50, mehrtaegig: true};
-  } catch(e){ return null; }
+  } catch(e){ ausfallUmplanen.grund = e.message; return null; }
   finally { state.abwesend[sl] = abwVorher; }
 }
+
+// ==== kern/14-ereignisse.js ====
+/* Besondere Ereignisse: Urlaub und Krankheit.
+
+   Trägt nur die Filialleitung ein — einmal als Zeitraum, auch über mehrere Wochen. Die
+   App schreibt die Tage in die Abwesenheiten der betroffenen Wochen; der Planer, das
+   Stundenkonto (Urlaub und Krankheit zählen als Soll) und der Ausfall-Assistent sehen
+   sie von dort. Unter dem Plan stehen sie in Rot. Gespeichert wird nur Art und Zeitraum —
+   keine Diagnose, kein Grund —, und nach Ablauf der Archivfrist wird der Eintrag gelöscht. */
+
+const EREIGNIS_ARTEN = [["urlaub", "Urlaub"], ["krank", "Krank"]];
+
+// Die Arbeitstage eines Ereignisses (Mo–Sa, ohne Feiertage)
+function ereignisTage(e){
+  const raus = [];
+  const d = new Date(e.von + "T12:00:00"), ende = new Date(e.bis + "T12:00:00");
+  for (let n = 0; d <= ende && n < 400; n++, d.setDate(d.getDate() + 1)){
+    const wt = (d.getDay() + 6) % 7;
+    if (wt === 6 || istFeiertag(d)) continue;
+    raus.push({datum: isoVon(d), sl: wochenSchluessel(d), tag: TAGE[wt][0], ti: wt});
+  }
+  return raus;
+}
+
+function ereignisEintragen(e){
+  const i = state.mitarbeiter.findIndex(m => m.name === e.name);
+  if (i < 0) throw new Error("Diese Person gibt es nicht im Personal.");
+  if (!e.von || !e.bis || e.bis < e.von) throw new Error("Bitte einen gültigen Zeitraum wählen.");
+  const tage = ereignisTage(e);
+  if (!tage.length) throw new Error("In diesem Zeitraum liegt kein Arbeitstag.");
+  const neu = Object.assign({id: "e" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+                             angelegt: new Date().toISOString()}, e);
+  state.ereignisse = state.ereignisse || [];
+  state.ereignisse.push(neu);
+  state.abwesend = state.abwesend || {};
+  tage.forEach(t => {
+    const w = state.abwesend[t.sl] = state.abwesend[t.sl] || {};
+    w[i] = Object.assign({}, w[i], {[t.tag]: e.art});
+  });
+  return neu;
+}
+
+function ereignisLoeschen(id){
+  const e = (state.ereignisse || []).find(x => x.id === id);
+  if (!e) return;
+  const i = state.mitarbeiter.findIndex(m => m.name === e.name);
+  // nur austragen, was noch so dasteht — von Hand Geändertes bleibt
+  if (i >= 0) ereignisTage(e).forEach(t => {
+    const w = ((state.abwesend || {})[t.sl] || {})[i];
+    if (w && w[t.tag] === e.art) delete w[t.tag];
+  });
+  state.ereignisse = state.ereignisse.filter(x => x.id !== id);
+}
+
+// Wo stehen für die Person schon Schichten an den Tagen des Ereignisses?
+function ereignisBetroffen(e){
+  const raus = {};
+  ereignisTage(e).forEach(t => {
+    const kurz = (state.plaene || {})[t.sl];
+    if (!kurz) return;
+    const i = state.mitarbeiter.findIndex(m => m.name === e.name);
+    const j = planIndex(kurz, state.mitarbeiter[i], i);
+    if (j < 0 || !kurz.tage[t.ti].schichten.some(s => s.mi === j)) return;
+    (raus[t.sl] = raus[t.sl] || {sl: t.sl, j, tage: []}).tage.push(t.ti);
+  });
+  return Object.values(raus);
+}
+
+// Für die Anzeige unter dem Plan: Urlaub und Krankheit der Woche, je Person zusammengefasst
+function ereignisseDerWoche(sl){
+  const abw = (state.abwesend || {})[sl] || {};
+  const raus = [];
+  state.mitarbeiter.forEach((m, i) => {
+    EREIGNIS_ARTEN.forEach(([art, text]) => {
+      const tage = TAGE.map(([k], ti) => (abw[i] || {})[k] === art ? ti : -1).filter(ti => ti >= 0);
+      if (tage.length) raus.push({name: m.name, art, text, tage});
+    });
+  });
+  return raus;
+}
+// „Mo, Mi“ oder „Di bis Fr“
+function tageText(tage){
+  const zusammen = tage.length > 2 && tage.every((t, n) => n === 0 || t === tage[n-1] + 1);
+  return zusammen ? `${TAGE[tage[0]][1]} bis ${TAGE[tage[tage.length-1]][1]}` : tage.map(t => TAGE[t][1]).join(", ");
+}
+// Nach der Archivfrist löschen (Gesundheitsdaten nicht länger aufheben als nötig)
+function ereignisseAufraeumen(){
+  const grenze = new Date(); grenze.setDate(grenze.getDate() - ARCHIV_WOCHEN * 7);
+  const vorher = (state.ereignisse || []).length;
+  state.ereignisse = (state.ereignisse || []).filter(e => e.bis >= isoVon(grenze));
+  return vorher - state.ereignisse.length;
+}
+// Hinweise zum Plan ohne Über- und Minusstunden — die stehen im Plan selbst
+const STUNDEN_HINWEIS = /h verplant, Ziel|über ihren Vertragsstunden|über die Vertragsstunden hinaus/;
+const hinweiseOhneStunden = meldungen => (meldungen || []).filter(m => !STUNDEN_HINWEIS.test(m.text));
 
 // ==== app/20-zustand.js ====
 /* Zustand der App und Einlesen alter Datenstände */
@@ -3362,6 +3478,7 @@ function normalisiere(s){
   if (!s.abwesend) s.abwesend = {};
   if (!s.listen) s.listen = {};
   if (!s.phasen) s.phasen = {};
+  if (!s.ereignisse) s.ereignisse = [];
   if (!s.land) s.land = "BW";        // bis 12.11.2026 gab es nur Baden-Württemberg
   // Vor dem 10.11.2026 gab es nur eine Stundenliste ohne Woche — sie wird zur
   // Liste der laufenden Woche, statt unsichtbar liegen zu bleiben
@@ -3635,7 +3752,7 @@ function abgabenAlsEintraege(antwort){
     const d = new Date(mo); d.setDate(mo.getDate() + ti); d.setHours(12, 0, 0, 0);
     const art = v ? v.art : "frei";
     raus.push({quelle: a.auto ? "keine Abgabe = frei verfügbar" : "Online-Abgabe", online: true, name: a.name, filiale: "",
-               von: d, bis: null, art, artText: art, zVon: v && v.von || "", zBis: v && v.bis || "", mitZeit: art === "nur",
+               von: d, bis: null, art, artText: art, zVon: v && v.von || "", zBis: v && v.bis || "", mitZeit: art === "nur" || art === "ohne",
                abgegeben: a.abgegeben, auto: a.auto});
   }));
   return raus;
@@ -3760,6 +3877,7 @@ function render(){
   else if (ansicht === "archiv")      v.appendChild(archivAnsicht());
   else if (ansicht === "sicherung")   v.appendChild(sicherungsAnsicht());
   else if (ansicht === "termine")     v.appendChild(termineAnsicht());
+  else if (ansicht === "ereignisse")  v.appendChild(ereignisAnsicht());
   else                                v.appendChild(SCHRITT_FN()[schritt]());
 
   pruefePlatz();
@@ -5007,11 +5125,16 @@ function startseite(){
           && b.verfahren === "Optimierer" && b.vergleich.planer > b.vergleich.optimierer + 0.25
           ? ` (der bisherige Planer hätte ${h1(b.vergleich.planer)} h gebraucht)` : ""}.</span></span></div>`));
     }
-    if (plan.meldungen && plan.meldungen.length){
+    // Besondere Ereignisse der Woche — rot und immer sichtbar
+    const ereignisse = ereignisseDerWoche(sl);
+    if (ereignisse.length) inhalt.appendChild(el(`<div class="note bad ereignisliste" style="margin-top:12px"><span class="ic">!</span>
+      <span><b>Besondere Ereignisse</b>${ereignisse.map(e => `<br>${esc(e.text)}: ${esc(e.name)} — ${tageText(e.tage)}`).join("")}</span></div>`));
+    const hinweise = hinweiseOhneStunden(plan.meldungen);
+    if (hinweise.length){
       const d = el(`<details style="margin-top:12px"><summary class="hint" style="cursor:pointer">
-        ${plan.meldungen.length} Hinweise zum Plan</summary><div style="margin-top:10px"></div></details>`);
+        ${hinweise.length} Hinweise zum Plan</summary><div style="margin-top:10px"></div></details>`);
       const box = d.querySelector("div");
-      plan.meldungen.forEach(m => box.appendChild(
+      hinweise.forEach(m => box.appendChild(
         el(`<div class="note ${m.art}"><span class="ic">${m.art === "bad" ? "×" : m.art === "ok" ? "✓" : "!"}</span><span>${esc(m.text)}</span></div>`)));
       inhalt.appendChild(d);
     }
@@ -5060,6 +5183,11 @@ function startseite(){
     (altP + altL) === 0 ? "noch leer"
       : `${altP} ${altP === 1 ? "Plan" : "Pläne"}, ${altL} ${altL === 1 ? "Liste" : "Listen"}`}</span></button>`);
   arch.onclick = () => { ansicht = "archiv"; render(); };
+  const heuteIso = isoVon(new Date());
+  const aktuell = (state.ereignisse || []).filter(e => e.bis >= heuteIso).length;
+  const erg = el(`<button class="kachel"><b>Urlaub & Krankheit</b><span>${aktuell ? aktuell + (aktuell === 1 ? " Eintrag" : " Einträge") + " aktuell" : "nichts eingetragen"}</span></button>`);
+  erg.onclick = () => { ansicht = "ereignisse"; render(); };
+  kb.insertBefore(erg, kb.firstChild);
   kb.appendChild(arch);
   const sich = el(`<button class="kachel arch"><b>Sicherung</b><span>${inApp ? "läuft automatisch" : "Datei anlegen"}</span></button>`);
   sich.onclick = () => { ansicht = "sicherung"; render(); };
@@ -5855,7 +5983,8 @@ function archivAnsicht(){
 /* Ausfall eintragen: wer fällt aus, an welchen Tagen, warum — dann Lösungen ansehen und
    eine übernehmen. Der Grund zählt nur fürs Stundenkonto und steht nirgends im Plan. */
 
-function ausfallAnsicht(sl, wohin, fertig){
+// vorwahl (aus „Urlaub & Krankheit“): {j, tage, grund} — dann gleich die Lösungen zeigen
+function ausfallAnsicht(sl, wohin, fertig, vorwahl){
   const kurz = state.plaene[sl];
   if (!kurz) return;
   const mo = montagDer(kurz.mo);
@@ -5898,6 +6027,12 @@ function ausfallAnsicht(sl, wohin, fertig){
   wer.onchange = tageZeigen; tageZeigen();
   box.querySelector("#afZu").onclick = () => box.remove();
   suchen.onclick = () => schritt([...gewaehlt].sort());
+  if (vorwahl){
+    wer.value = String(vorwahl.j); tageZeigen();
+    box.querySelector("#afGrund").value = vorwahl.grund;
+    const tage = vorwahl.tage.filter(ti => ti >= heute);
+    setTimeout(() => schritt(tage), 0);
+  }
 
   // Tag für Tag: Vorschläge zeigen, einen übernehmen, weiter zum nächsten Tag
   const ergebnis = box.querySelector("#afErgebnis");
@@ -5951,6 +6086,114 @@ function ausfallAnsicht(sl, wohin, fertig){
     ergebnis.appendChild(ohne);
     ergebnis.scrollIntoView({behavior: "smooth", block: "nearest"});
   }
+}
+
+// ==== app/45-ereignisse.js ====
+/* Urlaub & Krankheit: besondere Ereignisse als Zeitraum eintragen, ansehen, löschen.
+   Steht für die Tage schon ein Plan, geht es von hier direkt zum Ausfall-Assistenten. */
+
+function ereignisAnsicht(){
+  const heute = isoVon(new Date());
+  const p = el(`<div class="panel">
+    <div class="head"><span class="eyebrow">Besondere Ereignisse</span>
+      <h1 style="margin-top:4px">Urlaub & Krankheit</h1>
+      <p class="lede">Einmal als Zeitraum eintragen — auch über mehrere Wochen. Die App trägt die Tage
+      in alle betroffenen Wochen ein; der nächste Plan berücksichtigt sie, und fürs Stundenkonto
+      zählen sie als gearbeitet. Steht schon ein Plan, schlägt die App Ersatz vor. Mitarbeiter
+      können Urlaub und Krankheit nicht selbst melden.</p></div>
+    <div class="tile">
+      <div class="grid g3">
+        <label class="f">Wer?<select id="ePerson"><option value="">— auswählen —</option>${
+          state.mitarbeiter.map(m => `<option>${esc(m.name)}</option>`).join("")}</select></label>
+        <label class="f">Was?<select id="eArt">${EREIGNIS_ARTEN.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
+        <div class="grid g2" style="gap:8px">
+          <label class="f">von<input type="date" id="eVon" value="${heute}"></label>
+          <label class="f">bis<input type="date" id="eBis" value="${heute}"></label></div>
+      </div>
+      <div class="actions" style="border-top:0;padding-top:4px"><span class="hint" id="eTage"></span>
+        <div class="spacer"></div><button class="btn" id="eEintragen">Eintragen</button></div>
+      <p class="err" id="eFehler"></p>
+    </div>
+    <div id="eFolgen"></div>
+    <h3 style="margin:22px 0 8px">Aktuell und kommend</h3><div id="eKommend"></div>
+    <h3 style="margin:22px 0 8px">Vorbei <span class="hint">— wird nach ${ARCHIV_WOCHEN} Wochen gelöscht</span></h3><div id="eVorbei"></div>
+    <div class="actions"><button class="btn ghost" id="zurueck">Zurück</button></div>
+  </div>`);
+
+  const von = p.querySelector("#eVon"), bis = p.querySelector("#eBis");
+  const zaehlen = () => {
+    if (bis.value < von.value) bis.value = von.value;
+    const n = von.value && bis.value ? ereignisTage({von: von.value, bis: bis.value}).length : 0;
+    p.querySelector("#eTage").textContent = n ? `${n} ${n === 1 ? "Arbeitstag" : "Arbeitstage"} (ohne Sonn- und Feiertage)` : "";
+  };
+  von.oninput = bis.oninput = zaehlen; zaehlen();
+
+  p.querySelector("#eEintragen").onclick = async () => {
+    const fehler = p.querySelector("#eFehler"); fehler.textContent = "";
+    const e = {name: p.querySelector("#ePerson").value, art: p.querySelector("#eArt").value, von: von.value, bis: bis.value};
+    if (!e.name){ fehler.textContent = "Bitte die Person wählen."; return; }
+    let neu;
+    try { neu = ereignisEintragen(e); } catch(err){ fehler.textContent = err.message; return; }
+    await speichere();
+    liste(); folgen(neu);
+  };
+
+  // Was das Ereignis für schon erstellte Pläne bedeutet
+  function folgen(e){
+    const box = p.querySelector("#eFolgen"); box.innerHTML = "";
+    const betroffen = ereignisBetroffen(e);
+    const art = (EREIGNIS_ARTEN.find(x => x[0] === e.art) || [])[1];
+    if (!betroffen.length){
+      box.appendChild(el(`<div class="note ok"><span class="ic">✓</span><span>${esc(art)} für ${esc(e.name)} eingetragen.
+        Kein bestehender Plan ist betroffen — der nächste Plan berücksichtigt es.</span></div>`));
+      return;
+    }
+    const n = el(`<div class="note warn"><span class="ic">!</span><span>${esc(art)} für ${esc(e.name)} eingetragen.
+      In schon erstellten Plänen stehen an diesen Tagen Schichten:<span class="knopfreihe"></span></span></div>`);
+    betroffen.forEach(b => {
+      const k = el(`<button class="btn small" style="margin:6px 6px 0 0">KW ${b.sl.slice(-2).replace(/^0/, "")}: ${tageText(b.tage)} — Ersatz suchen</button>`);
+      k.onclick = () => {
+        zeigeWoche = isoVon(montagAusSchluessel(b.sl));
+        ansicht = "start"; render();
+        const inhalt = document.querySelector("#planInhalt");
+        if (inhalt) ausfallAnsicht(b.sl, inhalt, text => {
+          const y = window.scrollY; render(); window.scrollTo(0, y);
+          const box2 = document.querySelector("#planInhalt");
+          if (box2) box2.prepend(el(`<div class="note ok" style="margin-bottom:10px"><span class="ic">✓</span><span>${esc(text)}</span></div>`));
+        }, {j: b.j, tage: b.tage, grund: e.art});
+      };
+      n.querySelector(".knopfreihe").appendChild(k);
+    });
+    box.appendChild(n);
+  }
+
+  function liste(){
+    const zeile = e => {
+      const tage = ereignisTage(e).length;
+      const tr = el(`<tr class="${e.bis < heute ? "ereignis-vorbei" : ""}"><td><b>${esc(e.name)}</b></td>
+        <td><span class="tag ${e.art}">${esc((EREIGNIS_ARTEN.find(x => x[0] === e.art) || [])[1])}</span></td>
+        <td>${deVon(new Date(e.von + "T12:00:00"))}${e.bis !== e.von ? " – " + deVon(new Date(e.bis + "T12:00:00")) : ""}</td>
+        <td class="n">${tage} ${tage === 1 ? "Tag" : "Tage"}</td>
+        <td class="n"><button class="btn ghost small">löschen</button></td></tr>`);
+      tr.querySelector("button").onclick = async () => {
+        if (!confirm(`Eintrag für ${e.name} löschen? Die Tage werden wieder als verfügbar geführt — schon erstellte Pläne ändern sich dadurch nicht.`)) return;
+        ereignisLoeschen(e.id); await speichere(); liste();
+      };
+      return tr;
+    };
+    const alle = (state.ereignisse || []).slice().sort((a, b) => a.von < b.von ? -1 : 1);
+    [["#eKommend", alle.filter(e => e.bis >= heute)], ["#eVorbei", alle.filter(e => e.bis < heute).reverse()]].forEach(([wo, l]) => {
+      const box = p.querySelector(wo); box.innerHTML = "";
+      if (!l.length){ box.appendChild(el(`<p class="empty">Nichts eingetragen.</p>`)); return; }
+      const tab = el(`<div class="tablewrap"><table class="ereignisse-tab"><thead><tr><th>Wer</th><th>Was</th><th>Zeitraum</th>
+        <th class="n">Arbeitstage</th><th></th></tr></thead><tbody></tbody></table></div>`);
+      l.forEach(e => tab.querySelector("tbody").appendChild(zeile(e)));
+      box.appendChild(tab);
+    });
+  }
+  liste();
+  p.querySelector("#zurueck").onclick = () => { ansicht = "start"; render(); };
+  return p;
 }
 
 // ==== app/50-ausgabe.js ====
@@ -6185,9 +6428,10 @@ async function planExcel(plan){
 
   // Hinweise unter den Plan
   let hz = zSumme + 2;
-  if (plan.meldungen.length){
+  const hinweise = hinweiseOhneStunden(plan.meldungen);
+  if (hinweise.length){
     ws.getCell(hz,1).value = "Hinweise"; ws.getCell(hz,1).font = {bold:true}; hz++;
-    plan.meldungen.slice(0,15).forEach(m => {
+    hinweise.slice(0,15).forEach(m => {
       ws.getCell(hz,1).value = (m.art === "bad" ? "! " : "- ") + m.text;
       ws.mergeCells(hz,1,hz,P); hz++;
     });

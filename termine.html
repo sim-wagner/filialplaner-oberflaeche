@@ -51,13 +51,12 @@ input:focus,button:focus-visible{outline:2px solid var(--blau);outline-offset:2p
 .frist .uhr{font-size:1.6rem;line-height:1}
 .tag h2{font-size:1rem;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline}
 .tag h2 span{font-weight:500;color:var(--muted);font-size:.88rem}
-.wahl{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.wahl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .wahl button{font:inherit;font-size:.95rem;font-weight:600;min-height:52px;border-radius:12px;border:2px solid var(--line);
   background:var(--surface);color:var(--ink);cursor:pointer;padding:8px 6px;line-height:1.2}
 .wahl button[aria-pressed="true"].frei{background:var(--gruen-hell);border-color:var(--gruen);color:var(--gruen)}
-.wahl button[aria-pressed="true"].nur{background:var(--blau-hell);border-color:var(--blau);color:var(--blau)}
-.wahl button[aria-pressed="true"].krank{background:var(--rot-hell);border-color:var(--rot);color:var(--rot)}
-.wahl button[aria-pressed="true"].urlaub{background:var(--lila-hell);border-color:var(--lila);color:var(--lila)}
+.wahl button[aria-pressed="true"].ohne{background:var(--blau-hell);border-color:var(--blau);color:var(--blau)}
+.wahl button[aria-pressed="true"].nicht{background:var(--rot-hell);border-color:var(--rot);color:var(--rot)}
 .wahl button[aria-pressed="true"]::before{content:"✓ "}
 .zeiten{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 .zeiten label.f{margin:0}
@@ -92,7 +91,9 @@ const SERVER = "https://nduzeascvtjkdknhyzwe.supabase.co";
 const SCHLUESSEL = "sb_publishable_ZSvBat1AEEvtUbpykTCrjw_FSPRl6H1";
 
 const TAGE = [["mo","Montag"],["di","Dienstag"],["mi","Mittwoch"],["do","Donnerstag"],["fr","Freitag"],["sa","Samstag"]];
-const ARTEN = [["frei","Frei verfügbar"],["nur","Nur bestimmte Zeiten"],["krank","Krank"],["urlaub","Urlaub"]];
+// Mitarbeiter melden nur, wann sie NICHT können. Krankheit und Urlaub trägt die
+// Filialleitung ein (seit 13.11.2026).
+const ARTEN = [["frei","Kann arbeiten"],["ohne","Termin"],["nicht","Kann nicht"]];
 // Feiertage des Bundeslands der Filiale, für jedes Jahr berechnet (wie in der App)
 let landDerFiliale = "BW";
 function ostersonntag(j){
@@ -156,7 +157,8 @@ function anmeldung(fehler){
   clearInterval(uhr);
   $("#app").innerHTML = `
     <h1>Meine Zeiten</h1>
-    <p class="lede">Hier trägst du für den nächsten Arbeitsplan ein, wann du arbeiten kannst.
+    <p class="lede">Hier trägst du für den nächsten Arbeitsplan ein, wann du <b>nicht</b> arbeiten
+    kannst — einen Termin oder einen ganzen Tag. Alles andere heißt: du kannst arbeiten.
     Melde dich einmal an — dein Handy merkt sich das.</p>
     ${fehler ? `<div class="meldung m-bad">${esc(fehler)}</div>` : ""}
     <form class="karte" id="form" novalidate>
@@ -193,7 +195,11 @@ async function laden(z){
     if (alt && alt.woche !== w.woche && alt.nr === z.nr && alt.name === w.name && alt.ungesendet)
       verpasst = {woche: alt.woche, gesendet: alt.gesendet || null};
     woche = w;
-    if (alt && alt.woche === w.woche && alt.nr === z.nr && alt.name === w.name) entwurf = alt.tage;
+    if (alt && alt.woche === w.woche && alt.nr === z.nr && alt.name === w.name){
+      // Entwürfe der älteren Seite (nur/krank/urlaub) nicht stillschweigend umdeuten
+      entwurf = alt.tage;
+      Object.values(entwurf).forEach(x => { if (!["frei","nicht","ohne"].includes(x.art)) Object.assign(x, {art:"frei", von:"", bis:""}); });
+    }
     else entwurf = w.abgabe ? ausServer(w.abgabe) : leererEntwurf();
     if (verpasst || (alt && alt.woche !== w.woche)) merke("entwurf", null);
     zeigen(verpasst);
@@ -208,7 +214,10 @@ async function laden(z){
 const leererEntwurf = () => Object.fromEntries(TAGE.map(([k]) => [k, {art:"frei", von:"", bis:""}]));
 function ausServer(a){
   const e = leererEntwurf();
-  Object.entries(a || {}).forEach(([k, v]) => { if (e[k]) e[k] = {art:v.art, von:v.von || "", bis:v.bis || ""}; });
+  // Nur, was es heute noch gibt — ältere Abgaben (nur/krank/urlaub) zählen als „kann arbeiten“
+  Object.entries(a || {}).forEach(([k, v]) => {
+    if (e[k] && (v.art === "nicht" || v.art === "ohne")) e[k] = {art:v.art, von:v.von || "", bis:v.bis || ""};
+  });
   return e;
 }
 // Was zum Server geht: nur die Tage, die nicht „frei verfügbar“ sind
@@ -218,14 +227,15 @@ function fuerServer(){
     if (istFeiertag(tagDatum(woche.montag, i))) return;
     const t = entwurf[k];
     if (t.art === "frei") return;
-    raus[k] = t.art === "nur" ? {art:"nur", von:t.von, bis:t.bis} : {art:t.art};
+    raus[k] = t.art === "ohne" ? {art:"ohne", von:t.von, bis:t.bis} : {art:"nicht"};
   });
   return raus;
 }
 const gesendetGleich = () => woche.abgegeben && JSON.stringify(fuerServer()) === JSON.stringify(ausServerKurz(woche.abgabe));
 function ausServerKurz(a){
   const raus = {};
-  TAGE.forEach(([k]) => { const v = (a || {})[k]; if (v) raus[k] = v.art === "nur" ? {art:"nur", von:v.von, bis:v.bis} : {art:v.art}; });
+  TAGE.forEach(([k]) => { const v = (a || {})[k];
+    if (v && (v.art === "nicht" || v.art === "ohne")) raus[k] = v.art === "ohne" ? {art:"ohne", von:v.von, bis:v.bis} : {art:"nicht"}; });
   return raus;
 }
 function sichern(){
@@ -250,7 +260,7 @@ function zeigen(verpasst){
         ? `Deine letzten Änderungen für KW ${esc(kwNr(verpasst.woche))} kamen zu spät.`
         : `Für KW ${esc(kwNr(verpasst.woche))} hast du nichts abgeschickt.`}</b>${verpasst.gesendet
         ? `Es gilt, was du am ${new Date(verpasst.gesendet).toLocaleString("de-DE", {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"})} Uhr geschickt hast.`
-        : "Die Frist ist vorbei — dort giltst du als frei verfügbar."} Jetzt geht es um die nächste Woche.</div>` : ""}
+        : "Die Frist ist vorbei — dort kannst du laut Plan an allen Tagen arbeiten."} Jetzt geht es um die nächste Woche.</div>` : ""}
     <div id="status"></div>
     <div id="tage"></div>
     <p class="feldfehler" id="fehler" role="alert"></p>
@@ -258,7 +268,9 @@ function zeigen(verpasst){
     <div class="fuss">
       <button class="link" id="kalender">Erinnerung in meinen Kalender</button>
       <button class="link" id="abmelden">Abmelden</button>
-    </div>`;
+    </div>
+    <p class="hint" style="margin-top:12px">Krank oder Urlaub? Das trägt die Filialleitung ein —
+    bitte wie gewohnt bei ihr melden.</p>`;
   zeichneMeinPlan();
   zeichneTage();
   status();
@@ -298,7 +310,7 @@ function zeigen(verpasst){
       art = rest < 2 * 864e5 ? "m-warn" : "m-info";
       titel = rest < 2 * 864e5 ? "⏰ Erinnerung: Bitte bis Mittwoch abschicken" : "Noch nicht abgeschickt";
       text = `Abgabe bis <b style="display:inline">${fristText}</b> — ${noch}. Wenn du nichts abschickst,
-        giltst du die ganze Woche als frei verfügbar.`;
+        kannst du laut Plan die ganze Woche arbeiten.`;
     }
     box.innerHTML = `<div class="meldung ${art} frist"><span class="uhr" aria-hidden="true">${art === "m-ok" ? "" : "🕒"}</span>
       <span><b>${titel}</b>${text}</span></div>`;
@@ -349,13 +361,13 @@ function zeichneTage(){
     karte.innerHTML = `<h2>${name} <span>${kurz(d)}</span></h2>
       <div class="wahl" role="group" aria-label="${name}">${ARTEN.map(([a, l]) =>
         `<button type="button" class="${a}" data-a="${a}" aria-pressed="${t.art === a}">${l}</button>`).join("")}</div>
-      ${t.art === "nur" ? `<div class="zeiten">
+      ${t.art === "ohne" ? `<div class="zeiten">
         <label class="f">Ich kann von<input type="time" data-z="von" value="${esc(t.von)}"></label>
-        <label class="f">bis<input type="time" data-z="bis" value="${esc(t.bis)}"></label></div>` : ""}`;
+        <label class="f">bis nicht<input type="time" data-z="bis" value="${esc(t.bis)}"></label></div>` : ""}`;
     karte.querySelectorAll("[data-a]").forEach(b => b.onclick = () => {
       t.art = b.dataset.a;
       sichern(); zeichneTage(); zeigen.status();
-      if (t.art === "nur") { const f = box.querySelectorAll(".tag")[i].querySelector("[data-z=von]"); if (f && !t.von) f.focus(); }
+      if (t.art === "ohne") { const f = box.querySelectorAll(".tag")[i].querySelector("[data-z=von]"); if (f && !t.von) f.focus(); }
     });
     karte.querySelectorAll("[data-z]").forEach(f => f.oninput = () => {
       t[f.dataset.z] = f.value; f.classList.remove("fehlerfeld"); sichern(); zeigen.status();
@@ -370,13 +382,13 @@ async function senden(){
   // Uhrzeiten prüfen, bevor etwas rausgeht
   for (const [k, name] of TAGE){
     const t = entwurf[k];
-    if (t.art !== "nur") continue;
+    if (t.art !== "ohne") continue;
     if (!t.von || !t.bis || t.bis <= t.von){
       const i = TAGE.findIndex(x => x[0] === k);
       const karte = document.querySelectorAll(".tag")[i];
       karte.querySelectorAll("[data-z]").forEach(f => f.classList.add("fehlerfeld"));
       karte.scrollIntoView({behavior:"smooth", block:"center"});
-      fehler.textContent = !t.von || !t.bis ? `${name}: Bitte beide Uhrzeiten eintragen.`
+      fehler.textContent = !t.von || !t.bis ? `${name}: Bitte eintragen, von wann bis wann du nicht kannst.`
                                             : `${name}: Die zweite Uhrzeit muss nach der ersten liegen.`;
       return;
     }
