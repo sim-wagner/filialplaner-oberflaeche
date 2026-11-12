@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-10-2">
+<meta name="fassung" content="2026-11-12-1">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -832,7 +832,12 @@ function anmeldung(){
       tb.appendChild(tr);
     });
     box.appendChild(tab);
-    box.appendChild(sicherungsKnoepfe());
+    // Gesichert wird von selbst — die Knöpfe zum Speichern und Einlesen einer
+    // Sicherungsdatei stehen nur noch in der Kachel „Sicherung" auf der Startseite
+    box.appendChild(el(`<div class="note ok" style="margin-top:14px"><span class="ic">✓</span>
+      <span>${inApp
+        ? "Deine Filialen werden automatisch gesichert — bei jeder Änderung auf dem Gerät und in iCloud, dazu jeden Tag eine Kopie, die vier Monate aufgehoben wird."
+        : "Im Browser liegen die Daten nur in diesem Browser. In der Kachel „Sicherung“ lässt sich eine Sicherungsdatei anlegen."}</span></div>`));
   };
 
   umschalten("anmelden");
@@ -869,8 +874,8 @@ function lokaleFilialen(){
 // Im Browser wird dieselbe Datei als Download angeboten und über ein Dateifeld gelesen.
 function sicherungsKnoepfe(){
   const k = el(`<div style="margin-top:16px;display:flex;gap:9px;flex-wrap:wrap;align-items:center">
-    <button class="btn ghost small" id="sichAus">Sicherung speichern</button>
-    <button class="btn ghost small" id="sichEin">Sicherung einlesen</button>
+    <button class="btn ghost small" id="sichAus">Sicherungsdatei anlegen</button>
+    <button class="btn ghost small" id="sichEin">Sicherungsdatei einlesen</button>
     <span class="hint" id="sichHinweis"></span>
   </div>`);
   const sagen = t => k.querySelector("#sichHinweis").textContent = t;
@@ -2919,7 +2924,7 @@ function startseite(){
       : `${altP} ${altP === 1 ? "Plan" : "Pläne"}, ${altL} ${altL === 1 ? "Liste" : "Listen"}`}</span></button>`);
   arch.onclick = () => { ansicht = "archiv"; render(); };
   kb.appendChild(arch);
-  const sich = el(`<button class="kachel arch"><b>Sicherung</b><span>speichern oder einlesen</span></button>`);
+  const sich = el(`<button class="kachel arch"><b>Sicherung</b><span>${inApp ? "läuft automatisch" : "Datei anlegen"}</span></button>`);
   sich.onclick = () => { ansicht = "sicherung"; render(); };
   kb.appendChild(sich);
 
@@ -3074,9 +3079,10 @@ function sicherungsAnsicht(){
   const p = el(`<div class="panel">
     <div class="head"><span class="eyebrow">Sicherung</span>
       <h1 style="margin-top:4px">Daten sichern und zurückholen</h1>
-      <p class="lede">Die Sicherung enthält alle Filialen dieses Geräts mit Stammdaten,
-      Standardwochen und dem gesamten Planarchiv — eine einzige Datei. Beim Einlesen wird
-      nur übernommen, was neuer ist als das, was schon da ist.</p></div>
+      <p class="lede">${inApp
+        ? "Du musst hier nichts tun: Die App sichert jede Änderung von selbst — auf dem Gerät, in iCloud und einmal täglich als Kopie. Eine Sicherungsdatei brauchst du nur, wenn du die Daten zusätzlich außerhalb der App aufheben willst, etwa vor einem Handywechsel."
+        : "Im Browser gibt es keine automatische Sicherung außerhalb dieses Browsers — eine Sicherungsdatei von Zeit zu Zeit ist hier sinnvoll."}
+      Beim Einlesen wird nur übernommen, was neuer ist als das, was schon da ist.</p></div>
     <div id="knoepfe"></div>
     <div id="orte"></div>
     <div class="actions"><button class="btn ghost" id="zurueck">Zurück</button></div>

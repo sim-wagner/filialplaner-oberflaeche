@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-10-2",
+  "fassung": "2026-11-12-1",
   "datei": "filialplaner.html",
-  "pruefsumme": "4e9d0eb66c20492ceb718fd23fc11d625c6f0a8e06d3ba5db430a045ab077392",
-  "hinweis": "Planer verschwendet keine Stunden mehr, Pausen versetzt, Stundenkonto buchen, Fehler aus der Durchsicht behoben"
+  "pruefsumme": "4da9ae05f39f310ec71cadc4726dc3be65ae192f891313c35254275faa76f402",
+  "hinweis": "Sicherung läuft sichtbar automatisch, Sicherungsdatei nur noch als Zusatz"
 }
