@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-12-3">
+<meta name="fassung" content="2026-11-12-4">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -272,6 +272,18 @@ table.plan td.stunden{background:var(--surface-2)}
 .phasendetail .switch input[type=radio]{width:16px;height:16px}
 input.kurzzahl{width:70px;padding:4px 6px;font:inherit;text-align:right}
 .tag.phase{background:var(--warn-soft, #FFF4E5);border-color:var(--warn);color:var(--warn);vertical-align:middle}
+.kachelknoepfe{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.termin-wege{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch}
+@media(max-width:700px){.termin-wege{grid-template-columns:1fr}}
+.termin-wege .ablage{justify-content:center;min-height:150px}
+.termin-text{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.termin-text label.f{width:100%}
+.termin-text textarea{width:100%;font-family:var(--mono);font-size:.8rem;resize:vertical}
+.namenzuordnung{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:8px}
+table.termintabelle td{vertical-align:middle}
+table.termintabelle tr.t-fehler td{color:var(--bad)}
+table.termintabelle tr.t-gleich td{color:var(--muted)}
+table.termintabelle tr.t-ersetzt td:nth-child(5){color:var(--warn);font-weight:600}
 table.plan tr.bestell td{font-size:.64rem;color:var(--ink-2);white-space:normal;line-height:1.35}
 table.plan .ue-plus{color:var(--warn)}
 table.plan .ue-minus{color:var(--blau-600)}
@@ -765,6 +777,7 @@ function render(){
   else if (ansicht === "planen")      v.appendChild(planenAnsicht());
   else if (ansicht === "archiv")      v.appendChild(archivAnsicht());
   else if (ansicht === "sicherung")   v.appendChild(sicherungsAnsicht());
+  else if (ansicht === "termine")     v.appendChild(termineAnsicht());
   else                                v.appendChild(SCHRITT_FN()[schritt]());
 
   pruefePlatz();
@@ -3468,6 +3481,7 @@ function planenAnsicht(){
       <label class="f">Kalenderwoche<select id="kw">${wahl.map(w =>
         `<option value="${w.iso}"${w.iso === planWoche ? " selected" : ""}>${w.text}</option>`).join("")}</select></label>
       <div class="tile" id="listenKachel"></div>
+      <div class="tile" id="terminKachel"></div>
     </div>
     <div class="phasenbox">
       <span class="eyebrow">Art der Woche <span class="tag">testweise</span></span>
@@ -3494,6 +3508,28 @@ function planenAnsicht(){
     <p class="sub" style="margin-top:4px">${liste && summe
       ? "Der Plan wird dagegen gehalten."
       : "Ohne Vorgabe entsteht der Plan genauso — nur ohne Vergleich."}</p></div>`));
+
+  // Terminliste: Termine der Mitarbeiter einlesen statt abtippen
+  const tk = p.querySelector("#terminKachel");
+  const eingetragen = Object.values(abw).reduce((x, t) => x + Object.keys(t || {}).length, 0);
+  const imp = state.terminImport;
+  tk.appendChild(el(`<div><span class="eyebrow">Terminliste</span>
+    <div style="font-weight:700;margin-top:4px">${eingetragen
+      ? eingetragen + (eingetragen === 1 ? " Termin" : " Termine") + " in dieser Woche" : "noch keine Termine"}</div>
+    <p class="sub" style="margin-top:4px">${imp ? "zuletzt eingelesen am " + new Date(imp.am).toLocaleDateString("de-DE")
+      : "Urlaub und freie Tage einlesen statt abtippen."}</p>
+    <div class="kachelknoepfe"><button class="btn small" id="termineEin">Einlesen</button>
+      <button class="btn ghost small" id="termineVorlage">Vorlage</button>${TERMIN_SEITE_ONLINE
+      ? `<button class="btn ghost small" id="termineLink">Link für Mitarbeiter</button>` : ""}</div></div>`));
+  tk.querySelector("#termineEin").onclick = () => { ansicht = "termine"; render(); };
+  tk.querySelector("#termineVorlage").onclick = () => terminVorlage();
+  const tl = tk.querySelector("#termineLink");
+  if (tl) tl.onclick = async () => {
+    const text = `Bitte trag deine Termine (Urlaub, freie Tage, Berufsschule) hier ein und schick sie mir: ${TERMIN_SEITE}`;
+    if (inApp){ await appRuf("teilen", {name:"Termine-melden.txt", inhalt: btoa(unescape(encodeURIComponent(text)))}); return; }
+    try { await navigator.clipboard.writeText(TERMIN_SEITE); alert("Link kopiert:\n" + TERMIN_SEITE); }
+    catch(e){ prompt("Link zum Weitergeben:", TERMIN_SEITE); }
+  };
 
   const tb = p.querySelector("#abwBody");
   if (!state.mitarbeiter.length){
@@ -3630,6 +3666,453 @@ function wochenAuswahl(gewaehlt){
     raus.unshift({iso: gewaehlt, text: `KW ${kwVon(d)} · ${deVon(d)}`});
   }
   return raus;
+}
+
+/* ---- Terminliste --------------------------------------------------------
+   Termine der Mitarbeiter — wer wann nicht kann, Urlaub, Berufsschule, nur zu
+   bestimmten Zeiten — kommen über einen einzigen Eingang in die Abwesenheiten:
+     · als Text, wie ihn die Seite „Termine melden“ erzeugt und die Mitarbeiter
+       per WhatsApp oder Mail schicken (einfach einfügen, auch mehrere auf einmal)
+     · als Excel- oder CSV-Datei nach der Vorlage
+     · als .txt-Datei mit demselben Text
+   Alles läuft durch dieselbe Prüfung und landet erst in einer Vorschau. Übernommen
+   wird nur, was dort bestätigt wird, und der letzte Import lässt sich zurücknehmen.
+   Kommen die Meldungen später einmal direkt über einen Server, ändert sich nur
+   die Quelle — Prüfung und Vorschau bleiben dieselben. */
+
+// Die Seite, auf der Mitarbeiter ihre Termine melden. Erst sichtbar, wenn sie online steht.
+const TERMIN_SEITE = "https://sim-wagner.github.io/filialplaner-oberflaeche/termine.html";
+const TERMIN_SEITE_ONLINE = false;
+const TERMIN_ARTEN = [
+  ["nicht",  "kann nicht"],
+  ["urlaub", "Urlaub"],
+  ["krank",  "krank"],
+  ["schule", "Berufsschule"],
+  ["nur",    "nur von–bis"],
+  ["ohne",   "nicht von–bis"]
+];
+const terminArtText = (art, von, bis) => art === "nur" ? `nur ${von}–${bis}`
+  : art === "ohne" ? `nicht ${von}–${bis}` : (TERMIN_ARTEN.find(x => x[0] === art) || ["",""])[1];
+
+// Namen vergleichbar machen: klein, ohne doppelte Leerzeichen, Umlaute ausgeschrieben
+const namensForm = s => String(s || "").toLowerCase().trim().replace(/\s+/g, " ")
+  .replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss");
+
+// „16.11.2026“, „16.11.26“, „2026-11-16“ oder ein Excel-Datum → Date (mittags) oder null
+function datumAusText(v){
+  if (v instanceof Date && !isNaN(v)){
+    // Excel liefert Tage als Mitternacht UTC — dann zählt das UTC-Datum
+    const utc = v.getUTCHours() === 0 && v.getUTCMinutes() === 0;
+    return utc ? new Date(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate(), 12)
+               : new Date(v.getFullYear(), v.getMonth(), v.getDate(), 12);
+  }
+  const s = String(v ?? "").trim();
+  let m = /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/.exec(s);
+  if (m){
+    const j = +m[3] < 100 ? 2000 + +m[3] : +m[3];
+    const d = new Date(j, +m[2] - 1, +m[1], 12);
+    return d.getDate() === +m[1] && d.getMonth() === +m[2] - 1 ? d : null;
+  }
+  m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m){ const d = new Date(+m[1], +m[2] - 1, +m[3], 12); return d.getDate() === +m[3] ? d : null; }
+  return null;
+}
+// „8:00“, „08.00“, „8“ oder eine Excel-Uhrzeit → „08:00“ oder null
+function uhrAusText(v){
+  if (v instanceof Date && !isNaN(v)) return hhmm(v.getUTCHours()*60 + v.getUTCMinutes());
+  if (typeof v === "number" && v >= 0 && v < 1) return hhmm(Math.round(v * 24 * 60));
+  const m = zeitAusText(String(v ?? ""));
+  return m === null ? null : hhmm(m);
+}
+// Was ist gemeint? Erlaubt sind die Wörter der Vorlage und ein paar übliche Kürzel.
+function terminArtAus(text, mitZeit){
+  const t = namensForm(text).replace(/[–—]/g, "-");
+  if (/^(urlaub|u)$/.test(t)) return "urlaub";
+  if (/^(krank|k|au)$/.test(t)) return "krank";
+  if (/^(berufsschule|schule|bs)$/.test(t)) return "schule";
+  if (/^nur( von)?(-bis)?$/.test(t)) return mitZeit ? "nur" : null;
+  if (/^(nicht|kann nicht|nicht da|frei|wunschfrei|verhindert|x)( von)?(-bis)?$/.test(t)) return mitZeit ? "ohne" : "nicht";
+  return null;
+}
+
+/* Text lesen. Erwartet wird, was die Seite „Termine melden“ schreibt:
+     Name: Petra Naumann
+     Filiale: 540
+     Di 17.11.2026: kann nicht
+     Mi 18.11.2026 bis Sa 21.11.2026: Urlaub
+     Do 19.11.2026: nur 08:00–14:00
+   Mehrere Meldungen hintereinander sind erlaubt; jede beginnt mit „Name:“. */
+function termineAusText(text){
+  const raus = [];
+  let name = "", filiale = "";
+  String(text || "").split(/\r?\n/).forEach((roh, nr) => {
+    const z = roh.replace(/\*/g, "").trim();         // WhatsApp setzt gern Sternchen für Fett
+    if (!z) return;
+    let m = /^name\s*:\s*(.+)$/i.exec(z);
+    if (m){ name = m[1].trim(); filiale = ""; return; }
+    m = /^filiale\s*:\s*(?:n\s*)?(\d+)/i.exec(z);
+    if (m){ filiale = m[1]; return; }
+    const datum = "(?:[A-Za-z]{2}\\.?,?\\s*)?(\\d{1,2}\\.\\d{1,2}\\.\\d{2,4})";
+    m = new RegExp("^" + datum + "(?:\\s*(?:bis|-|–)\\s*" + datum + ")?\\s*:?\\s*(.*)$").exec(z);
+    if (!m) return;                                    // Überschriften, Grüße, Leerzeilen
+    const rest = m[3].trim();
+    const zeiten = /(\d{1,2}[:.]\d{2}|\d{1,2})\s*(?:-|–|bis)\s*(\d{1,2}[:.]\d{2}|\d{1,2})\s*(?:uhr)?\s*$/i.exec(rest);
+    const artText = zeiten ? rest.slice(0, zeiten.index).trim() : rest;
+    raus.push({quelle:"Zeile " + (nr + 1), name, filiale,
+               von: datumAusText(m[1]), bis: m[2] ? datumAusText(m[2]) : null,
+               artText, art: terminArtAus(artText, !!zeiten),
+               zVon: zeiten ? uhrAusText(zeiten[1]) : "", zBis: zeiten ? uhrAusText(zeiten[2]) : "",
+               mitZeit: !!zeiten});
+  });
+  return raus;
+}
+
+// Tabelle lesen (Excel oder CSV nach der Vorlage). Die Spalten werden an der
+// Überschrift erkannt, nicht an ihrer Stelle — eine verschobene Spalte schadet nicht.
+function termineAusZeilen(zeilen, quelle){
+  const text = v => v && typeof v === "object" && v.richText ? v.richText.map(r => r.text).join("")
+                  : v && typeof v === "object" && v.text ? v.text : v;
+  const kopfNr = zeilen.findIndex(z => z.some(v => /^name$/i.test(String(text(v) ?? "").trim()))
+                                    && z.some(v => /datum/i.test(String(text(v) ?? ""))));
+  if (kopfNr < 0) return null;
+  const kopf = zeilen[kopfNr].map(v => namensForm(text(v)));
+  const sp = muster => kopf.findIndex(k => muster.test(k));
+  const cName = sp(/^name/), cVon = sp(/^(datum|von datum|ab)/), cBis = sp(/^bis datum|^bis tag|^letzter tag/),
+        cArt = sp(/^art|^grund|^was/), cZv = sp(/^(von|uhrzeit von|ab uhr)$/), cZb = sp(/^(bis|uhrzeit bis|bis uhr)$/);
+  const raus = [];
+  zeilen.slice(kopfNr + 1).forEach((z, n) => {
+    const w = c => c < 0 ? "" : text(z[c]);
+    const name = String(w(cName) ?? "").trim();
+    const d = w(cVon);
+    const leer = v => v === "" || v === null || v === undefined;
+    const zVon = w(cZv), zBis = w(cZb);
+    // Leere Zeilen und die vorgedruckten Namen der Vorlage ohne Termin überspringen
+    if (leer(d) && leer(w(cArt)) && leer(zVon) && leer(zBis)) return;
+    if (/^beispiel/i.test(name)) return;                                   // Musterzeile der Vorlage
+    const mitZeit = (zVon !== "" && zVon !== null && zVon !== undefined) || (zBis !== "" && zBis !== null && zBis !== undefined);
+    const artText = String(w(cArt) ?? "").trim();
+    raus.push({quelle: `${quelle}, Zeile ${kopfNr + n + 2}`, name, filiale:"",
+               von: datumAusText(d), bis: cBis < 0 || !w(cBis) ? null : datumAusText(w(cBis)),
+               artText, art: terminArtAus(artText, mitZeit),
+               zVon: mitZeit ? uhrAusText(zVon) : "", zBis: mitZeit ? uhrAusText(zBis) : "", mitZeit});
+  });
+  return raus;
+}
+function csvZeilen(text){
+  const erste = text.split(/\r?\n/)[0] || "";
+  const trenn = erste.includes("\t") ? "\t" : (erste.match(/;/g) || []).length >= (erste.match(/,/g) || []).length ? ";" : ",";
+  return text.split(/\r?\n/).map(z => z.split(trenn).map(v => v.replace(/^"(.*)"$/, "$1").trim()));
+}
+
+/* Aus den gelesenen Einträgen eine Liste je Mitarbeiter und Tag machen und jeden
+   Tag prüfen. Ergebnis je Zeile: ok (neu), gleich (steht schon so da), ersetzt
+   (anderer Eintrag würde überschrieben), fehler (wird nicht übernommen). */
+function termineVorbereiten(eintraege){
+  const ms = state.mitarbeiter;
+  const zuordnung = state.namensZuordnung || {};
+  const heute = montagDer(null);
+  const zeilen = [];
+  const wer = name => {
+    const n = namensForm(name);
+    if (!n) return {i:-1, grund:"ohne Namen"};
+    if (zuordnung[n] !== undefined){ const i = ms.findIndex(m => m.name === zuordnung[n]); if (i >= 0) return {i}; }
+    const genau = ms.map((m,i) => i).filter(i => namensForm(ms[i].name) === n);
+    if (genau.length === 1) return {i:genau[0]};
+    // „Petra“ oder „Naumann“ allein: nur, wenn es genau eine Person mit diesem Namensteil gibt
+    const teil = ms.map((m,i) => i).filter(i => namensForm(ms[i].name).split(" ").includes(n)
+                                             || namensForm(ms[i].name).startsWith(n + " "));
+    if (teil.length === 1) return {i:teil[0]};
+    return {i:-1, grund: teil.length > 1 ? "Name passt auf mehrere" : "Name nicht im Personal"};
+  };
+  eintraege.forEach(e => {
+    const basis = {quelle:e.quelle, nameRoh:e.name, art:e.art, zVon:e.zVon, zBis:e.zBis};
+    const zu = wer(e.name);
+    const fehler = t => zeilen.push(Object.assign({}, basis, {status:"fehler", grund:t, datum:e.von, i:zu.i}));
+    if (e.filiale && state.nr && key(e.filiale) !== key(state.nr)) return fehler(`gehört zu Filiale ${e.filiale}`);
+    if (!e.von) return fehler("Datum fehlt oder ist nicht lesbar");
+    if (e.bis && e.bis < e.von) return fehler("„bis“ liegt vor dem Anfang");
+    if (!e.art) return fehler(e.mitZeit ? `„${e.artText || "?"}“ mit Uhrzeit nicht verständlich — „nur“ oder „nicht“?`
+                                        : `„${e.artText || "(leer)"}“ ist keine bekannte Art`);
+    if (e.mitZeit){
+      if (!e.zVon || !e.zBis) return fehler("Uhrzeit nicht lesbar");
+      if (minuten(e.zBis) <= minuten(e.zVon)) return fehler("Uhrzeit „bis“ liegt nicht nach „von“");
+    }
+    const ende = e.bis || e.von;
+    if ((ende - e.von) / 864e5 > 62) return fehler("Zeitraum länger als zwei Monate — bitte prüfen und aufteilen");
+    for (let d = new Date(e.von); d <= ende; d.setDate(d.getDate() + 1)){
+      const tagNr = (d.getDay() + 6) % 7;
+      const zeile = Object.assign({}, basis, {datum:new Date(d), i:zu.i});
+      if (tagNr === 6){ if (!e.bis) zeilen.push(Object.assign(zeile, {status:"gleich", grund:"Sonntag — geschlossen"})); continue; }
+      if (istFeiertag(d)){ zeilen.push(Object.assign(zeile, {status:"gleich", grund:"Feiertag — geschlossen"})); continue; }
+      if (montagDer(isoVon(d)) < heute){ zeilen.push(Object.assign(zeile, {status:"fehler", grund:"liegt in einer vergangenen Woche"})); continue; }
+      if (zu.i < 0){ zeilen.push(Object.assign(zeile, {status:"fehler", grund:zu.grund, offenerName:true})); continue; }
+      zeilen.push(terminVergleichen(zeile));
+    }
+  });
+  return zeilen;
+}
+// Steht für diesen Tag schon etwas — und ist es dasselbe?
+function terminVergleichen(z){
+  const sl = wochenSchluessel(z.datum), tag = TAGE[(z.datum.getDay() + 6) % 7][0];
+  const neu = (z.art === "nur" || z.art === "ohne") ? {a:z.art, von:z.zVon, bis:z.zBis} : z.art;
+  const alt = (((state.abwesend || {})[sl] || {})[z.i] || {})[tag];
+  const gleich = alt && JSON.stringify(alt) === JSON.stringify(neu);
+  const altText = !alt ? "" : typeof alt === "string" ? terminArtText(alt) : terminArtText(alt.a, alt.von, alt.bis);
+  return Object.assign(z, {sl, tag, neu, status: gleich ? "gleich" : alt ? "ersetzt" : "ok",
+    grund: gleich ? "steht schon so da" : alt ? `ersetzt „${altText}“` : "", plan: !!state.plaene[sl]});
+}
+
+// Übernehmen, was angehakt ist — und merken, was vorher dastand
+function termineUebernehmen(zeilen, quelle){
+  const rueck = [];
+  zeilen.forEach(z => {
+    state.abwesend[z.sl] = state.abwesend[z.sl] || {};
+    const w = state.abwesend[z.sl][z.i] = state.abwesend[z.sl][z.i] || {};
+    rueck.push({sl:z.sl, i:z.i, name:state.mitarbeiter[z.i].name, tag:z.tag, vorher: w[z.tag] === undefined ? null : w[z.tag]});
+    w[z.tag] = z.neu;
+  });
+  const wochen = [...new Set(zeilen.map(z => z.sl))].sort();
+  state.terminImport = {am: new Date().toISOString(), quelle, anzahl: zeilen.length, wochen, rueck};
+  return wochen;
+}
+function terminImportZuruecknehmen(){
+  const imp = state.terminImport;
+  if (!imp || !imp.rueck) return 0;
+  imp.rueck.forEach(r => {
+    // über den Namen, falls sich die Liste inzwischen verschoben hat
+    const i = state.mitarbeiter.findIndex(m => m.name === r.name);
+    if (i < 0) return;
+    state.abwesend[r.sl] = state.abwesend[r.sl] || {};
+    const w = state.abwesend[r.sl][i] = state.abwesend[r.sl][i] || {};
+    if (r.vorher === null) delete w[r.tag]; else w[r.tag] = r.vorher;
+  });
+  const n = imp.rueck.length;
+  delete state.terminImport;
+  return n;
+}
+
+// Excel-Vorlage: eine Zeile je Termin, Art als Auswahlliste, Erklärung auf Blatt 2
+async function terminVorlage(){
+  if (!window.ExcelJS){ alert("Excel-Bibliothek nicht geladen."); return; }
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Termine");
+  ws.columns = [{header:"Name", width:24}, {header:"Datum", width:13}, {header:"bis Datum", width:13},
+                {header:"Art", width:16}, {header:"von", width:8}, {header:"bis", width:8}];
+  ws.getRow(1).font = {bold:true};
+  ws.addRow(["Beispiel: Petra Naumann", "17.11.2026", "", "nur", "08:00", "14:00"]).font = {italic:true, color:{argb:"FF888888"}};
+  state.mitarbeiter.forEach(m => ws.addRow([m.name, "", "", "", "", ""]));
+  for (let r = 2; r <= 200; r++){
+    ws.getCell(r, 4).dataValidation = {type:"list", allowBlank:true,
+      formulae:['"kann nicht,Urlaub,krank,Berufsschule,nur,nicht"'],
+      showErrorMessage:true, errorTitle:"Art", error:"Bitte aus der Liste wählen."};
+    ws.getCell(r, 2).numFmt = "dd.mm.yyyy"; ws.getCell(r, 3).numFmt = "dd.mm.yyyy";
+  }
+  ws.views = [{state:"frozen", ySplit:1}];
+  const h = wb.addWorksheet("So geht's");
+  [["So wird die Liste ausgefüllt"], [""],
+   ["Name", "wie im Personal (Vor- und Nachname). Ein Vorname allein reicht, wenn er eindeutig ist."],
+   ["Datum", "der Tag, z. B. 17.11.2026"],
+   ["bis Datum", "nur bei mehreren Tagen am Stück, z. B. Urlaub — sonst leer lassen"],
+   ["Art", "kann nicht · Urlaub · krank · Berufsschule · nur · nicht"],
+   ["von / bis", "nur bei „nur“ (arbeitet nur in dieser Zeit) und „nicht“ (in dieser Zeit nicht)"],
+   [""], ["Eine Zeile je Termin. Sonntage und Feiertage werden übersprungen."],
+   ["Die Datei danach in der App unter „Plan erstellen“ → Terminliste → „Einlesen“ hineinziehen."]]
+    .forEach(z => h.addRow(z));
+  h.getColumn(1).width = 14; h.getColumn(2).width = 90; h.getRow(1).font = {bold:true, size:13};
+  const buf = await wb.xlsx.writeBuffer();
+  await anbieten(new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),
+                 `Terminliste_Vorlage_N${state.nr}.xlsx`);
+}
+
+let terminVorschau = null;     // Zeilen der laufenden Prüfung
+
+function termineAnsicht(){
+  const p = el(`<div class="panel">
+    <div class="head"><span class="eyebrow">Terminliste</span>
+      <h1 style="margin-top:4px">Termine der Mitarbeiter einlesen</h1>
+      <p class="lede">Hier kommen Urlaub, freie Tage und Zeiten, zu denen jemand nur oder gar nicht
+      kann, in den Plan — ohne Abtippen. Erst siehst du eine Vorschau, übernommen wird nur, was du
+      bestätigst.</p></div>
+    <div class="termin-wege">
+      <div class="ablage" id="ablage" tabindex="0" role="button">
+        <b>Datei hierher ziehen</b>
+        <span class="hint">oder klicken zum Auswählen — Excel oder CSV nach der Vorlage, auch
+        mehrere Dateien auf einmal</span></div>
+      <div class="termin-text">
+        <label class="f">oder Nachrichten hier einfügen
+          <textarea id="text" rows="6" placeholder="Name: Petra Naumann&#10;Di 17.11.2026: kann nicht&#10;Mi 18.11.2026: nur 08:00–14:00"></textarea></label>
+        <button class="btn small" id="pruefen">Prüfen</button>
+      </div>
+    </div>
+    <input type="file" id="datei" accept=".xlsx,.csv,.txt,text/plain" multiple hidden>
+    <p class="err" id="lesefehler"></p>
+    <div id="vorschau"></div>
+    <div id="letzter"></div>
+    <div class="actions"><button class="btn ghost" id="zurueck">Zurück zum Plan</button></div>
+  </div>`);
+
+  const sagen = t => p.querySelector("#lesefehler").textContent = t;
+  const zeigen = (zeilen, quelle) => { terminVorschau = {zeilen, quelle}; vorschau(); };
+
+  // --- Dateien ---
+  const ablage = p.querySelector("#ablage"), feld = p.querySelector("#datei");
+  ablage.onclick = () => feld.click();
+  ablage.onkeydown = e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); feld.click(); } };
+  ["dragenter","dragover"].forEach(n => ablage.addEventListener(n, e => { e.preventDefault(); ablage.classList.add("drueber"); }));
+  ["dragleave","drop"].forEach(n => ablage.addEventListener(n, e => { e.preventDefault(); ablage.classList.remove("drueber"); }));
+  ablage.addEventListener("drop", e => lesen([...e.dataTransfer.files]));
+  feld.onchange = () => { lesen([...feld.files]); feld.value = ""; };
+  async function lesen(dateien){
+    sagen("");
+    if (!dateien.length) return;
+    const alle = [];
+    for (const d of dateien){
+      const n = d.name.toLowerCase();
+      try {
+        let ein = null;
+        if (n.endsWith(".xlsx")){
+          if (!window.ExcelJS) return sagen("Die Excel-Bibliothek ist nicht geladen.");
+          const wb = new ExcelJS.Workbook();
+          await wb.xlsx.load(await d.arrayBuffer());
+          const zeilen = [];
+          wb.worksheets[0].eachRow(r => { const z = []; r.eachCell({includeEmpty:true}, c => z.push(c.value && c.value.result !== undefined ? c.value.result : c.value)); zeilen.push(z); });
+          ein = termineAusZeilen(zeilen, d.name);
+          if (!ein) return sagen(`${d.name}: keine Spalten „Name“ und „Datum“ gefunden. Am sichersten geht es mit der Vorlage.`);
+        } else if (n.endsWith(".csv")){
+          ein = termineAusZeilen(csvZeilen(await d.text()), d.name);
+          if (!ein) return sagen(`${d.name}: keine Spalten „Name“ und „Datum“ gefunden. Am sichersten geht es mit der Vorlage.`);
+        } else if (n.endsWith(".txt") || d.type === "text/plain"){
+          ein = termineAusText(await d.text()).map(e => Object.assign(e, {quelle: d.name + ", " + e.quelle}));
+        } else return sagen(`${d.name}: Dieses Format kann die Terminliste nicht lesen — Excel, CSV oder Text.`);
+        alle.push(...ein);
+      } catch(e){ return sagen(`${d.name} ließ sich nicht lesen: ${e.message}`); }
+    }
+    if (!alle.length) return sagen("In der Datei stand kein Termin.");
+    zeigen(termineVorbereiten(alle), dateien.map(d => d.name).join(", "));
+  }
+
+  // --- Text ---
+  p.querySelector("#pruefen").onclick = () => {
+    sagen("");
+    const ein = termineAusText(p.querySelector("#text").value);
+    if (!ein.length) return sagen("Im Text stand keine Zeile mit Datum. Eine Zeile sieht so aus: „Di 17.11.2026: kann nicht“.");
+    zeigen(termineVorbereiten(ein), "dem eingefügten Text");
+  };
+
+  // --- Vorschau ---
+  function vorschau(){
+    const box = p.querySelector("#vorschau");
+    box.innerHTML = "";
+    if (!terminVorschau) return;
+    const z = terminVorschau.zeilen;
+    const nutzbar = z.filter(x => x.status === "ok" || x.status === "ersetzt");
+    const fehler = z.filter(x => x.status === "fehler");
+    const offen = [...new Set(fehler.filter(x => x.offenerName).map(x => x.nameRoh))];
+    const wochen = [...new Set(nutzbar.map(x => x.sl))].sort();
+    const mitPlan = wochen.filter(sl => state.plaene[sl]);
+    nutzbar.forEach(x => { if (x.an === undefined) x.an = true; });
+
+    const kopf = el(`<div class="note ${fehler.length ? "warn" : "ok"}" style="margin-top:16px"><span class="ic">${fehler.length ? "!" : "✓"}</span>
+      <span><b>${nutzbar.length} ${nutzbar.length === 1 ? "Tag" : "Tage"} zum Übernehmen</b>${wochen.length
+        ? ` in ${wochen.map(sl => "KW " + sl.slice(-2)).join(", ")}` : ""}${fehler.length
+        ? ` · <b>${fehler.length} ${fehler.length === 1 ? "Zeile" : "Zeilen"} mit Problem</b> — ${fehler.length === 1 ? "sie wird" : "sie werden"} nicht übernommen` : ""}${
+        z.length - nutzbar.length - fehler.length ? ` · ${z.length - nutzbar.length - fehler.length} schon erledigt oder übersprungen` : ""}.</span></div>`);
+    box.appendChild(kopf);
+
+    // Unbekannte Namen gleich hier zuordnen — wird gemerkt
+    if (offen.length){
+      const zu = el(`<div class="tile" style="margin-top:10px"><span class="eyebrow">Wer ist gemeint?</span>
+        <div class="namenzuordnung"></div>
+        <p class="hint" style="margin-top:6px">Die Zuordnung wird gemerkt — beim nächsten Mal klappt es von selbst.</p></div>`);
+      offen.forEach(n => {
+        const r = el(`<label class="f">„${esc(n || "ohne Namen")}“<select><option value="">— auswählen —</option>${
+          state.mitarbeiter.map(m => `<option>${esc(m.name)}</option>`).join("")}</select></label>`);
+        r.querySelector("select").onchange = e => {
+          if (!e.target.value) return;
+          if (n){ state.namensZuordnung = state.namensZuordnung || {}; state.namensZuordnung[namensForm(n)] = e.target.value; }
+          const i = state.mitarbeiter.findIndex(m => m.name === e.target.value);
+          terminVorschau.zeilen.forEach(x => {
+            if (!x.offenerName || x.nameRoh !== n) return;
+            delete x.offenerName; x.i = i;
+            terminVergleichen(x);
+          });
+          sichern(); vorschau();
+        };
+        zu.querySelector(".namenzuordnung").appendChild(r);
+      });
+      box.appendChild(zu);
+    }
+
+    const sortiert = z.slice().sort((a,b) => (a.i - b.i) || ((a.datum || 0) - (b.datum || 0)));
+    const tab = el(`<div class="tablewrap" style="margin-top:10px"><table class="termintabelle"><thead><tr>
+      <th></th><th>Mitarbeiter</th><th>Tag</th><th>Termin</th><th>Hinweis</th></tr></thead><tbody></tbody></table></div>`);
+    sortiert.forEach(x => {
+      const nutzt = x.status === "ok" || x.status === "ersetzt";
+      const wer = x.i >= 0 ? state.mitarbeiter[x.i].name : (x.nameRoh || "—");
+      const tag = x.datum ? x.datum.toLocaleDateString("de-DE", {weekday:"short", day:"2-digit", month:"2-digit", year:"numeric"}) : "—";
+      const was = x.art ? terminArtText(x.art, x.zVon, x.zBis) : "—";
+      const tr = el(`<tr class="t-${x.status}">
+        <td>${nutzt ? `<input type="checkbox"${x.an ? " checked" : ""} aria-label="übernehmen">` : x.status === "fehler" ? "✗" : "="}</td>
+        <td>${esc(wer)}</td><td>${esc(tag)}</td><td>${esc(was)}</td>
+        <td>${esc(x.grund || (x.plan ? "Plan dieser Woche gibt es schon" : ""))}<span class="hint">${
+          x.grund || x.plan ? " · " : ""}${esc(x.quelle)}</span></td></tr>`);
+      const cb = tr.querySelector("input");
+      if (cb) cb.onchange = () => { x.an = cb.checked; knopf(); };
+      tab.querySelector("tbody").appendChild(tr);
+    });
+    box.appendChild(tab);
+
+    const fuss = el(`<div class="actions" style="border-top:0;padding-top:6px">
+      <button class="btn ghost" id="verwerfen">Verwerfen</button><div class="spacer"></div>
+      <button class="btn" id="uebernehmen"></button></div>`);
+    box.appendChild(fuss);
+    const knopf = () => {
+      const n = nutzbar.filter(x => x.an).length;
+      const b = fuss.querySelector("#uebernehmen");
+      b.textContent = n ? `${n} ${n === 1 ? "Tag" : "Tage"} übernehmen` : "nichts ausgewählt";
+      b.disabled = !n;
+    };
+    knopf();
+    fuss.querySelector("#verwerfen").onclick = () => { terminVorschau = null; vorschau(); };
+    fuss.querySelector("#uebernehmen").onclick = async () => {
+      const wahl = nutzbar.filter(x => x.an);
+      if (!wahl.length) return;
+      const ersetzt = wahl.filter(x => x.status === "ersetzt").length;
+      if (ersetzt && !confirm(`${ersetzt} schon eingetragene ${ersetzt === 1 ? "Angabe wird" : "Angaben werden"} überschrieben. Weiter?`)) return;
+      const wo = termineUebernehmen(wahl, terminVorschau.quelle);
+      terminVorschau = null;
+      await speichere();
+      const plaeneDa = wo.filter(sl => state.plaene[sl]);
+      p.querySelector("#text").value = "";
+      vorschau(); letzter();
+      p.querySelector("#letzter").prepend(el(`<div class="note ok" style="margin-top:14px"><span class="ic">✓</span><span>
+        <b>${wahl.length} ${wahl.length === 1 ? "Tag" : "Tage"} übernommen.</b>${plaeneDa.length
+          ? ` Für ${plaeneDa.map(sl => "KW " + sl.slice(-2)).join(", ")} gibt es schon einen Plan — damit die Termine
+             darin stehen, die Woche neu erstellen.` : " Sie stehen beim nächsten Plan drin."}</span></div>`));
+    };
+  }
+
+  // --- Letzter Import, zum Zurücknehmen ---
+  function letzter(){
+    const box = p.querySelector("#letzter");
+    box.innerHTML = "";
+    const imp = state.terminImport;
+    if (!imp) return;
+    const z = el(`<p class="hint" style="margin-top:14px">Zuletzt eingelesen am ${new Date(imp.am).toLocaleString("de-DE",
+      {day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"})}: ${imp.anzahl} ${imp.anzahl === 1 ? "Tag" : "Tage"}
+      aus ${esc(imp.quelle)}. <button class="btn ghost small" id="rueck">rückgängig machen</button></p>`);
+    z.querySelector("#rueck").onclick = async () => {
+      if (!confirm("Den letzten Import zurücknehmen? Was vorher eingetragen war, kommt zurück.")) return;
+      const n = terminImportZuruecknehmen();
+      await speichere(); letzter();
+      box.prepend(el(`<div class="note ok" style="margin-top:14px"><span class="ic">✓</span><span>${n} ${n === 1 ? "Tag" : "Tage"} zurückgenommen.</span></div>`));
+    };
+    box.appendChild(z);
+  }
+
+  p.querySelector("#zurueck").onclick = () => { terminVorschau = null; ansicht = "planen"; render(); };
+  vorschau(); letzter();
+  return p;
 }
 
 /* ---- Sicherung ---- */
