@@ -66,6 +66,18 @@ input:focus,button:focus-visible{outline:2px solid var(--blau);outline-offset:2p
 .feldfehler{color:var(--rot);font-size:.88rem;margin-top:8px}
 .laden{opacity:.6;pointer-events:none}
 #senden{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom,0px));box-shadow:0 6px 18px rgba(20,33,61,.18)}
+.abschnitt{font-size:1.1rem;margin:18px 0 10px}
+.meinplan .mp-kopf{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.mp-reiter{display:flex;gap:6px}
+.mp-reiter button{font:inherit;font-size:.85rem;font-weight:700;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);
+  border-radius:999px;padding:5px 12px;cursor:pointer}
+.mp-reiter button[aria-pressed="true"]{background:var(--blau);border-color:var(--blau);color:#fff}
+.mp-zeile{display:flex;gap:12px;padding:8px 6px;border-top:1px solid var(--line);align-items:baseline}
+.mp-zeile.mp-heute{background:var(--blau-hell);border-radius:8px}
+.mp-tag{width:78px;flex:none;font-weight:700;font-size:.92rem}
+.mp-zeit{font-weight:700;font-variant-numeric:tabular-nums}
+.mp-pause{color:var(--muted);font-size:.84rem;margin-left:10px}
+.mp-frei{color:var(--muted)}
 .fuss{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:18px}
 </style>
 </head>
@@ -81,10 +93,30 @@ const SCHLUESSEL = "sb_publishable_ZSvBat1AEEvtUbpykTCrjw_FSPRl6H1";
 
 const TAGE = [["mo","Montag"],["di","Dienstag"],["mi","Mittwoch"],["do","Donnerstag"],["fr","Freitag"],["sa","Samstag"]];
 const ARTEN = [["frei","Frei verfügbar"],["nur","Nur bestimmte Zeiten"],["krank","Krank"],["urlaub","Urlaub"]];
-const FEIERTAGE_BW = {
-  2026:["01-01","01-06","04-03","04-06","05-01","05-14","05-25","06-04","10-03","11-01","12-25","12-26"],
-  2027:["01-01","01-06","03-26","03-29","05-01","05-06","05-17","05-27","10-03","11-01","12-25","12-26"]
-};
+// Feiertage des Bundeslands der Filiale, für jedes Jahr berechnet (wie in der App)
+let landDerFiliale = "BW";
+function ostersonntag(j){
+  const a = j % 19, b = Math.floor(j / 100), c = j % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19*a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2*e + 2*i - h - k) % 7, m = Math.floor((a + 11*h + 22*l) / 451);
+  return new Date(j, Math.floor((h + l - 7*m + 114) / 31) - 1, ((h + l - 7*m + 114) % 31) + 1, 12);
+}
+function feiertage(j, land){
+  const o = ostersonntag(j), n = x => { const d = new Date(o); d.setDate(o.getDate() + x); return mt(d); };
+  const mt = d => String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  const in_ = (...l) => l.includes(land);
+  const s = new Set(["01-01", n(-2), n(1), "05-01", n(39), n(50), "10-03", "12-25", "12-26"]);
+  if (in_("BW","BY","ST")) s.add("01-06");
+  if (in_("BE") || (in_("MV") && j >= 2023)) s.add("03-08");
+  if (in_("BW","BY","HE","NW","RP","SL")) s.add(n(60));
+  if (in_("SL","BY")) s.add("08-15");
+  if (in_("TH") && j >= 2019) s.add("09-20");
+  if (in_("BB","MV","SN","ST","TH") || (in_("HB","HH","NI","SH") && j >= 2018)) s.add("10-31");
+  if (in_("BW","BY","NW","RP","SL")) s.add("11-01");
+  if (in_("SN")){ const d = new Date(j, 10, 22, 12); while (d.getDay() !== 3) d.setDate(d.getDate() - 1); s.add(mt(d)); }
+  return s;
+}
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const lies = k => { try { return JSON.parse(localStorage.getItem("zeiten:" + k) || "null"); } catch(e){ return null; } };
@@ -94,6 +126,8 @@ let zugang = lies("zugang");          // {nr, code, name}
 let woche = null;                     // Antwort des Servers: woche, montag, frist, abgabe, abgegeben
 let entwurf = null;                   // {mo:{art,von,bis}, …}
 let abstand = 0;                      // Serverzeit minus Gerätezeit — falsch gestellte Handys zählen nicht
+let meinPlan = null;                  // eigene Schichten der laufenden und nächsten Woche, falls freigegeben
+let planReiter = 0;
 let uhr = null;
 
 async function rufe(fn, daten){
@@ -112,7 +146,7 @@ async function rufe(fn, daten){
 const tagDatum = (montag, i) => { const d = new Date(montag + "T12:00:00"); d.setDate(d.getDate() + i); return d; };
 const kurz = d => d.toLocaleDateString("de-DE", {day:"2-digit", month:"2-digit"});
 const lang = d => d.toLocaleDateString("de-DE", {day:"2-digit", month:"2-digit", year:"numeric"});
-const istFeiertag = d => (FEIERTAGE_BW[d.getFullYear()] || []).includes(
+const istFeiertag = d => feiertage(d.getFullYear(), landDerFiliale).has(
   String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"));
 const jetzt = () => new Date(Date.now() + abstand);
 const kwNr = sl => String(sl).slice(-2).replace(/^0/, "");
@@ -148,6 +182,10 @@ async function laden(z){
     const w = await rufe("termine_anmelden", {p_nr:z.nr, p_code:z.code, p_name:z.name});
     zugang = {nr:z.nr, code:z.code, name:w.name};
     merke("zugang", zugang);
+    if (w.land) landDerFiliale = w.land;
+    // Den eigenen Plan holen — gibt es ihn (noch) nicht, bleibt der Bereich einfach weg
+    try { meinPlan = await rufe("termine_mein_plan", {p_nr:z.nr, p_code:z.code, p_name:w.name}); }
+    catch(e){ meinPlan = null; }
     abstand = new Date(w.jetzt) - Date.now();
     // Liegt noch ein Entwurf für eine Woche herum, deren Frist vorbei ist? Dann sagen.
     const alt = lies("entwurf");
@@ -201,6 +239,8 @@ function zeigen(verpasst){
   const mo = tagDatum(woche.montag, 0), sa = tagDatum(woche.montag, 5);
   const frist = new Date(woche.frist), fristTag = new Date(frist.getTime() - 60000);   // Mittwoch 23:59
   $("#app").innerHTML = `
+    <div id="meinPlan"></div>
+    <h2 class="abschnitt">Zeiten abgeben</h2>
     <div class="karte kopf">
       <div class="kw">Arbeitsplan KW ${esc(woche.woche.slice(-2).replace(/^0/, ""))}</div>
       <div class="zeitraum">${kurz(mo)} – ${lang(sa)}</div>
@@ -219,6 +259,7 @@ function zeigen(verpasst){
       <button class="link" id="kalender">Erinnerung in meinen Kalender</button>
       <button class="link" id="abmelden">Abmelden</button>
     </div>`;
+  zeichneMeinPlan();
   zeichneTage();
   status();
   uhr = setInterval(status, 30000);
@@ -266,6 +307,31 @@ function zeigen(verpasst){
     knopf.textContent = gesendet ? (gleich ? "Abgeschickt ✓" : "Änderungen abschicken") : "Abschicken";
   }
   zeigen.status = status;
+}
+
+// Die eigenen Schichten — nur, wenn die Filialleitung den Plan freigegeben hat
+function zeichneMeinPlan(){
+  const box = $("#meinPlan");
+  const wochen = (meinPlan && meinPlan.wochen) || [];
+  if (!box || !wochen.length){ if (box) box.innerHTML = ""; return; }
+  if (planReiter >= wochen.length) planReiter = 0;
+  const w = wochen[planReiter];
+  const heute = new Date(); heute.setHours(12, 0, 0, 0);
+  const zeilen = TAGE.map(([k, name], i) => {
+    const d = tagDatum(w.montag, i);
+    const eigene = (w.schichten || []).filter(s => s.tag === k);
+    const was = istFeiertag(d) ? `<span class="mp-frei">Feiertag</span>`
+      : eigene.length ? eigene.map(s => `<span class="mp-zeit">${esc(s.von)}–${esc(s.bis)}</span>${s.pVon
+          ? `<span class="mp-pause">Pause ${esc(s.pVon)}–${esc(s.pBis)}</span>` : ""}`).join("<br>")
+      : `<span class="mp-frei">frei</span>`;
+    return `<div class="mp-zeile${d.getTime() === heute.getTime() ? " mp-heute" : ""}">
+      <span class="mp-tag">${name.slice(0, 2)} ${kurz(d)}</span><span>${was}</span></div>`;
+  }).join("");
+  const stand = new Date(w.geaendert).toLocaleString("de-DE", {weekday:"short", day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit"});
+  box.innerHTML = `<div class="karte meinplan"><div class="mp-kopf"><b>Mein Plan</b>
+      <div class="mp-reiter">${wochen.map((x, n) => `<button type="button" data-n="${n}" aria-pressed="${n === planReiter}">KW ${esc(kwNr(x.woche))}</button>`).join("")}</div></div>
+    ${zeilen}<p class="hint" style="margin:8px 0 0">Stand: ${stand} Uhr. Ändert die Filialleitung etwas, steht es hier.</p></div>`;
+  box.querySelectorAll("[data-n]").forEach(b => b.onclick = () => { planReiter = +b.dataset.n; zeichneMeinPlan(); });
 }
 
 function zeichneTage(){
