@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-13-1",
+  "fassung": "2026-11-13-2",
   "datei": "filialplaner.html",
-  "pruefsumme": "1a3a14d1c82af1a8c7d2b4371662376c41f51dcf3c96f7e12a747398513aff39",
-  "hinweis": "Testsystem: Testfassung ausprobieren und jederzeit zurück; Urlaub & Krankheit; Mein Plan"
+  "pruefsumme": "cf20cf09ffbc5b523e87046c91b5eb554fb52c0b6b258adb4c5a52cbe963102e",
+  "hinweis": "Prüfung vor dem Planen, Alter als Pflichtangabe, keine Vorbelegungen, unvollständige Zeiten rot"
 }
