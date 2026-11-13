@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-13-3-test">
+<meta name="fassung" content="2026-11-13-4-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -5260,18 +5260,6 @@ function startseite(){
 
   const warnung = archivHinweis();
   if (warnung) p.insertBefore(warnung, p.firstChild);
-
-  // Fehlt etwas Grundlegendes, steht es oben — nicht erst beim Planen
-  const bereit = bereitschaft(null);
-  if (!bereit.bereit){
-    const n = bereit.blocker.length;
-    const hinweis = el(`<div class="note bad" style="margin-top:14px"><span class="ic">!</span><span>
-      <b>Bevor ein Plan entstehen kann, ${n === 1 ? "fehlt eine Angabe" : `fehlen ${n} Angaben`}.</b>
-      <span class="bereit-zeile"><span>${esc(bereit.blocker[0].text)}</span>
-      <button class="btn ghost small">Ansehen</button></span></span></div>`);
-    hinweis.querySelector("button").onclick = () => { planWoche = isoVon(mo); ansicht = "planen"; render(); };
-    p.querySelector("#planBox").before(hinweis);
-  }
 
   // Plan oder Hinweis
   const inhalt = p.querySelector("#planInhalt");
