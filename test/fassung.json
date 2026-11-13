@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-13-1-test",
+  "fassung": "2026-11-13-2-test",
   "datei": "filialplaner.html",
-  "pruefsumme": "0d4aa473424df0d92116a7326253b7f7e91dbbb1ed40083a4cb78c79a53940db",
-  "hinweis": "Testkanal eingerichtet: Testfassung mit eigener Testkopie der Daten"
+  "pruefsumme": "9f7b2803d12a94cff11468134a25052b18ce59388b6688a15a734bd2c34876c0",
+  "hinweis": "Schritt 1: Prüfung vor dem Planen, Alter als Pflichtangabe, keine Vorbelegungen, unvollständige Zeiten rot"
 }

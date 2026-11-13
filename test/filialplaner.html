@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-13-1-test">
+<meta name="fassung" content="2026-11-13-2-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -343,6 +343,30 @@ table.plan .ue-aend{font-size:.62rem;font-weight:700}
 .testband .btn.hell{background:#fff;color:#7C2D12;border-color:#fff}
 .chip.test{background:#FEF3C7;border-color:#B45309;color:#7C2D12}
 .testkasten{margin:16px 0;border-color:#F59E0B}
+
+/* Bereitschaft und Pflichtangaben (13.11.2026) */
+.pflicht{font-size:.66rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--warn);margin-left:4px}
+input.fehlt, select.fehlt{border-color:var(--bad) !important;box-shadow:0 0 0 3px var(--bad-soft)}
+.janein{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden}
+.janein button{font:inherit;font-size:.8rem;font-weight:600;padding:6px 11px;border:0;background:var(--surface);color:var(--ink-2);cursor:pointer}
+.janein button + button{border-left:1.5px solid var(--line)}
+.janein button[aria-pressed="true"]{background:var(--blau-700);color:#fff}
+.task .offenhinweis{display:none;margin:6px 0 0}
+.task.offen{border-color:var(--warn);background:var(--warn-soft)}
+.task.offen .offenhinweis{display:block;color:var(--warn);font-weight:600}
+.bereit{margin:18px 0 4px}
+.bereit .note span b{display:block;margin-bottom:2px}
+.bereit-zeile{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.bereit-zeile .btn{flex:none}
+.bereit-alter{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px;color:var(--ink)}
+.bereit-alter b{min-width:8em;display:inline-block!important;margin:0!important}
+.abwzelle.fehlt{background:var(--bad-soft)}
+.abwzelle.fehlt input[type=time]:invalid, .abwzelle.fehlt input[type=time]{border-color:var(--bad)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.tag.fehlt{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.bereit-hinweise{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:11px 13px;font-size:.85rem;font-weight:500;margin-top:8px}
+.bereit-hinweise summary{cursor:pointer}
+.bereit-hinweise .bereit-zeile span{color:var(--ink-2)}
 </style>
 
 <div class="topbar"><div class="topbar-in">
@@ -661,6 +685,16 @@ function alter(gb){
   return a;
 }
 
+// Für den Jugendschutz zählt das Geburtsdatum. Ohne Datum gilt die Angabe
+// „18 oder älter“ / „unter 18“ (volljaehrig true/false); fehlt auch die, ist das Alter
+// unbekannt — dann entsteht kein Plan (siehe bereitschaft).
+function altersAngabe(m){
+  const a = alter(m.geb);
+  if (a !== null) return a < 18 ? "minder" : "voll";
+  return m.volljaehrig === true ? "voll" : m.volljaehrig === false ? "minder" : null;
+}
+const minderjaehrig = m => altersAngabe(m) === "minder";
+
 const istAzubi = m => m.typ === "Azubi";
 
 const faktor = m => !istAzubi(m) ? 1 : (m.lehrjahr === 1 ? 0 : m.lehrjahr === 2 ? 0.5 : 1);
@@ -702,7 +736,7 @@ function pauseGesetz(anwesend, minder){
 }
 
 function pauseFuer(m, anwesend){
-  return pauseGesetz(anwesend, alter(m.geb) !== null && alter(m.geb) < 18);
+  return pauseGesetz(anwesend, minderjaehrig(m));
 }
 
 function schicht(m, tag){
@@ -711,7 +745,7 @@ function schicht(m, tag){
   const von = minuten(s.von), bis = minuten(s.bis);
   if (bis <= von) return null;
   const anwesend = (bis - von) / 60;
-  const minder = (alter(m.geb) !== null && alter(m.geb) < 18);
+  const minder = minderjaehrig(m);
   const p = pauseFuer(m, anwesend);
   return {von, bis, anwesend, pause:p, arbeit: anwesend - p, minder};
 }
@@ -722,7 +756,7 @@ function wochenStunden(m){
 
 function pruefeStandard(m){
   const out = [];
-  const minder = (alter(m.geb) !== null && alter(m.geb) < 18);
+  const minder = minderjaehrig(m);
   const tage = TAGE.map(([k,l]) => ({k, l, s: schicht(m,k)}));
   const belegt = tage.filter(x => x.s);
   if (!belegt.length) return out;
@@ -856,7 +890,7 @@ function auswertung(){
   const anwesend = ms.reduce((s,m) => s + stunden(m), 0);
   const wirksam  = ms.reduce((s,m) => s + stunden(m) * faktor(m), 0);
   const ohneStunden = ms.filter(m => !hat(istAzubi(m) ? m.betrieb : m.vertrag));
-  const ohneGeb = ms.filter(m => !m.geb);
+  const ohneGeb = ms.filter(m => altersAngabe(m) === null);
   // Maßgeblich ist die Stundenliste der Woche, die gerade oben steht
   const lst = (state.listen || {})[wochenSchluessel(aktuellerMontag())] || state.budget || {stunden:{}, umsatz:{}};
   const budgetTage = TAGE.filter(([k]) => hat(lst.stunden[k])).length;
@@ -941,7 +975,7 @@ function auswertung(){
   if (!offenBekannt)       luecken.push("Öffnungszeit — ohne sie lässt sich die Grundbesetzung nicht rechnen");
   if (offeneAufgaben.length) luecken.push("Wochenaufgaben ohne Tag, Dauer oder Personenzahl: " + offeneAufgaben.join(", "));
   if (ohneStunden.length)  luecken.push("Ohne Stundenangabe: " + ohneStunden.map(m => m.name).join(", "));
-  if (ohneGeb.length)      luecken.push("Ohne Geburtsdatum, Altersregeln ungeprüft: " + ohneGeb.map(m => m.name).join(", "));
+  if (ohneGeb.length)      luecken.push("Ohne Altersangabe, Jugendschutz ungeprüft: " + ohneGeb.map(m => m.name).join(", "));
   const leitung = ms.filter(m => m.typ === "Filialleitung");
   if (leitung.length && !leitung.some(m => TAGE.some(([k]) => (m.standard || {})[k] && (m.standard || {})[k].von)))
     luecken.push("Standardwoche der Filialleitung — sie ist der Fixpunkt des Wochenplans");
@@ -951,7 +985,7 @@ function auswertung(){
 
   return {anwesend, wirksam, budget, budgetTage, umsatz, aufgaben, aufgabenTage, qual, fruehOk, spaetOk,
           offenH, grund, vorlauf, nachlauf, zusatz, bedarf, flexible, aussen, luecken, offeneAufgaben, ohneStunden, ohneGeb, vollstaendig,
-          minderjaehrig: ms.filter(m => { const a = alter(m.geb); return a !== null && a < 18; })};
+          minderjaehrig: ms.filter(minderjaehrig)};
 }
 
 // ==== kern/05-planer.js ====
@@ -1068,7 +1102,7 @@ function baueWoche(montagISO, rnd, vorgabe){
       const m = ms[i];
       if (!passtDazu(i, von, bis)) return false;
       if (!darfArbeiten(i, key, von, bis)) return false;
-      const minder = (alter(m.geb) !== null && alter(m.geb) < 18);
+      const minder = minderjaehrig(m);
       if (minder && !jugendZeit(von, bis)) return false;
       const schonHeute = schichtenVon(i);
       if (!schonHeute.length && tageGearbeitet[i] >= maxTageFuer(minder)) return false;
@@ -1131,7 +1165,7 @@ function baueWoche(montagISO, rnd, vorgabe){
       const i = b.mi, m = ms[i];
       if (b.fest) return false;                         // Standardwochen bleiben, wie sie sind
       if (!darfArbeiten(i, key, von, bis)) return false;
-      const minder = alter(m.geb) !== null && alter(m.geb) < 18;
+      const minder = minderjaehrig(m);
       if (minder && !jugendZeit(von, bis)) return false;
       const andere = schichtenVon(i).filter(x => x !== b);
       if (andere.some(x => !(von >= x.bis + 60 || bis + 60 <= x.von))) return false;
@@ -1180,7 +1214,7 @@ function baueWoche(montagISO, rnd, vorgabe){
             b.pVon = null; const ohne = mangelZahl(); b.pVon = alt;
             if (ohne === mit) continue;
           }
-          const minder = alter(ms[b.mi].geb) !== null && alter(ms[b.mi].geb) < 18;
+          const minder = minderjaehrig(ms[b.mi]);
           const amStueck = amStueckFuer(minder);
           const mitte = b.von + (b.bis - b.von)/2 - laenge/2;
           let besteLage = b.pVon, besteZahl = mangelZahl(), besteAbstand = Math.abs(b.pVon - mitte);
@@ -1256,7 +1290,7 @@ function baueWoche(montagISO, rnd, vorgabe){
         meldungen.push({art:"warn", text:`${label}: ${m.name} ${typeof e === "string" ? "fällt aus" : "ist nur eingeschränkt da (" + grundText(e) + ")"} — die Standardschicht entfällt und wird anders besetzt.`});
         return;
       }
-      const minder = (alter(m.geb) !== null && alter(m.geb) < 18);
+      const minder = minderjaehrig(m);
       if (letztesEnde[i] !== null && (ti*24*60 + s.von - letztesEnde[i])/60 < ruhezeitFuer(minder) - 0.01)
         meldungen.push({art:"bad", text:`${label}: ${m.name} hat nur ${h1((ti*24*60 + s.von - letztesEnde[i])/60)} h Ruhezeit seit dem Vortag — die Standardwoche verstößt gegen die Ruhezeit.`});
       setzen(i, s.von, s.bis, "Standard", false);
@@ -1603,7 +1637,7 @@ function ausgleichen(plan){
     if (a === null || b === null || b <= a) return true;
     return e.a === "nur" ? (von >= a && bis <= b) : (bis <= a || von >= b);
   };
-  const minderj = i => { const a = alter(ms[i].geb); return a !== null && a < 18; };
+  const minderj = i => minderjaehrig(ms[i]);
 
   const fest = sch => (sch.rollen || []).includes("Standard");
   // Ruhezeit zu Vor- und Folgetag, wenn i am Tag ti von–bis arbeitet
@@ -1825,7 +1859,7 @@ function phasenMeldung(plan, ph, normal){
 function schichtWerkzeug(plan){
   const ms = state.mitarbeiter;
   const abw = (state.abwesend || {})[wochenSchluessel(plan.mo)] || {};
-  const minderj = i => { const a = alter(ms[i].geb); return a !== null && a < 18; };
+  const minderj = i => minderjaehrig(ms[i]);
   const pauseAnpassen = sch => {
     const m = ms[sch.mi], anw = (sch.bis - sch.von)/60, pz = pauseFuer(m, anw);
     if (!pz){ sch.pauseVon = null; sch.pauseBis = null; }
@@ -2170,7 +2204,7 @@ function handPruefung(plan){
     t.schichten.forEach(s => {
       const m = plan.namen ? ms.find(x => x.name === plan.namen[s.mi]) : ms[s.mi];
       if (!m) return;
-      const a = alter(m.geb), minder = a !== null && a < 18;
+      const minder = minderjaehrig(m);
       const anw = (s.bis - s.von)/60;
       if (s.arbeit > (minder ? REGELN.gesetzMaxTagJugend : REGELN.gesetzMaxTag) + 0.01)
         raus.push(`${t.label}: ${m.name} arbeitet ${h1(s.arbeit)} h — mehr als das Gesetz zulässt.`);
@@ -2591,7 +2625,7 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
   const offenBis = hatZeit(state.bis) ? minuten(state.bis) : 21*60;
   const wechsel = hatZeit(state.wechsel) ? minuten(state.wechsel) : Math.round((offenVon + offenBis)/2);
   const aussen = state.allein ? 1 : MIN_BESETZUNG;
-  const minderj = i => { const a = alter(ms[i].geb); return a !== null && a < 18; };
+  const minderj = i => minderjaehrig(ms[i]);
   const fuehrt = (i, q) => ms[i].typ === "Filialleitung" || (ms[i].qual || []).includes(q);
   const kann = (i, q) => !q || (ms[i].qual || []).includes(q);
   const hatStandard = i => TAGE.some(([k]) => schicht(ms[i], k));
@@ -2803,7 +2837,7 @@ function pausenLegen(plan){
   plan.tage.forEach((t, ti) => {
     if (t.feiertag) return;
     const mitte = s => Math.round((s.von + (s.bis - s.von)/2 - s.pause*30) / 15) * 15;
-    const minderj = s => { const a = alter(ms[s.mi].geb); return a !== null && a < 18; };
+    const minderj = s => minderjaehrig(ms[s.mi]);
     const lagen = s => {
       const laenge = s.pause * 60, am = amStueckFuer(minderj(s)), raus = [];
       for (let pv = s.von + 60; pv + laenge <= s.bis - 60; pv += 15)
@@ -3008,7 +3042,7 @@ function tagesMaengelAm(plan, ti, m){
 function ausfallErlaubt(plan, j, ti, von, bis, ausser){
   const {i, m} = planPerson(plan, j);
   if (!m) return false;
-  const minder = alter(m.geb) !== null && alter(m.geb) < 18;
+  const minder = minderjaehrig(m);
   if (minder && !jugendZeit(von, bis)) return false;
   const anw = (bis - von)/60;
   if (anw - pauseFuer(m, anw) > MAXARBEIT + 0.01 || anw > REGELN.maxAnwesenheit + 0.01) return false;
@@ -3039,7 +3073,7 @@ function schichtSetzen(plan, ti, s, von, bis){
   const anw = (bis - von)/60, p = pauseFuer(m, anw);
   s.pause = p; s.arbeit = anw - p;
   if (!p){ s.pauseVon = null; s.pauseBis = null; return; }
-  const laenge = p * 60, minder = alter(m.geb) !== null && alter(m.geb) < 18, am = amStueckFuer(minder);
+  const laenge = p * 60, minder = minderjaehrig(m), am = amStueckFuer(minder);
   const mitte = Math.round((von + (bis - von)/2 - laenge/2) / 15) * 15;
   let beste = null, besteZahl = Infinity, besteAbstand = Infinity;
   for (let pv = von + 60; pv + laenge <= bis - 60; pv += 15){
@@ -3087,7 +3121,7 @@ function pausenNachbessern(plan, ti){
     tag.schichten.forEach(s => {
       if (!s.pause || s.pauseVon === null) return;
       const {m} = planPerson(plan, s.mi);
-      const laenge = s.pause * 60, am = amStueckFuer(m && alter(m.geb) !== null && alter(m.geb) < 18);
+      const laenge = s.pause * 60, am = amStueckFuer(m && minderjaehrig(m));
       let beste = s.pauseVon, besteZahl = tagesMaengel(plan, ti);
       for (let pv = s.von + 60; pv + laenge <= s.bis - 60; pv += 15){
         if (pv - s.von > am || s.bis - (pv + laenge) > am) continue;
@@ -3436,6 +3470,80 @@ function ereignisseAufraeumen(){
 const STUNDEN_HINWEIS = /h verplant, Ziel|über ihren Vertragsstunden|über die Vertragsstunden hinaus/;
 const hinweiseOhneStunden = meldungen => (meldungen || []).filter(m => !STUNDEN_HINWEIS.test(m.text));
 
+// ==== kern/15-bereitschaft.js ====
+/* Bereitschaft: Kann für eine Woche ein Plan entstehen, der nicht auf falschen
+   Annahmen beruht?
+
+   Blocker halten „Plan erzeugen“ an — ohne sie entstünde ein Plan, der falsch ist
+   oder gegen das Gesetz verstößt, ohne dass es jemand merkt. Hinweise halten nicht
+   an; der Plan rechnet dann nur mit dem, was bekannt ist.
+   Jeder Punkt sagt, wo er sich beheben lässt: bereich = id aus BEREICHE oder "planen". */
+
+// „nur von–bis“ / „nicht von–bis“ brauchen zwei Uhrzeiten, und die erste vor der zweiten
+function abwZeitFehlt(e){
+  if (!e || typeof e !== "object" || (e.a !== "nur" && e.a !== "ohne")) return false;
+  return !hatZeit(e.von) || !hatZeit(e.bis) || minuten(e.von) >= minuten(e.bis);
+}
+
+// Unvollständige Zeitangaben einer Woche: [{mi, tag, name, label}]
+function unvollstaendigeZeiten(sl){
+  const abw = (state.abwesend || {})[sl] || {}, raus = [];
+  state.mitarbeiter.forEach((m, mi) => {
+    TAGE.forEach(([k, l]) => {
+      if (abwZeitFehlt((abw[mi] || {})[k])) raus.push({mi, tag:k, name:m.name, label:l});
+    });
+  });
+  return raus;
+}
+
+// Wochenaufgaben, bei denen noch niemand gesagt hat, ob es sie hier gibt
+const offeneAufgabenWahl = () => WAREN.filter(w => state.aufgaben[w.id] && state.aufgaben[w.id].offen);
+
+function bereitschaft(sl){
+  const ms = state.mitarbeiter, blocker = [], hinweise = [];
+  const b = (text, bereich, extra) => blocker.push(Object.assign({text, bereich}, extra || {}));
+  const h = (text, bereich) => hinweise.push({text, bereich});
+  const namen = l => l.map(m => m.name).join(", ");
+
+  // Öffnungszeit — ohne sie gibt es keine Grundbesetzung
+  if (!hatZeit(state.von) || !hatZeit(state.bis)) b("Die Öffnungszeit fehlt.", "filiale");
+  else if (minuten(state.von) >= minuten(state.bis)) b("Die Öffnungszeit endet vor dem Beginn.", "filiale");
+
+  if (!ms.length) b("Es ist noch kein Personal erfasst.", "personal");
+  else {
+    // Alter: entscheidet über Pausen, Arbeitszeit, 6–20 Uhr und fünf Tage
+    const ohneAlter = ms.filter(m => altersAngabe(m) === null);
+    if (ohneAlter.length) b(`Bei ${ohneAlter.length === 1 ? "einer Person" : ohneAlter.length + " Personen"} fehlt, ob sie 18 oder älter ist — `
+      + "davon hängen Pausen, Arbeitszeiten und Ruhezeiten ab.", "personal", {alter: ohneAlter.map(m => ms.indexOf(m))});
+    const ohneDatum = ms.filter(m => m.volljaehrig === false && alter(m.geb) === null);
+    if (ohneDatum.length) h(`Unter 18 ohne Geburtsdatum: ${namen(ohneDatum)}. Bis ein Datum eingetragen ist, gelten die Regeln für Jugendliche.`, "personal");
+
+    // Wer schließt auf, wer schließt ab, wer sitzt an der Kasse
+    const a = auswertung();
+    if (a.fruehOk === 0) b("Niemand kann die Frühschicht führen (Filialleitung oder Frühschichtvertretung).", "personal");
+    if (a.spaetOk === 0) b("Niemand kann die Spätschicht führen (Filialleitung oder Spätschichtvertretung).", "personal");
+    if (a.qual.kasse === 0) b("Niemand hat die Funktion „Kasse“.", "personal");
+    if (a.fruehOk === 1) h("Nur eine Person kann die Frühschicht führen — an ihren freien Tagen bleibt die Lücke.", "personal");
+    if (a.spaetOk === 1) h("Nur eine Person kann die Spätschicht führen — an ihren freien Tagen bleibt die Lücke.", "personal");
+    if (a.qual.kasse === 1) h("Nur eine Person hat die Funktion „Kasse“.", "personal");
+    if (a.ohneStunden.length) h(`Ohne Stundenangabe: ${namen(a.ohneStunden)} — sie werden nur nach Bedarf eingeplant.`, "personal");
+    if (a.offeneAufgaben.length) h(`Wochenaufgaben ohne Tag, Dauer oder Personenzahl: ${a.offeneAufgaben.join(", ")} — sie fehlen im Plan.`, "aufgaben");
+    const leitung = ms.filter(m => m.typ === "Filialleitung");
+    if (leitung.length && !leitung.some(m => wochenStunden(m) > 0))
+      h("Für die Filialleitung ist keine Standardwoche hinterlegt — der Plan legt ihre Zeiten selbst fest.", "standardwoche");
+  }
+
+  const offen = offeneAufgabenWahl();
+  if (offen.length) b(`Noch nicht festgelegt, ob es diese Wochenaufgaben hier gibt: ${offen.map(w => w.anzeige || w.name).join(", ")}.`, "aufgaben");
+
+  if (sl){
+    const zeiten = unvollstaendigeZeiten(sl);
+    if (zeiten.length) b(`„nur“ oder „nicht von–bis“ ohne vollständige Uhrzeit: `
+      + zeiten.map(z => `${z.name} (${z.label})`).join(", ") + ".", "planen", {zeiten});
+  }
+  return {blocker, hinweise, bereit: !blocker.length};
+}
+
 // ==== app/20-zustand.js ====
 /* Zustand der App und Einlesen alter Datenstände */
 
@@ -3467,9 +3575,11 @@ let zeigeWoche = null;    // Montag (ISO) der Woche, die die Startseite zeigt
 let listenWoche = null;   // Montag (ISO) der Woche in der Stundenliste
 
 function neueAufgabe(w){
-  // Bestellungen haben eine Frist und macht eine Person — das ist der Normalfall
+  // Bestellungen haben eine Frist und macht eine Person — das ist der Normalfall.
+  // Ob es die Aufgabe hier gibt, ist offen, bis es jemand festlegt (seit 13.11.2026;
+  // vorher war alles als „gibt es hier“ angehakt und sah wie eine Eingabe aus).
   const best = w.gruppe === "bestellung";
-  return {aktiv:true, tage:[], zeitArt: best ? "spanne" : "fest", zeit:"",
+  return {aktiv:false, offen:true, tage:[], zeitArt: best ? "spanne" : "fest", zeit:"",
           fVon:"", fBis:"", dauer:"", personen: best ? "1" : "",
           jeTag:false, proTag:{}};
 }
@@ -3477,9 +3587,11 @@ function neueAufgabe(w){
 function leer(){
   const a = {};
   WAREN.forEach(w => a[w.id] = neueAufgabe(w));
-  return {nr:"", ort:"", land:"BW", von:"08:00", bis:"21:00", wechsel:"", allein:false, aufgaben:a, mitarbeiter:[],
+  // Öffnungszeit bleibt leer, bis sie eingetragen ist — eine vorbelegte Zeit sah aus,
+  // als wäre sie schon geprüft
+  return {nr:"", ort:"", land:"BW", von:"", bis:"", wechsel:"", allein:false, aufgaben:a, mitarbeiter:[],
           budget:{stunden:{}, umsatz:{}}, eingerichtet:false, plaene:{}, abwesend:{},
-          listen:{}, phasen:{}};
+          listen:{}, phasen:{}, rrSichtbar:true};
 }
 
 function normalisiere(s){
@@ -3504,7 +3616,7 @@ function normalisiere(s){
   // hinein — leicht zu übersehen. Unberührt? Dann einschalten und als neu zeigen.
   const rr = s.aufgaben && s.aufgaben.rr;
   if (rr && !s.rrSichtbar){
-    if (!rr.aktiv && !rr.tage.length && !rr.zeit && !rr.dauer){ rr.aktiv = true; rr.neu = true; }
+    if (!rr.aktiv && !rr.offen && !rr.tage.length && !rr.zeit && !rr.dauer){ rr.aktiv = true; rr.neu = true; }
     s.rrSichtbar = true;
   }
   if (s.eingerichtet === undefined) s.eingerichtet = !!(s.mitarbeiter && s.mitarbeiter.length);
@@ -3915,10 +4027,12 @@ async function pruefePlatz(){
 function navLeiste(idx){
   const a = el(`<div class="actions"></div>`);
   if (ansicht === "bereich"){
-    const f = el(`<button class="btn">Fertig</button>`);
-    f.onclick = async () => { await speichere(); ansicht = "start"; render(); };
+    // Wer aus der Prüfung vor dem Planen hierher kam, landet wieder dort
+    const zurueck = () => { ansicht = zurueckNach || "start"; zurueckNach = null; render(); };
+    const f = el(`<button class="btn">${zurueckNach === "planen" ? "Fertig, zurück zum Plan" : "Fertig"}</button>`);
+    f.onclick = async () => { await speichere(); zurueck(); };
     const ab = el(`<button class="btn ghost">Abbrechen</button>`);
-    ab.onclick = () => { ansicht = "start"; render(); };
+    ab.onclick = zurueck;
     a.appendChild(ab); a.appendChild(el(`<div class="spacer"></div>`)); a.appendChild(f);
     return a;
   }
@@ -3950,9 +4064,12 @@ function nav(zurueck, weiter, label){ return navLeiste(schritt); }
 
 function weiterZu(i){ maxSchritt = Math.max(maxSchritt, i); schritt = i; fehler = ""; sichern(); render(); }
 
-function oeffneBereich(id){
+let zurueckNach = null;   // Ansicht, in die „Fertig“ zurückführt (sonst die Startseite)
+
+function oeffneBereich(id, zurueck){
   const b = BEREICHE.find(x => x.id === id);
   if (!b) return;
+  zurueckNach = zurueck || null;
   ansicht = "bereich"; schritt = b.schritt; bearbeite = -1; fehler = "";
   render();
 }
@@ -3968,7 +4085,7 @@ function anmeldung(){
       <p class="lede">Mit Filialnummer und Kennwort anmelden — oder einen neuen
       Filialbereich anlegen.</p></div>
     <div class="grid g3">
-      <label class="f">Filialnummer<input type="text" id="nr" inputmode="numeric" placeholder="269" class="num"></label>
+      <label class="f">Filialnummer<input type="text" id="nr" inputmode="numeric" placeholder="Nummer der Filiale" class="num"></label>
       <label class="f">Kennwort<input type="password" id="pw" placeholder="mindestens 4 Zeichen"></label>
       <label class="f" id="wrapPw2" hidden>Kennwort wiederholen<input type="password" id="pw2"></label>
     </div>
@@ -4164,8 +4281,8 @@ function filiale(){
       Was schwankt, bleibt leer.</p></div>
     <div class="grid g3">
       <label class="f">Ort<input type="text" id="ort" value="${esc(state.ort)}" placeholder="z. B. Eutingen"></label>
-      <label class="f">Öffnet<input type="time" id="von" value="${state.von}"></label>
-      <label class="f">Schließt<input type="time" id="bis" value="${state.bis}"></label>
+      <label class="f">Öffnet <span class="pflicht">Pflicht</span><input type="time" id="von" value="${esc(state.von)}"></label>
+      <label class="f">Schließt <span class="pflicht">Pflicht</span><input type="time" id="bis" value="${esc(state.bis)}"></label>
     </div>
     <div class="grid g2" style="margin-top:14px">
       <label class="switch" style="align-items:flex-start;padding-top:22px">
@@ -4188,14 +4305,18 @@ function filiale(){
     <p class="err" id="err"></p></div>`);
   const speichereFelder = () => {
     state.ort = p.querySelector("#ort").value.trim();
-    state.von = p.querySelector("#von").value || "08:00";
-    state.bis = p.querySelector("#bis").value || "21:00";
+    state.von = p.querySelector("#von").value;
+    state.bis = p.querySelector("#bis").value;
     state.wechsel = p.querySelector("#wechsel").value;
     state.allein = p.querySelector("#allein").checked;
     state.land = p.querySelector("#land").value;
   };
   // Feiertage dieses Jahres und die Ladenöffnung des Landes zeigen — und warnen, wenn
   // die eingetragene Öffnungszeit sie überschreitet
+  const pflichtZeigen = () => ["#von", "#bis"].forEach(s => {
+    const f = p.querySelector(s);
+    f.classList.toggle("fehlt", !hatZeit(f.value) || (s === "#bis" && hatZeit(state.von) && f.value <= state.von));
+  });
   const landInfo = () => {
     const j = new Date().getFullYear();
     const anzahl = Object.keys(feiertageIm(j, state.land)).length;
@@ -4205,8 +4326,8 @@ function filiale(){
       + (lo ? `Ladenöffnung werktags ${lo[0]}–${lo[1]} Uhr.` : "Mo–Sa kein gesetzlicher Ladenschluss.")
       + (zuLang ? ` <b style="color:var(--bad)">Die Öffnungszeit oben liegt außerhalb.</b>` : "");
   };
-  landInfo();
-  p.addEventListener("input", () => { speichereFelder(); landInfo(); sichern(); });
+  landInfo(); pflichtZeigen();
+  p.addEventListener("input", () => { speichereFelder(); landInfo(); pflichtZeigen(); sichern(); });
   p.querySelector("#land").addEventListener("change", () => { speichereFelder(); landInfo(); sichern(); });
   p.appendChild(navLeiste(0));
   return p;
@@ -4219,8 +4340,9 @@ function warentage(){
       <h1 style="margin-top:6px">Wochenaufgaben</h1>
       <p class="lede">Entscheidend ist die <b>Dauer</b> — die Uhrzeit kann fest sein, in einer
       Spanne liegen oder offen bleiben. Was schwankt, bleibt leer und fließt nicht in die
-      Rechnung ein. Was es nicht gibt, wird abgeschaltet. Ist eine Aufgabe nicht jeden Tag
-      gleich, „an den Tagen unterschiedlich“ einschalten und jeden Tag einzeln einstellen.</p></div>
+      Rechnung ein. Bei jeder Aufgabe einmal festlegen, ob es sie hier gibt — erst dann
+      entsteht ein Plan. Ist eine Aufgabe nicht jeden Tag gleich, „an den Tagen
+      unterschiedlich“ einschalten und jeden Tag einzeln einstellen.</p></div>
     <div id="tasks"></div>
     <h2 style="margin:28px 0 4px">Bestellungen</h2>
     <p class="lede" style="margin-bottom:12px">Für jede Bestellung die Tage und die Frist
@@ -4250,9 +4372,11 @@ function aufgabenKarte(w, p){
   const a = state.aufgaben[w.id];
   const best = w.gruppe === "bestellung";
   let offenerTag = null;      // welcher Tag aufgeklappt ist, wenn je Tag verschieden
-  const t = el(`<div class="task${a.aktiv ? "" : " off"}">
+  const t = el(`<div class="task">
     <div class="task-top"><h3>${esc(w.anzeige || w.name)}${a.neu ? ' <span class="tag neu">neu</span>' : ""}</h3>
-      <label class="switch"><input type="checkbox" data-aktiv ${a.aktiv ? "checked" : ""}> gibt es hier</label></div>
+      <div class="janein" role="group" aria-label="Gibt es ${esc(w.anzeige || w.name)} hier?">
+        <button data-ja>gibt es hier</button><button data-nein>gibt es nicht</button></div></div>
+    <p class="hint offenhinweis">Noch nicht festgelegt — bitte wählen.</p>
     <div class="body">
       <div class="days" role="group" aria-label="Wochentage ${esc(w.anzeige || w.name)}"></div>
       <label class="switch jetag"><input type="checkbox" data-jetag ${a.jeTag ? "checked" : ""}>
@@ -4273,11 +4397,14 @@ function aufgabenKarte(w, p){
   // Nur Werte übernehmen und Summen nachziehen — nichts neu aufbauen, sonst
   // verliert das Feld, in dem gerade getippt wird, den Fokus
   const frisch = () => {
-    if (a.neu && (a.tage.length || a.zeit || a.dauer || !a.aktiv)) delete a.neu;
+    if (a.neu && !a.offen && (a.tage.length || a.zeit || a.dauer || !a.aktiv)) delete a.neu;
     const tage = a.tage.map(k => aufgabeAm(a, k));
     const bekannt = a.aktiv && tage.length && tage.every(x => hat(x.dauer) && hat(x.personen));
     out.textContent = bekannt ? h1(tage.reduce((s,x) => s + nz(x.dauer) * nz(x.personen), 0)) : "?";
-    t.classList.toggle("off", !a.aktiv);
+    t.classList.toggle("off", !a.aktiv && !a.offen);
+    t.classList.toggle("offen", !!a.offen);
+    t.querySelector("[data-ja]").setAttribute("aria-pressed", !a.offen && a.aktiv);
+    t.querySelector("[data-nein]").setAttribute("aria-pressed", !a.offen && !a.aktiv);
     t.querySelector(".body").style.display = a.aktiv ? "" : "none";
     felderBox.querySelectorAll("[data-info]").forEach(s => s.textContent = tagesKurzinfo(a.proTag[s.dataset.info]));
     p.querySelector("#sumP").textContent = h1(auswertung().aufgaben);
@@ -4351,7 +4478,8 @@ function aufgabenKarte(w, p){
     };
     daysBox.appendChild(b);
   });
-  t.querySelector("[data-aktiv]").onchange = e => { a.aktiv = e.target.checked; frisch(); };
+  t.querySelector("[data-ja]").onclick = () => { a.aktiv = true; delete a.offen; frisch(); };
+  t.querySelector("[data-nein]").onclick = () => { a.aktiv = false; delete a.offen; frisch(); };
   t.querySelector("[data-jetag]").onchange = e => {
     a.jeTag = e.target.checked;
     if (a.jeTag) a.tage.forEach(tagAnlegen);
@@ -4394,7 +4522,14 @@ function mitarbeiter(){
         <label class="f">Name<input type="text" id="mName" placeholder="Vor- und Nachname" value="${esc(m.name)}"></label>
         <label class="f">Einordnung<select id="mTyp">${TYPEN.map(x =>
           `<option${x === m.typ ? " selected" : ""}>${x}</option>`).join("")}</select></label>
-        <label class="f">Geburtsdatum <span class="hint">optional</span><input type="date" id="mGeb" value="${esc(m.geb || "")}"></label>
+        <label class="f">Alter <span class="pflicht">Pflicht</span><select id="mAlter">
+          <option value="">— bitte wählen —</option>
+          <option value="voll"${altersAngabe(m) === "voll" ? " selected" : ""}>18 oder älter</option>
+          <option value="minder"${altersAngabe(m) === "minder" ? " selected" : ""}>unter 18</option></select>
+          <span class="hint">Davon hängen Pausen, Arbeitszeiten und Ruhezeiten ab (Jugendarbeitsschutz).</span></label>
+      </div>
+      <div class="grid g3" style="margin-top:12px">
+        <label class="f">Geburtsdatum <span class="hint" id="gebHinweis">bei unter 18 bitte angeben</span><input type="date" id="mGeb" value="${esc(m.geb || "")}"></label>
       </div>
       <div class="grid g3" style="margin-top:12px">
         <label class="f" id="wrapVertrag">Stunden laut Vertrag<input type="number" id="mVertrag" min="0" step="0.5" placeholder="leer lassen, wenn unklar" value="${esc(m.vertrag || "")}"></label>
@@ -4436,12 +4571,24 @@ function mitarbeiter(){
     };
     typ.onchange = umschalten; umschalten();
 
+    // Mit Geburtsdatum ergibt sich das Alter von selbst — die Auswahl folgt ihm
+    const altF = f.querySelector("#mAlter"), gebF = f.querySelector("#mGeb");
+    const alterAbgleichen = () => {
+      const j = alter(gebF.value);
+      if (j !== null){ altF.value = j < 18 ? "minder" : "voll"; altF.disabled = true; }
+      else altF.disabled = false;
+      f.querySelector("#gebHinweis").textContent = j !== null ? `${j} Jahre` : "bei unter 18 bitte angeben";
+      altF.classList.remove("fehlt");
+    };
+    gebF.oninput = alterAbgleichen; altF.onchange = alterAbgleichen; alterAbgleichen();
+
     const lesen = () => {
       const az = typ.value === "Azubi";
       return {
         name: f.querySelector("#mName").value.trim(),
         typ: typ.value,
         geb: f.querySelector("#mGeb").value,
+        volljaehrig: altF.value === "voll" ? true : altF.value === "minder" ? false : undefined,
         vertrag: az ? "" : f.querySelector("#mVertrag").value,
         lehrjahr: az ? parseInt(f.querySelector("#mLj").value,10) : null,
         betrieb: az ? f.querySelector("#mBetrieb").value : "",
@@ -4456,6 +4603,11 @@ function mitarbeiter(){
     speichern.onclick = () => {
       const d = lesen();
       if (!d.name){ f.querySelector("#err").textContent = "Bitte einen Namen eintragen."; return; }
+      if (d.volljaehrig === undefined){
+        altF.classList.add("fehlt");
+        f.querySelector("#err").textContent = "Bitte angeben, ob die Person 18 oder älter ist — davon hängen Pausen, Arbeitszeiten und Ruhezeiten ab.";
+        return;
+      }
       // Den Überstundenstand nur neu setzen, wenn er geändert wurde — sonst bleibt
       // die Rechnung über die Wochen hinweg unangetastet
       const eingabe = f.querySelector("#mSaldo").value;
@@ -4493,10 +4645,11 @@ function mitarbeiter(){
       <th>Name</th><th>Einordnung</th><th class="n">Stunden</th><th class="n">Leistung</th>
       <th class="n">Überstunden</th><th>Funktionen</th><th></th></tr></thead><tbody>${
       state.mitarbeiter.map((m,i) => {
-        const al = alter(m.geb), fk = faktor(m), bek = hat(istAzubi(m) ? m.betrieb : m.vertrag);
+        const al = alter(m.geb), aa = altersAngabe(m), fk = faktor(m), bek = hat(istAzubi(m) ? m.betrieb : m.vertrag);
         const ue = stand[i] || 0;
         return `<tr${i === bearbeite ? ' style="background:var(--accent-soft)"' : ""}>
-          <td>${esc(m.name)}${al !== null && al < 18 ? ` <span class="tag minor">${al} J.</span>` : ""}</td>
+          <td>${esc(m.name)}${aa === "minder" ? ` <span class="tag minor">${al !== null ? al + " J." : "unter 18"}</span>`
+            : aa === null ? ` <span class="tag fehlt">Alter fehlt</span>` : ""}</td>
           <td>${esc(m.typ)}${istAzubi(m) ? ` <span class="tag azubi">${m.lehrjahr}. LJ</span>` : ""}</td>
           <td class="n">${bek ? h1(stunden(m)) : "?"}</td>
           <td class="n">${bek ? h1(stunden(m)*fk) : "?"}<span class="hint"> · ${Math.round(fk*100)} %</span></td>
@@ -4910,8 +5063,11 @@ function pruefen(){
   spaetMinder.forEach(m => add("bad","§",
     `${esc(m.name)} ist als Spätschichtvertretung eingetragen, darf aber nur bis 20:00 Uhr arbeiten — die Spätschicht endet später.`));
 
+  // JArbSchG: §§ 8, 11, 13, 14, 15 — so, wie der Planer es einhält (REGELN)
   a.minderjaehrig.forEach(m => add("warn","§",
-    `${esc(m.name)} ist ${alter(m.geb)} Jahre alt: Einsatz nur bis 20:00 Uhr, höchstens 8 h am Tag und 5 Tage pro Woche, ab 6 h Arbeitszeit 60 Minuten Pause.`));
+    `${esc(m.name)} ist ${alter(m.geb) !== null ? alter(m.geb) + " Jahre alt" : "unter 18"}: Einsatz nur von 6 bis 20 Uhr, `
+    + `höchstens 8 h am Tag und 5 Tage pro Woche, 12 h Ruhe zwischen zwei Schichten, Pause 30 Minuten bei mehr als 4,5 h `
+    + `und 60 Minuten bei mehr als 6 h Arbeitszeit.`));
   if (a.minderjaehrig.length && state.bis > "20:00")
     add("warn","§",`Die Filiale schließt um ${state.bis} Uhr — den Abschluss kann keiner der minderjährigen Mitarbeiter übernehmen.`);
 
@@ -5105,6 +5261,18 @@ function startseite(){
   const warnung = archivHinweis();
   if (warnung) p.insertBefore(warnung, p.firstChild);
 
+  // Fehlt etwas Grundlegendes, steht es oben — nicht erst beim Planen
+  const bereit = bereitschaft(null);
+  if (!bereit.bereit){
+    const n = bereit.blocker.length;
+    const hinweis = el(`<div class="note bad" style="margin-top:14px"><span class="ic">!</span><span>
+      <b>Bevor ein Plan entstehen kann, ${n === 1 ? "fehlt eine Angabe" : `fehlen ${n} Angaben`}.</b>
+      <span class="bereit-zeile"><span>${esc(bereit.blocker[0].text)}</span>
+      <button class="btn ghost small">Ansehen</button></span></span></div>`);
+    hinweis.querySelector("button").onclick = () => { planWoche = isoVon(mo); ansicht = "planen"; render(); };
+    p.querySelector("#planBox").before(hinweis);
+  }
+
   // Plan oder Hinweis
   const inhalt = p.querySelector("#planInhalt");
   const knoepfe = p.querySelector("#planKnoepfe");
@@ -5265,7 +5433,8 @@ function planenAnsicht(){
     <div class="tablewrap"><table><thead><tr><th>Mitarbeiter</th>${
       TAGE.map(([,l]) => `<th>${l}</th>`).join("")}</tr></thead><tbody id="abwBody"></tbody></table></div>
     <p class="hint" style="margin-top:8px">„nur …“ und „nicht …“ brauchen beide Uhrzeiten —
-    solange eine fehlt, gilt der Tag als frei verfügbar.</p>
+    fehlt eine, wird das Feld rot und der Plan wartet, bis sie eingetragen ist.</p>
+    <div class="bereit" id="bereit"></div>
     <div class="actions">
       <button class="btn ghost" id="zurueck">Zurück</button>
       <div class="spacer"></div>
@@ -5318,8 +5487,8 @@ function planenAnsicht(){
     abw[i] = abw[i] || {};
     const tr = el(`<tr><td><b>${esc(m.name)}</b></td></tr>`);
     TAGE.forEach(([k]) => {
-      const td = el(`<td class="abwzelle"></td>`);
-      td.appendChild(abwFeld(abw, i, k));
+      const td = el(`<td class="abwzelle" data-mi="${i}" data-tag="${k}"></td>`);
+      td.appendChild(abwFeld(abw, i, k, () => bereitZeigen()));
       tr.appendChild(td);
     });
     tb.appendChild(tr);
@@ -5379,9 +5548,55 @@ function planenAnsicht(){
   };
   phasenFelder();
 
+  // Bereitschaft: Was fehlt, damit der Plan nicht auf falschen Annahmen steht?
+  const bereitBox = p.querySelector("#bereit"), knopf = p.querySelector("#erzeugen");
+  function bereitZeigen(){
+    const b = bereitschaft(sl);
+    bereitBox.innerHTML = "";
+    knopf.disabled = !b.bereit;
+    knopf.title = b.bereit ? "" : "Erst die rot markierten Punkte klären";
+    tb.querySelectorAll(".abwzelle").forEach(td => td.classList.toggle("fehlt",
+      b.blocker.some(x => x.zeiten && x.zeiten.some(z => z.mi === +td.dataset.mi && z.tag === td.dataset.tag))));
+    const ziel = x => x.bereich === "planen"
+      ? `<button class="btn ghost small" data-zeigen>Zeigen</button>`
+      : `<button class="btn ghost small" data-bereich="${x.bereich}">Beheben</button>`;
+    if (b.blocker.length){
+      const box = el(`<div class="note bad"><span class="ic">!</span><span><b>Bevor der Plan entstehen kann</b></span></div>`);
+      const inhalt = box.querySelector("span:last-child");
+      b.blocker.forEach(x => {
+        const z = el(`<div class="bereit-zeile"><span>${esc(x.text)}</span>${ziel(x)}</div>`);
+        inhalt.appendChild(z);
+        // Das Alter lässt sich gleich hier nachtragen — ein Tipp je Person
+        (x.alter || []).forEach(mi => {
+          const m = state.mitarbeiter[mi];
+          const r = el(`<div class="bereit-alter"><b>${esc(m.name)}</b>
+            <button class="btn ghost small" data-voll>18 oder älter</button>
+            <button class="btn ghost small" data-minder>unter 18</button></div>`);
+          r.querySelector("[data-voll]").onclick = () => { m.volljaehrig = true; sichern(); bereitZeigen(); };
+          r.querySelector("[data-minder]").onclick = () => { m.volljaehrig = false; sichern(); bereitZeigen(); };
+          inhalt.appendChild(r);
+        });
+      });
+      bereitBox.appendChild(box);
+    }
+    if (b.hinweise.length){
+      const box = el(`<details class="bereit-hinweise"${b.blocker.length ? "" : " open"}><summary><b>${b.hinweise.length}
+        ${b.hinweise.length === 1 ? "Hinweis" : "Hinweise"}</b> — der Plan entsteht trotzdem</summary></details>`);
+      b.hinweise.forEach(x => box.appendChild(el(`<div class="bereit-zeile"><span>${esc(x.text)}</span>${ziel(x)}</div>`)));
+      bereitBox.appendChild(box);
+    }
+    bereitBox.querySelectorAll("[data-bereich]").forEach(k => k.onclick = () => oeffneBereich(k.dataset.bereich, "planen"));
+    bereitBox.querySelectorAll("[data-zeigen]").forEach(k => k.onclick = () => {
+      const erste = tb.querySelector(".abwzelle.fehlt");
+      if (erste){ erste.scrollIntoView({block:"center", behavior:"smooth"}); const f = erste.querySelector("input"); if (f) f.focus(); }
+    });
+  }
+  bereitZeigen();
+
   p.querySelector("#kw").onchange = e => { planWoche = e.target.value; render(); };
   p.querySelector("#zurueck").onclick = () => { ansicht = "start"; render(); };
   p.querySelector("#erzeugen").onclick = async () => {
+    if (!bereitschaft(sl).bereit){ bereitZeigen(); bereitBox.scrollIntoView({block:"center", behavior:"smooth"}); return; }
     // Bevor geplant wird: Sind die Abgaben der Mitarbeiter da und übernommen?
     if (ONLINE_BEREIT && state.online && state.mitarbeiter.length){
       let antwort = null;
@@ -5430,7 +5645,7 @@ function planenAnsicht(){
 }
 
 // Ein Feld je Mitarbeiter und Tag: Auswahl, bei Zeitangaben zwei Uhrzeiten dazu
-function abwFeld(abw, i, tag){
+function abwFeld(abw, i, tag, nachher){
   const box = el(`<div class="abwfeld"></div>`);
   const wert = abw[i][tag];
   const art = wert ? (typeof wert === "string" ? wert : wert.a) : "";
@@ -5450,6 +5665,7 @@ function abwFeld(abw, i, tag){
       abw[i][tag] = {a:s.value, von:vonF.value, bis:bisF.value};
     } else abw[i][tag] = s.value;
     sichern();
+    if (nachher) nachher();
   };
   s.onchange = () => { zeigen(); merken(); };
   vonF.oninput = bisF.oninput = merken;
