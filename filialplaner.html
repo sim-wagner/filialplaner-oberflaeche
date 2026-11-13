@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-12-8">
+<meta name="fassung" content="2026-11-13-1">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -334,6 +334,15 @@ table.plan .ue-aend{font-size:.62rem;font-weight:700}
 .tag.krank{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
 .tag.urlaub{background:var(--blau-50);border-color:var(--blau-600);color:var(--blau-700)}
 .ereignis-vorbei td{color:var(--muted)}
+
+/* ---------- Testfassung ---------- */
+.testband{position:sticky;top:0;z-index:70;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:10px 16px;background:#B45309;color:#fff;font-size:.86rem;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.testband b{font-size:.95rem;letter-spacing:.02em;text-transform:uppercase}
+.testband span{flex:1;min-width:200px}
+.testband .btn.hell{background:#fff;color:#7C2D12;border-color:#fff}
+.chip.test{background:#FEF3C7;border-color:#B45309;color:#7C2D12}
+.testkasten{margin:16px 0;border-color:#F59E0B}
 </style>
 
 <div class="topbar"><div class="topbar-in">
@@ -3550,12 +3559,15 @@ let _lauf = 0;
 
 window.appAntwort = (nr, wert) => { const f = _offen[nr]; if (f){ delete _offen[nr]; f(wert); } };
 
-function appRuf(aktion, daten){
+// Testfassung: Die App lädt sie aus dem Testkanal und leitet Lesen und Schreiben an eine
+// Kopie der Filialdaten um. Hier gilt zusätzlich: nichts Online-Seitiges, keine Sicherungen.
+const TESTMODUS = inApp && window.appKanal === "test";
+function appRuf(aktion, daten, wartezeit){
   if (!inApp) return Promise.resolve(null);
   return new Promise(ok => {
     const nr = ++_lauf;
     _offen[nr] = ok;
-    setTimeout(() => { if (_offen[nr]){ delete _offen[nr]; ok(null); } }, 4000);
+    setTimeout(() => { if (_offen[nr]){ delete _offen[nr]; ok(null); } }, wartezeit || 4000);
     window.webkit.messageHandlers.filialplaner.postMessage({id:nr, aktion, daten: daten || {}});
   });
 }
@@ -3569,8 +3581,8 @@ async function initStore(){
   if (inApp){
     storeArt = "app";
     const chip = document.getElementById("storeChip");
-    chip.textContent = "iCloud";
-    chip.className = "chip live";
+    chip.textContent = TESTMODUS ? "Testkopie · nur dieses Gerät" : "iCloud";
+    chip.className = TESTMODUS ? "chip test" : "chip live";
     return;
   }
   try { db = (typeof claude !== "undefined" && claude.use) ? await claude.use("db") : null; } catch(e){ db = null; }
@@ -3689,7 +3701,8 @@ const ABGABE_SERVER = "https://nduzeascvtjkdknhyzwe.supabase.co";
 
 const ABGABE_SCHLUESSEL = "sb_publishable_ZSvBat1AEEvtUbpykTCrjw_FSPRl6H1";
 
-const ONLINE_BEREIT = !ABGABE_SERVER.startsWith("__");
+// In der Testfassung bleibt der Server unberührt — Mitarbeiter sollen keine Testpläne sehen
+const ONLINE_BEREIT = !ABGABE_SERVER.startsWith("__") && !TESTMODUS;
 
 async function abgabeRuf(fn, daten){
   let r;
@@ -4036,6 +4049,7 @@ function anmeldung(){
         <td class="n"><button class="btn ghost small">löschen</button></td></tr>`);
       tr.querySelector("button").onclick = async () => {
         if (!confirm(`Filiale N ${f.nr} mit allen Daten löschen? Das lässt sich nicht rückgängig machen.`)) return;
+        if (TESTMODUS){ alert("In der Testfassung lassen sich keine Filialen löschen."); return; }
         await loescheFiliale(f.nr);
         tr.remove();
         if (!tb.children.length) box.innerHTML = `<p class="empty">Keine gespeicherten Filialen.</p>`;
@@ -5843,7 +5857,10 @@ function sicherungsAnsicht(){
     <div id="orte"></div>
     <div class="actions"><button class="btn ghost" id="zurueck">Zurück</button></div>
   </div>`);
-  p.querySelector("#knoepfe").appendChild(sicherungsKnoepfe());
+  if (TESTMODUS) p.querySelector("#knoepfe").appendChild(el(`<p class="hint">In der Testfassung gibt es keine
+    Sicherungsdateien — sie würden echte und Testdaten vermischen.</p>`));
+  else p.querySelector("#knoepfe").appendChild(sicherungsKnoepfe());
+  if (inApp) p.querySelector("#orte").before(testfassungKasten());
   (async () => {
     const liste = inApp ? await bekannteFilialen() : lokaleFilialen();
     const plaene = Object.keys(state.plaene || {}).length;
@@ -5977,6 +5994,48 @@ function archivAnsicht(){
 
   p.querySelector("#zurueck").onclick = () => { ansicht = "start"; render(); };
   return p;
+}
+
+/* Neue Funktionen ausprobieren: Testfassung ein- und ausschalten, Testkopie zurücksetzen.
+   Die echten Daten berührt die Testfassung nie — sie arbeitet mit einer Kopie, die nur
+   auf diesem Gerät liegt. */
+function testfassungKasten(){
+  const k = el(`<div class="tile testkasten"><span class="eyebrow">Neue Funktionen ausprobieren</span>
+    <div id="tfInhalt"></div><p class="err" id="tfFehler"></p></div>`);
+  const inhalt = k.querySelector("#tfInhalt"), fehler = k.querySelector("#tfFehler");
+  if (!TESTMODUS){
+    inhalt.appendChild(el(`<div><p class="sub" style="margin:6px 0 10px">Die <b>Testfassung</b> enthält Neuerungen,
+      bevor sie für alle gelten. Sie arbeitet mit einer <b>Kopie</b> deiner Filialdaten, die nur auf diesem Gerät
+      liegt — dein echter Stand, deine Pläne und die Abgaben der Mitarbeiter bleiben unberührt. Zurück geht jederzeit.</p>
+      <button class="btn small" id="tfAn">Testfassung ausprobieren</button></div>`));
+    k.querySelector("#tfAn").onclick = async e => {
+      e.target.disabled = true; e.target.textContent = "Testfassung wird geladen …"; fehler.textContent = "";
+      await speichere();
+      const r = await appRuf("kanal", {setzen: "test"}, 90000);
+      if (!r || !r.ok){
+        fehler.textContent = (r && r.fehler) || "Die Testfassung ließ sich nicht laden — ist das Gerät online?";
+        e.target.disabled = false; e.target.textContent = "Testfassung ausprobieren";
+      }
+      // bei Erfolg lädt die App die Seite neu
+    };
+  } else {
+    inhalt.appendChild(el(`<div><p class="sub" style="margin:6px 0 10px">Du bist in der <b>Testfassung</b>. Alles, was du
+      hier änderst, landet nur in der Testkopie auf diesem Gerät.</p>
+      <div class="kachelknoepfe"><button class="btn small" id="tfAus">Zurück zur stabilen Fassung</button>
+      <button class="btn ghost small" id="tfNeu">Testkopie zurücksetzen</button></div>
+      <p class="hint" style="margin-top:6px">Zurücksetzen holt den echten Stand frisch in die Testkopie — was du in der
+      Testfassung geändert hast, ist dann weg.</p></div>`));
+    k.querySelector("#tfAus").onclick = () => testfassungVerlassen();
+    k.querySelector("#tfNeu").onclick = async () => {
+      if (!confirm("Testkopie zurücksetzen? Alles, was du in der Testfassung geändert hast, wird verworfen. Deine echten Daten bleiben, wie sie sind.")) return;
+      await appRuf("testkopieVerwerfen", {});
+    };
+  }
+  return k;
+}
+async function testfassungVerlassen(){
+  await speichere();
+  await appRuf("kanal", {setzen: "stabil"});
 }
 
 // ==== app/44-ausfall.js ====
@@ -6602,6 +6661,16 @@ if (inApp && window.appFassung){
   const t = /^(\d{4})-(\d{2})-(\d{2})/.exec(window.appFassung);
   document.getElementById("fuss").textContent += " · Fassung "
     + (t ? "vom " + (+t[3]) + "." + (+t[2]) + "." + t[1] : window.appFassung);
+}
+
+/* Testfassung: ein Band, das man nicht übersehen kann — mit dem Weg zurück */
+if (TESTMODUS){
+  const band = el(`<div class="testband" role="status"><b>Testfassung</b>
+    <span>Änderungen gelten nur in der Testkopie auf diesem Gerät — deine echten Daten bleiben unberührt.</span>
+    <button class="btn small hell" id="testZurueck">Zurück zur stabilen Fassung</button></div>`);
+  document.body.prepend(band);
+  document.body.classList.add("mit-testband");
+  band.querySelector("#testZurueck").onclick = () => testfassungVerlassen();
 }
 
 window.appNeueFassung = function(name){
