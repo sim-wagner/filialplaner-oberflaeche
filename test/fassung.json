@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-13-5-test",
+  "fassung": "2026-11-13-6-test",
   "datei": "filialplaner.html",
-  "pruefsumme": "3548e3df33e9666ac02d0bda84bb43c0dcf7b2e274d46df7f99f27a0e18728be",
-  "hinweis": "Eigene Wünsche 1–9: Markierungen, Altersangabe, Plan passt in die Breite, neue Gestaltung, Plan ändern mit Vorschlägen und Assistent, Urlaub beim Mitarbeiter, Wochenaufgaben aktiv/aus, neue Funktionsnamen, Analyse"
+  "pruefsumme": "3b3648d3dce7cc094ced2b496e34290db77c30453c9f075f131f0f3f9aa57723",
+  "hinweis": "Überarbeitung: Lösungen klar formuliert mit Tagesbalken, alte Zeit durchgestrichen, Zurück-Knopf, Änderungen orange auf der Startseite, Personal als Liste, Filialformular-Raster, Assistent mit Gesprächsverlauf"
 }
