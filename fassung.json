@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-16-1",
+  "fassung": "2026-11-16-2",
   "datei": "filialplaner.html",
-  "pruefsumme": "38fe535bf7409b463c049b2e2ba32d08d6a4b2e2ad7bc1b1e670bbf4cafedc5d",
-  "hinweis": "Neue Gestaltung: Leiste links, Übersicht mit „Zu erledigen“ und „Heute im Laden“, Plan als Aushang, Hausfarben; dazu die Wünsche der Filialleitung (Plan ändern, Urlaub & Krankheit, Analyse)"
+  "pruefsumme": "0a52617a64b6ae6e267e61655cb332a5550da18e7b206cc70c7ae583e6b151fe",
+  "hinweis": "Tagesanalyse, Dashboard mit Vorfällen der Woche, Assistent versteht Alltagssätze und fragt nach, Bestellungen ausgeschrieben"
 }
