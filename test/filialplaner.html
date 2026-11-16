@@ -3,14 +3,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-16-1-test">
+<meta name="fassung" content="2026-11-16-2-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
 /* Farben seit 16.11.2026: Anthrazit und Grau tragen die Oberfläche (--ton-…).
    Rot (--zutun) heißt nur „hier ist etwas zu tun“ — dazu der schmale Markenstreifen.
    Gelb (--gelb) ist der eine Hauptknopf je Seite, --marker der Textmarker für das,
-   was nach dem Erstellen geändert wurde. Blau (--info) nur für Neues und den Fokus. */
+   was nach dem Erstellen geändert wurde. Blau (--info) nur für Neues und den Fokus.
+   --t-…: Tätigkeiten in Zeitleisten (geprüfte Farbfolge, je Modus eigene Stufen) —
+   nur dort, und immer mit Legende. */
 :root{
   --ton-900:#1B1D20; --ton-800:#24272B; --ton-700:#33373D; --ton-600:#4A5058;
   --ton-500:#7A818A; --ton-200:#CDD1D6; --ton-100:#E6E8EB; --ton-50:#F3F4F6;
@@ -23,6 +25,7 @@
   --marker:#FFE98A; --auf-marker:#1B1D20;
   --papier:#FBFAF7; --papier-2:#F1EFE9; --formlinie:#2E3136; --formlinie-2:#B4B8BE;
   --leiste:#24272B; --auf-leiste:#E6E8EB; --leiste-leise:#9AA1A9;
+  --t-kasse:#2F6FB5; --t-ware:#2A9D8F; --t-bestell:#9A6BD0; --t-sonst:#C9762F;
   --good:#1F7A45; --good-soft:#E3F3E9;
   --warn:#9A6206; --warn-soft:#FDF1DD;
   --bad:#B32320;  --bad-soft:#FBE6E5;
@@ -46,6 +49,7 @@
     --marker:#5C4A00; --auf-marker:#FFF3C4;
     --papier:#1F2124; --papier-2:#272A2E; --formlinie:#9AA1A9; --formlinie-2:#4A5058;
     --leiste:#16181A; --auf-leiste:#E6E8EB; --leiste-leise:#8D949C;
+    --t-kasse:#3F78D0; --t-ware:#35A77C; --t-bestell:#A07BDC; --t-sonst:#C9803F;
     --good:#7FC395; --good-soft:#14301F; --warn:#D9A05B; --warn-soft:#33270F; --bad:#E08585; --bad-soft:#331B1B;
     --shadow:0 1px 2px rgba(0,0,0,.45), 0 6px 20px -10px rgba(0,0,0,.7);
     --shadow-l:0 2px 6px rgba(0,0,0,.5), 0 18px 38px -22px rgba(0,0,0,.85);
@@ -63,6 +67,7 @@
     --marker:#5C4A00; --auf-marker:#FFF3C4;
     --papier:#1F2124; --papier-2:#272A2E; --formlinie:#9AA1A9; --formlinie-2:#4A5058;
     --leiste:#16181A; --auf-leiste:#E6E8EB; --leiste-leise:#8D949C;
+    --t-kasse:#3F78D0; --t-ware:#35A77C; --t-bestell:#A07BDC; --t-sonst:#C9803F;
     --good:#7FC395; --good-soft:#14301F; --warn:#D9A05B; --warn-soft:#33270F; --bad:#E08585; --bad-soft:#331B1B;
     --shadow:0 1px 2px rgba(0,0,0,.45), 0 6px 20px -10px rgba(0,0,0,.7);
     --shadow-l:0 2px 6px rgba(0,0,0,.5), 0 18px 38px -22px rgba(0,0,0,.85);
@@ -292,7 +297,10 @@ table.termintabelle td{vertical-align:middle}
 table.termintabelle tr.t-fehler td{color:var(--bad)}
 table.termintabelle tr.t-gleich td{color:var(--muted)}
 table.termintabelle tr.t-ersetzt td:nth-child(5){color:var(--warn);font-weight:600}
-table.plan tr.bestell td{font-size:.64rem;color:var(--ink-2);white-space:normal;line-height:1.35}
+table.plan tr.bestell td{white-space:normal;line-height:1.35;vertical-align:top;padding-top:5px;padding-bottom:5px}
+.b-gruppe{display:flex;flex-direction:column}
+.b-gruppe + .b-gruppe{margin-top:5px}
+.b-gruppe b{font-weight:700}
 table.plan .ue-plus{color:var(--warn)}
 table.plan .ue-minus{color:var(--info)}
 table.plan .ue-null{color:var(--muted)}
@@ -328,7 +336,6 @@ table.plan .ue-aend{font-size:.62rem;font-weight:700}
 .vorschlag-rechts{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
 
 /* ---------- Urlaub & Krankheit ---------- */
-.ereignisliste b{display:block;margin-bottom:2px}
 .ereignisse-tab td{vertical-align:middle}
 .tag.krank{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
 .tag.urlaub{background:var(--info-soft);border-color:var(--info);color:var(--info)}
@@ -517,12 +524,6 @@ tr.k-notiz td[data-notiz]{color:var(--muted)}
 .vkarte details{padding:0 12px 10px;font-size:.78rem;color:var(--ink-2)}
 .vkarte summary{cursor:pointer;font-weight:700;color:var(--link);font-size:.76rem}
 .vkarte details p{margin-top:6px;line-height:1.45}
-.aend-zeile{display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--line-2);font-size:.84rem}
-.aend-zeile:first-child{border-top:0}
-.aend-zeile > span:nth-child(2){flex:1}
-.aend-quelle{font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--gruen);
-  background:var(--gruen-soft);border-radius:6px;padding:2px 6px;flex:none}
-.aend-zeile.passt-nicht .aend-quelle{color:var(--rot);background:var(--rot-soft)}
 .chat{display:flex;flex-direction:column;gap:8px;max-height:360px;overflow-y:auto;padding:2px 2px 8px}
 .blase{max-width:92%;padding:8px 11px;border-radius:12px;font-size:.84rem;line-height:1.45}
 .blase.assistent{background:var(--ton-50);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
@@ -583,7 +584,7 @@ tr.k-zusatz th{overflow-wrap:normal;word-break:normal}
 @media(max-width:560px){
   .panel{padding:16px 12px}
   .aendern .karte{padding:12px 6px}
-  .aendern .karte > h3,.aendern .karte-kopf,.aendern .todo,.aendern .vgruppe,.aendern .aend-zeile{padding-left:6px;padding-right:6px}
+  .aendern .karte > h3,.aendern .karte-kopf,.aendern .todo,.aendern .vgruppe{padding-left:6px;padding-right:6px}
 }
 .vkarte-knopf .tag{align-self:start;justify-self:end}
 /* iOS gibt Zeit- und Datumsfeldern eine eigene Mindestbreite — sie ragten über den Rand */
@@ -597,7 +598,8 @@ input[type=time]::-webkit-date-and-time-value,input[type=date]::-webkit-date-and
    ====================================================================== */
 /* Plan: breit das Filialformular, schmal die kompakte Fassung */
 .planbox .ansicht-schmal{display:none}
-@container (max-width:700px){ .planbox .ansicht-breit{display:none} .planbox .ansicht-schmal{display:table} }
+/* Das Formular braucht gut 830 px — darunter die kompakte Fassung, statt rechts abzuschneiden */
+@container (max-width:860px){ .planbox .ansicht-breit{display:none} .planbox .ansicht-schmal{display:table} }
 table.plan.gitter{min-width:0;width:100%;table-layout:auto;font-size:.7rem}
 table.plan.gitter th,table.plan.gitter td{padding:3px 4px}
 table.plan.gitter .zeilenkopf{min-width:0;width:15%}
@@ -666,8 +668,6 @@ td.z-geaendert em.z-neu-text{color:var(--auf-marker)}
 @media(max-width:560px){.tb-reihe{grid-template-columns:48px 1fr}.tb-legende{padding-left:0}}
 
 /* Änderungen-Liste und Assistent */
-.aend-zeile.aus{opacity:.55}
-.aend-zeile.aus .aend-quelle{color:var(--muted);background:var(--line-2)}
 .chat-weg{display:block;font-weight:500!important;color:var(--ink-2)!important;font-size:.74rem!important;margin-top:3px}
 .chat-weg s{color:var(--muted)}
 .aendern-status .btn .sym{width:16px;height:16px}
@@ -705,7 +705,7 @@ td.z-geaendert em.z-neu-text{color:var(--auf-marker)}
 .tb-spur i.tb-luecke{top:0!important;bottom:0!important}
 .tb-achse .tb-spur{height:16px}
 .aendern-oben{display:flex;flex-direction:column;gap:14px;margin-bottom:14px}
-@media(min-width:1001px){.aendern-raster{grid-template-columns:minmax(0,1fr) 360px}}
+@media(min-width:1001px){.aendern-raster{grid-template-columns:minmax(0,1fr) 420px}}
 @media(max-width:640px){
   .aendern-status{position:static;gap:6px}
   .aendern-status .spacer{display:none}
@@ -874,6 +874,90 @@ tr.k-summe th,tr.k-summe td{background:var(--papier-2)}
 tr.k-person:hover td,tr.k-person:hover th{background:var(--papier-2)}
 .messlatte{background:none;border-radius:0;border-top:1px solid var(--line);padding:10px 0 0;margin-top:12px}
 .aendern-status .spacer{margin-left:auto}
+
+/* ---- Dashboard (16.11.2026): zu erledigen und die Vorfälle der Woche in einer Karte ---- */
+.dashboard{display:flex;flex-direction:column;gap:14px}
+.db-teil + .db-teil{border-top:1px solid var(--line);padding-top:14px}
+.db-teil .karte-kopf{margin-bottom:6px;justify-content:space-between}
+.vf-liste{display:flex;flex-direction:column}
+.vf-zeile{display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;align-items:baseline;padding:7px 2px;border-top:1px solid var(--line-2);font-size:.88rem;font-weight:600}
+.vf-liste > .vf-zeile:first-child{border-top:0}
+.vf-art{font-size:.68rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+@media(max-width:480px){.vf-zeile{grid-template-columns:1fr;gap:1px}}
+/* Mittlere Breiten: die kompakte Fassung trennt Wörter an Silben statt mitten im Wort */
+table.kompakt th,table.kompakt td{overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto}
+@container (min-width:481px){ tr.k-zusatz td{font-size:.72rem} }
+.planbox{overflow-x:auto}
+
+/* ---- Tagesanalyse (16.11.2026) ---- */
+.t-kasse{background:var(--t-kasse)} .t-ware{background:var(--t-ware)} .t-bestell{background:var(--t-bestell)} .t-sonst{background:var(--t-sonst)}
+.t-pause{background:repeating-linear-gradient(135deg,var(--ton-200) 0 3px,transparent 3px 6px)}
+.tagesanalyse{display:flex;flex-direction:column;gap:14px}
+.ta-kopf{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.ta-legende{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:.78rem;font-weight:600;color:var(--ink-2)}
+.ta-legende span,.ta-kachelname{display:inline-flex;align-items:center;gap:6px}
+.ta-legende i,.ta-kachelname i{width:12px;height:12px;border-radius:3px;flex:none}
+.ta-woche{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.ta-tag{display:grid;grid-template-columns:92px minmax(0,1fr) 64px;gap:12px;align-items:center;min-height:38px;padding:5px 12px;border:0;
+  border-top:1px solid var(--line-2);background:var(--surface);font:inherit;color:var(--ink);text-align:left;cursor:pointer}
+.ta-tag:first-child{border-top:0}
+.ta-tag:hover:not(:disabled){background:var(--ton-50)}
+.ta-tag[aria-pressed="true"]{background:var(--ton-100);box-shadow:inset 3px 0 0 var(--gelb)}
+.ta-tag:disabled{cursor:default;color:var(--muted)}
+.ta-tagname{font-size:.84rem;font-variant-numeric:tabular-nums}
+.ta-stapel{display:flex;gap:2px;height:14px}
+.ta-stapel i{display:block;height:100%;border-radius:2px;min-width:2px}
+.ta-stapel em{font-style:normal;font-size:.76rem;color:var(--muted)}
+.ta-summe{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.82rem;font-weight:700;text-align:right}
+.ta-titel{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;font-size:1rem;margin-top:8px}
+.ta-titel span{font-size:.8rem;font-weight:600;color:var(--muted)}
+.ta-summen{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media(max-width:900px){.ta-summen{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ta-kachel{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--surface-2)}
+.ta-kachelname{font-size:.76rem;font-weight:700;color:var(--ink-2)}
+.ta-kachel b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:1.25rem;letter-spacing:-.02em}
+.ta-kachel > span:last-child{font-size:.72rem;color:var(--muted);font-weight:600}
+.ta-leiste{display:flex;flex-direction:column;gap:5px;border:1px solid var(--line);border-radius:var(--r);padding:12px 12px 6px;background:var(--surface)}
+.ta-reihe{display:grid;grid-template-columns:118px minmax(0,1fr) 104px;gap:10px;align-items:center}
+.ta-name{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+.ta-name b{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ta-name span{font-size:.66rem;color:var(--muted);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ta-spur{position:relative;display:block;height:20px;background:var(--line-2);border-radius:4px}
+.ta-spur > i{position:absolute;top:0;bottom:0}
+.ta-zu{background:var(--surface);opacity:.6}
+.ta-linie{width:1px;background:var(--surface);opacity:.9}
+.ta-seg{border-radius:3px;box-shadow:inset -1.5px 0 0 var(--surface)}
+.ta-zeit{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.76rem;font-weight:600;text-align:right;white-space:nowrap}
+.ta-zeit span{display:block;font-size:.66rem;color:var(--muted);font-weight:500}
+.ta-besetzung{align-items:end;margin-bottom:6px}
+.ta-besetzung .ta-spur{height:76px;background:none;border-bottom:1.5px solid var(--line)}
+.ta-saeulen{position:absolute;inset:0;display:flex;align-items:flex-end}
+.ta-saeule{position:relative;flex:1;height:100%;display:flex;flex-direction:column-reverse;gap:1px;min-width:0}
+.ta-saeule i{display:block;width:100%}
+.ta-saeule u{position:absolute;left:0;right:0;height:2px;margin-bottom:-1px;background:var(--ink);text-decoration:none}
+.ta-saeule u.knapp{background:var(--zutun);height:3px}
+.ta-saeule:hover{outline:1.5px solid var(--ink);outline-offset:-1px;z-index:1}
+.ta-achse .ta-spur{height:16px;background:none}
+.ta-uhr{position:absolute;top:1px;transform:translateX(-50%);font-family:var(--mono);font-size:.64rem;color:var(--muted)}
+.ta-gruende{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media(max-width:900px){.ta-gruende{grid-template-columns:1fr}}
+.ta-grund{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--surface)}
+.ta-grundkopf{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:4px}
+.ta-grundkopf b{font-size:.9rem}
+.ta-grundkopf span{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.76rem;color:var(--muted);white-space:nowrap}
+.ta-grund p{font-size:.82rem;line-height:1.45;color:var(--ink-2);font-weight:500}
+.ta-grund p + p{margin-top:3px}
+@media(max-width:640px){
+  .ta-reihe{grid-template-columns:62px minmax(0,1fr)}
+  .ta-reihe > .ta-zeit{display:none}
+  .ta-tag{grid-template-columns:70px minmax(0,1fr) 52px;gap:8px;padding:5px 8px}
+  .ta-leiste{padding:10px 8px 4px}
+}
+
+/* ---- Assistent: Antwortknöpfe unter einer Rückfrage ---- */
+.chat-knoepfe{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chat-knoepfe .btn{border-radius:999px;padding:6px 12px}
+.chat{max-height:460px}
 </style>
 
 <div class="markenband" aria-hidden="true"></div>
@@ -4374,6 +4458,7 @@ function wegeFuerTag(mit, ti, weg, ziel, ausser){
     const v = wegAufbereiten(mit, ti, w.aenderungen, ziel.punkte, ausser);
     if (!gesehen.has(v.titel) && raus.length < 4){ gesehen.add(v.titel); raus.push(v); }
   });
+  wegeOrdnen(raus);
   raus.forEach((w, n) => w.warum = wegErklaerung(w, n, raus));
   return raus;
 }
@@ -4384,7 +4469,8 @@ function wegErklaerung(w, platz, alle){
     : `Schließt die Lücke nur teilweise: ${spannenText(w.offen)} bleibt offen. Ein vollständiger Weg am selben Tag hält Gesetz oder Ruhezeiten nicht ein.`);
   teile.push("Geprüft: Ruhezeit zwischen zwei Schichten, Höchstarbeitszeit, Pausen, Jugendschutz, höchstens sechs Arbeitstage und alle eingetragenen Abwesenheiten.");
   teile.push(w.mehr > 0.01 ? `Kostet ${h1(w.mehr)} Stunden mehr an diesem Tag.` : w.mehr < -0.01 ? `Spart ${h1(-w.mehr)} Stunden.` : "Kostet keine zusätzlichen Stunden.");
-  if (alle.length > 1) teile.push(platz === 0 ? "Steht oben, weil er am wenigsten Mehrstunden und Kontobelastung bringt."
+  if (alle.length > 1) teile.push(w.gelernt ? `Steht oben, weil du in dieser Filiale meist so löst: ${LOESUNGSARTEN[w.art]}.`
+    : platz === 0 ? "Steht oben, weil er am wenigsten Mehrstunden und Kontobelastung bringt."
     : `Platz ${platz + 1} — ${w.voll ? "mehr Stunden oder mehr Kontobelastung als die Wege davor" : "schließt weniger als die Wege davor"}.`);
   return teile.join(" ");
 }
@@ -4459,222 +4545,12 @@ function entwurfUebernehmen(sl){
   // Nachvollziehbar bleiben, was geändert wurde — ohne Gründe (Gesundheitsdaten)
   neu.ausfaelle = (kurz.ausfaelle || []).concat(aktiv.filter(a => a.typ !== "abwesend")
     .map(a => ({am: new Date().toISOString(), was: a.typ === "notiz" ? "Notiz" : a.text})));
+  // Welche Art von Lösung gewählt wurde — nur die Art, nie die Personen (siehe wegeOrdnen)
+  aktiv.forEach(a => { if (a.typ === "loesung") lernenMerken(a.art || wegArt(a.schritte)); else if (a.typ === "tage") lernenMerken("umplanen"); });
   state.plaene[sl] = neu;
   delete state.entwuerfe[sl];
   return neu;
 }
-
-/* ---- Assistent ------------------------------------------------------------
-   Versteht kurze Sätze zum Plan der Woche, ohne Verbindung nach draußen — es verlässt
-   kein Name und keine Uhrzeit das Gerät. Er merkt sich, worum es gerade geht (Tag,
-   Lücke, schon genannte Personen), damit Rückfragen wie „Keiner kann“ oder „Wie geht
-   es sonst?“ verstanden werden. Er schlägt Änderungen vor; im Plan erscheinen sie
-   erst, wenn man sie antippt. */
-
-const WOCHENTAGE = [["montag", "mo"], ["dienstag", "di"], ["mittwoch", "mi"], ["donnerstag", "do"],
-                    ["freitag", "fr"], ["samstag", "sa"]];
-
-function tageImText(t, mo){
-  const tage = new Set();
-  const wort = WOCHENTAGE.map(([lang, kurz]) => lang + "s?|" + kurz).join("|");
-  const bereich = new RegExp(`\\b(${wort})\\b\\.?\\s*(?:-|–|bis)\\s*\\b(${wort})\\b`, "g");
-  const index = w => WOCHENTAGE.findIndex(([lang, kurz]) => w.startsWith(lang) || w === kurz);
-  let r;
-  while ((r = bereich.exec(t))){ const a = index(r[1]), b = index(r[2]); for (let k = Math.min(a, b); k <= Math.max(a, b); k++) tage.add(k); }
-  t = t.replace(bereich, " ");
-  const einzel = new RegExp(`\\b(${wort})\\b`, "g");
-  while ((r = einzel.exec(t))) tage.add(index(r[1]));
-  if (/\bganze[nr]? woche\b|\bdie woche\b|\balle tage\b/.test(t)) TAGE.forEach((_, k) => tage.add(k));
-  const heute = new Date(); heute.setHours(12, 0, 0, 0);
-  const ab = d => Math.round((d - mo) / 864e5);
-  if (/(^|\s)heute(\s|$)/.test(t)) tage.add(ab(heute));
-  if (/(^|\s)übermorgen(\s|$)/.test(t)){ const d = new Date(heute); d.setDate(d.getDate() + 2); tage.add(ab(d)); }
-  else if (/(^|\s)morgen(\s|$)/.test(t)){ const d = new Date(heute); d.setDate(d.getDate() + 1); tage.add(ab(d)); }
-  const datum = /\b(\d{1,2})\.(\d{1,2})\.?/g;
-  while ((r = datum.exec(t))){ const d = new Date(mo); d.setMonth(+r[2] - 1, +r[1]); tage.add(ab(d)); }
-  return [...tage].filter(k => k >= 0 && k < 6).sort((a, b) => a - b);
-}
-
-function personenImText(t){
-  const raus = [];
-  state.mitarbeiter.forEach((m, i) => {
-    const voll = m.name.toLowerCase();
-    let stelle = t.indexOf(voll);
-    if (stelle < 0) voll.split(/\s+/).some(w => {
-      const r = new RegExp(`(^|[^a-zäöüß])${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-zäöüß])`).exec(t);
-      if (r && w.length > 1){ stelle = r.index; return true; }
-      return false;
-    });
-    if (stelle >= 0) raus.push({i, name: m.name, stelle});
-  });
-  return raus.sort((a, b) => a.stelle - b.stelle);
-}
-
-function zeitenImText(t){
-  const z = "(\\d{1,2})(?:[:.](\\d{2}))?";
-  const zahl = (h, m) => (+h) * 60 + (m ? +m : 0);
-  const r = new RegExp(`(?:von\\s*)?${z}\\s*(?:uhr)?\\s*(?:-|–|bis)\\s*${z}`).exec(t);
-  if (r && +r[1] < 24 && +r[3] <= 24) return {von: zahl(r[1], r[2]), bis: zahl(r[3], r[4])};
-  const bis = new RegExp(`\\bbis\\s*${z}`).exec(t), ab = new RegExp(`\\b(?:ab|um)\\s*${z}`).exec(t);
-  return {nurBis: bis ? zahl(bis[1], bis[2]) : null, nurAb: ab ? zahl(ab[1], ab[2]) : null};
-}
-
-const ASSISTENT_HILFE = "Zum Beispiel: „Eva ist Dienstag krank“, „Wer kann Eva am Dienstag ersetzen?“, "
-  + "„Hans hat Mi bis Fr Urlaub“, „Bernd Mittwoch 8–14“, „Carla Freitag frei“, „Eva bleibt Dienstag bis 18 Uhr“, "
-  + "„Tausche Eva und Hans am Mittwoch“, „Wer kann Samstag 14–20?“, „Was fehlt noch?“ — und nachfragen: "
-  + "„Keiner von denen kann“, „Wie geht es sonst?“.";
-
-function assistent(text, sl, kurz, eintrag){
-  const t = " " + String(text || "").toLowerCase().replace(/\s+/g, " ").trim() + " ";
-  const mo = montagDer(kurz.mo);
-  const pr = entwurfPruefen(sl, kurz, eintrag), plan = pr.plan;
-  const kontext = eintrag.kontext = eintrag.kontext || {};
-  const leute = personenImText(t);
-  let tage = tageImText(t, mo);
-  const zeit = zeitenImText(t);
-  const karte = (a, text) => Object.assign({id: aenderungsId(), aktiv: false, quelle: "assistent", text}, a);
-  const antwort = (text, karten) => ({antwort: text, karten: karten || []});
-  // Karten für die Wege einer Lücke (gleiche Rechnung wie bei den Vorschlägen)
-  const wegKarten = (wege, fuer) => wege.map(w => karte({typ: "loesung", fuer: fuer || null, ti: w.ti, schritte: w.schritte,
-    titel: w.titel, weg: wegKurz(w)}, `${tagName(w.ti)}: ${w.titel}${w.voll ? "" : ` (${spannenText(w.offen)} bleibt offen)`}`));
-  const lueckenWege = (ti, ausschluss) => {
-    const extra = (ausschluss || []).map(name => ({aktiv: true, typ: "abwesend", name, ti, grund: "nicht"}));
-    return mitEntwurfsAbwesenheiten(sl, {aenderungen: eintrag.aenderungen.concat(extra)}, () =>
-      wegeFuerTag(plan, ti, null, {maengel: tagesMaengel(kurz, ti), punkte: fehlzeiten(kurz, ti)}, null));
-  };
-  const keinWeg = ti => `Mit dem vorhandenen Personal lässt sich die Lücke am ${tagName(ti)}${
-      (pr.luecken[ti] || kontext.luecke || []).length ? " (" + spannenText(pr.luecken[ti] || kontext.luecke) + ")" : ""} ohne Regelverstoß nicht schließen. `
-    + "Was bleibt: unter „Lösungen“ über mehrere Tage umplanen lassen, jemanden fragen, der eine Ausnahme machen kann "
-    + "(z. B. Filialleitung bleibt länger — dann Mehrarbeit mit Ausgleich), oder die Bereichsleitung um Unterstützung aus einer Nachbarfiliale bitten.";
-
-  if (/hilfe|was kannst du|wie geht das/.test(t)) return antwort(ASSISTENT_HILFE);
-  if (/was fehlt|probleme?\b|was ist offen|noch zu tun|\brot\b/.test(t)){
-    if (!pr.offen.length) return antwort("Im Entwurf ist nichts offen — Besetzung, Gesetz und Abwesenheiten passen.");
-    return antwort("Offen ist noch: " + pr.offen.map(o => o.text).join(" "));
-  }
-
-  // Rückfragen ohne Namen beziehen sich auf das, worum es gerade ging
-  const verneint = /\b(keiner|keine|niemand|kann keiner|hat keiner|geht nicht|nein|leider nicht)\b/.test(t);
-  const sonst = /\bsonst\b|andere[nr]? (möglichkeit|lösung|weg)|alternativ|wie können wir|was können wir|wie (geht|ginge) es|lücke (füllen|schließen)|was (geht|ginge) noch|weitere/.test(t);
-  if ((verneint || sonst) && (!leute.length || verneint) && kontext.ti !== undefined && !tage.length){
-    const ti = kontext.ti;
-    if (verneint && kontext.kandidaten && kontext.kandidaten.length){
-      kontext.ausgeschlossen = [...new Set([...(kontext.ausgeschlossen || []), ...kontext.kandidaten])];
-      const vermerk = kontext.kandidaten.map(name => karte({typ: "abwesend", name, ti, grund: "nicht"}, `${name} ${tagName(ti)}: kann nicht`));
-      const wege = lueckenWege(ti, kontext.ausgeschlossen);
-      kontext.kandidaten = [];
-      if (!wege.length) return antwort(`Verstanden — ${vermerk.map(k => k.name).join(", ")} können ${tagName(ti)} nicht. Antippen vermerkt das. ` + keinWeg(ti), vermerk);
-      return antwort(`Verstanden — ohne ${vermerk.map(k => k.name.split(" ")[0]).join(", ")}. So ginge es trotzdem:`, wegKarten(wege).concat(vermerk));
-    }
-    const wege = lueckenWege(ti, kontext.ausgeschlossen);
-    if (!wege.length) return antwort(keinWeg(ti));
-    return antwort(`Andere Wege für ${tagName(ti)}:`, wegKarten(wege));
-  }
-
-  if (/\bwer kann\b|\bwer hat zeit\b|\bwer könnte\b|ersetz|vertret|einspring|übernehm/.test(t)){
-    if (!tage.length && kontext.ti !== undefined) tage = [kontext.ti];
-    if (!tage.length) return antwort("Für welchen Tag? Zum Beispiel: „Wer kann Eva am Samstag ersetzen?“");
-    const ti = tage[0];
-    kontext.ti = ti;
-    // „Wer kann Rustan ersetzen?“ — Ausfall dieser Person, mit allen Wegen
-    const fehlt = leute.find(p => schichtenVon(plan, p.name, ti).length);
-    if (fehlt && /ersetz|vertret|einspring|übernehm|fällt aus|krank|ausfall/.test(t)){
-      const s = schichtenVon(plan, fehlt.name, ti);
-      const aus = karte({typ: "abwesend", name: fehlt.name, ti, grund: /krank/.test(t) ? "krank" : /urlaub/.test(t) ? "urlaub" : "nicht"},
-        `${fehlt.name} ${tagName(ti)}: fällt aus`);
-      const probe = Object.assign({}, eintrag, {aenderungen: eintrag.aenderungen.concat(Object.assign({}, aus, {aktiv: true}))});
-      const g = entwurfVorschlaege(sl, kurz, probe, 0).find(x => x.fuer.id === aus.id);
-      kontext.kandidaten = g ? [...new Set(g.wege.flatMap(w => w.zeilen.map(z => z.name)))] : [];
-      kontext.luecke = g ? g.luecke : [];
-      if (!g || !g.luecke.length) return antwort(`Fällt ${fehlt.name} ${tagName(ti)} aus (${hhmm(s[0].von)}–${hhmm(s[s.length - 1].bis)}), entsteht keine Lücke — niemand muss einspringen.`, [aus]);
-      if (!g.wege.length) return antwort(`Ohne ${fehlt.name} ist ${tagName(ti)} ${spannenText(g.luecke)} nicht richtig besetzt: ${g.fehlt}. ` + keinWeg(ti), [aus]);
-      return antwort(`Ohne ${fehlt.name} ist ${tagName(ti)} ${spannenText(g.luecke)} nicht richtig besetzt: ${g.fehlt}. Diese Wege gibt es — antippen zeigt sie im Plan (der Ausfall wird mit eingetragen):`,
-        wegKarten(g.wege, aus.id).concat([aus]));
-    }
-    const von = zeit.von !== undefined ? zeit.von : (pr.luecken[ti] ? Math.min(...pr.luecken[ti]) : null);
-    const bis = zeit.bis !== undefined ? zeit.bis : (pr.luecken[ti] ? Math.max(...pr.luecken[ti]) + 30 : null);
-    const ausgeschlossen = kontext.ausgeschlossen || [];
-    const frei = state.mitarbeiter.filter(m => !schichtenVon(plan, m.name, ti).length && !ausgeschlossen.includes(m.name)).filter(m => {
-      if (von === null) return true;
-      return mitEntwurfsAbwesenheiten(sl, eintrag, () => {
-        const p = tagKopie(plan, ti);
-        return ausfallErlaubt(p, planPlatz(p, personIndex(m.name)), ti, von, Math.max(bis, von + MINSCHICHT * 60));
-      });
-    });
-    kontext.kandidaten = frei.map(m => m.name);
-    if (!frei.length){
-      const wege = von === null ? [] : lueckenWege(ti, ausgeschlossen);
-      if (!wege.length) return antwort(`${tagName(ti)}${von !== null ? " " + hhmm(von) + "–" + hhmm(bis) : ""} kann niemand zusätzlich kommen. ` + keinWeg(ti));
-      return antwort(`${tagName(ti)} kann niemand zusätzlich kommen — aber so ginge es:`, wegKarten(wege));
-    }
-    const lang = Math.max(bis, von + MINSCHICHT * 60);
-    const karten = von === null ? [] : frei.slice(0, 4).map(m =>
-      karte({typ: "schicht", name: m.name, ti, von, bis: lang}, `${m.name} ${tagName(ti)} ${hhmm(von)}–${hhmm(lang)}`));
-    return antwort(`${tagName(ti)}${von !== null ? " " + hhmm(von) + "–" + hhmm(bis) : ""} haben frei und dürften kommen: ${frei.map(m => m.name).join(", ")}`
-      + (lang > bis ? ` (mindestens ${MINSCHICHT} Stunden, also bis ${hhmm(lang)})` : "") + ". Ob sie wirklich können, weiß nur die Person selbst — "
-      + "wenn nicht, schreib einfach „keiner kann“.", karten);
-  }
-  if (/stunden|konto|überstunden/.test(t) && leute.length && !tage.length){
-    const p = leute[0], m = state.mitarbeiter[p.i];
-    const k = kontoNach(plan, platzImPlan(plan, p.name));
-    if (!k) return antwort(`${p.name}: keine Vertragsstunden hinterlegt.`);
-    return antwort(`${p.name} hat im Entwurf ${h1(k.ist)} h in dieser Woche (Soll ${h1(k.soll)} h). Konto danach: ${ueText(k.ende) || "0,0"} h`
-      + (darfUeberstunden(m) ? "." : " — macht keine Überstunden."));
-  }
-  if (!leute.length) return antwort("Das habe ich nicht verstanden. " + ASSISTENT_HILFE);
-  if (/tausch/.test(t)){
-    if (leute.length < 2 || !tage.length) return antwort("Wen mit wem und an welchem Tag? Zum Beispiel: „Tausche Eva und Hans am Mittwoch“.");
-    const [a, b] = leute, karten = [];
-    tage.forEach(ti => {
-      const sa = schichtenVon(plan, a.name, ti)[0], sb = schichtenVon(plan, b.name, ti)[0];
-      if (!sa && !sb) return;
-      karten.push(karte(sb ? {typ: "schicht", name: a.name, ti, von: sb.von, bis: sb.bis} : {typ: "frei", name: a.name, ti},
-        `${a.name} ${tagName(ti)} ${sb ? hhmm(sb.von) + "–" + hhmm(sb.bis) : "frei"}`));
-      karten.push(karte(sa ? {typ: "schicht", name: b.name, ti, von: sa.von, bis: sa.bis} : {typ: "frei", name: b.name, ti},
-        `${b.name} ${tagName(ti)} ${sa ? hhmm(sa.von) + "–" + hhmm(sa.bis) : "frei"}`));
-    });
-    if (!karten.length) return antwort(`${a.name} und ${b.name} haben an dem Tag beide frei — da gibt es nichts zu tauschen.`);
-    return antwort(`Tausch zwischen ${a.name} und ${b.name}: beide Karten antippen, dann steht es im Plan.`, karten);
-  }
-  const p = leute[0];
-  if (!tage.length && kontext.ti !== undefined) tage = [kontext.ti];
-  if (!tage.length) return antwort(`Für welchen Tag gilt das für ${p.name}? Zum Beispiel: „${p.name.split(" ")[0]} ist Dienstag krank“.`);
-  kontext.ti = tage[0];
-  const grund = /krank/.test(t) ? "krank" : /urlaub/.test(t) ? "urlaub" : /berufsschule|schule/.test(t) ? "schule"
-    : /kann nicht|kann .* nicht|fällt .*aus|ausfall|nicht da|verhindert|termin/.test(t) ? "nicht" : null;
-  if (grund){
-    const karten = tage.filter(ti => !plan.tage[ti].feiertag).map(ti =>
-      karte({typ: "abwesend", name: p.name, ti, grund}, `${p.name} ${tagName(ti)}: ${GRUND_NAME[grund]}`));
-    const betroffen = tage.filter(ti => schichtText(plan, p.name, ti));
-    return antwort(`${p.name}: ${GRUND_NAME[grund]} am ${tage.map(tagName).join(", ")}.`
-      + (betroffen.length ? ` Im Plan steht ${p.name} an ${betroffen.length === 1 ? "diesem Tag" : betroffen.length + " dieser Tage"} — nach dem Antippen erscheinen unter „Vorschläge“ die Wege, die Lücke zu schließen.`
-                          : ` ${p.name} ist an ${tage.length === 1 ? "dem Tag" : "den Tagen"} ohnehin nicht eingeplant.`), karten);
-  }
-  if (/\bfrei\b/.test(t) && zeit.von === undefined){
-    return antwort(`${p.name} bekommt frei am ${tage.map(tagName).join(", ")}. Entsteht eine Lücke, steht sie danach rot im Plan.`,
-      tage.map(ti => karte({typ: "frei", name: p.name, ti}, `${p.name} ${tagName(ti)} frei`)));
-  }
-  if (zeit.von !== undefined){
-    if (!(zeit.bis > zeit.von)) return antwort("Das Ende muss nach dem Beginn liegen.");
-    return antwort(`${p.name} arbeitet ${tage.map(tagName).join(", ")} ${hhmm(zeit.von)}–${hhmm(zeit.bis)}; die Pause legt der Planer nach Gesetz.`,
-      tage.map(ti => karte({typ: "schicht", name: p.name, ti, von: zeit.von, bis: zeit.bis}, `${p.name} ${tagName(ti)} ${hhmm(zeit.von)}–${hhmm(zeit.bis)}`)));
-  }
-  if (zeit.nurBis !== null || zeit.nurAb !== null){
-    const karten = [];
-    tage.forEach(ti => {
-      const s = schichtenVon(plan, p.name, ti)[0];
-      if (!s) return;
-      const von = zeit.nurAb !== null ? zeit.nurAb : s.von, bis = zeit.nurBis !== null ? zeit.nurBis : s.bis;
-      if (bis > von) karten.push(karte({typ: "schicht", name: p.name, ti, von, bis}, `${p.name} ${tagName(ti)} ${hhmm(von)}–${hhmm(bis)}`));
-    });
-    if (!karten.length) return antwort(`${p.name} hat an dem Tag keine Schicht, die sich verlängern oder verkürzen ließe. Mit Uhrzeit von–bis geht es: „${p.name.split(" ")[0]} ${tagName(tage[0])} 8–14“.`);
-    return antwort("So würde es aussehen — antippen zeigt es im Plan.", karten);
-  }
-  return antwort(`Was soll für ${p.name} am ${tage.map(tagName).join(", ")} gelten? ` + ASSISTENT_HILFE);
-}
-
-// Das Nötigste eines Wegs für die Anzeige in einer Karte (ohne die Plantage)
-const wegKurz = w => ({zeilen: w.zeilen, voll: w.voll, offen: w.offen, luecke: w.luecke, mehr: w.mehr, konto: w.konto});
 
 // ==== kern/17-analyse.js ====
 /* Analyse: Reicht das Personal, was sagen die Konten, was ist für die Zukunft zu tun?
@@ -4837,6 +4713,918 @@ function analyseEmpfehlungen(){
       text: `${h1(l.uebertrag)} h werden über die Minijob-Grenze hinaus mitgenommen (Grenze ${h1(l.grenze)} h im Monat). Weniger einplanen — oder einen Vertrag mit mehr Stunden anbieten, wenn der Bedarf dauerhaft da ist.`});
   });
   return raus;
+}
+
+// ==== kern/18-tagesanalyse.js ====
+/* Tagesanalyse: woher die Stunden eines Tages kommen.
+
+   Der Planer hält je Tag fest, welche Aufgaben wann wie viele Personen brauchen
+   (tag.aufgaben), und je Schicht, wofür sie gesetzt wurde (rollen). Daraus entsteht hier
+     · die Einteilung: wer in welcher Viertelstunde eine Aufgabe abdeckt, wer für Kasse
+       und Laden frei ist, wer Pause hat — nach denselben Regeln, mit denen der Planer
+       die Besetzung prüft (Können, Personenzahl, Kasse besetzt);
+     · die Begründung je Schicht: was fehlte, wenn es sie nicht gäbe. Das ist keine
+       nachträgliche Deutung, sondern dieselbe Prüfung (maengelGruende) ohne die Schicht.
+   Wer im Laden tatsächlich was macht, entscheidet die Filialleitung — die Einteilung
+   zeigt, wie gerechnet wurde. */
+
+const TAETIGKEITEN = [
+  {id: "kasse",   name: "Kasse & Laden"},
+  {id: "ware",    name: "Ware"},
+  {id: "bestell", name: "Bestellen"},
+  {id: "sonst",   name: "Weitere Aufgaben"}
+];
+
+// Zu welcher Tätigkeit eine Wochenaufgabe zählt
+function taetigkeitVon(aufgabe){
+  const w = WAREN.find(x => x.id === aufgabe.id);
+  if (w && w.gruppe === "bestellung") return "bestell";
+  if (w && (w.lieferung || w.braucht === "verraeumen")) return "ware";
+  return "sonst";                                   // Backen, Abendprogramm, MHD, Zusatzaufgaben
+}
+
+// [m, m, …] im Raster `schritt` → [[von, bis], …]
+function zuSpannen(punkte, schritt){
+  const raus = [];
+  [...punkte].sort((a, b) => a - b).forEach(m => {
+    const l = raus[raus.length - 1];
+    if (l && l[1] === m) l[1] = m + schritt; else raus.push([m, m + schritt]);
+  });
+  return raus;
+}
+const spanneText = ([von, bis]) => hhmm(von) + "–" + hhmm(bis);
+
+/* Die Einteilung eines Tages.
+   → {von, bis, offenVon, offenBis, reihen: [{name, m, schicht, segmente, stunden}],
+      zeitpunkte: [{m, da, noetig, je}], summen: {kasse, ware, bestell, sonst, pause},
+      spitze: {art: {n, m}},
+      aufgaben: [{name, art, von, bis, pers, wer, fehlt, nebenher: [{name, spannen}]}]} */
+function tagesEinteilung(plan, ti){
+  const t = plan && plan.tage[ti];
+  if (!t || t.feiertag) return null;
+  const SL = 15, ms = state.mitarbeiter, r = tagesRaster(t);
+  const aussen = state.allein ? 1 : MIN_BESETZUNG;
+  const nameVon = s => plan.namen ? plan.namen[s.mi] : (ms[s.mi] || {}).name;
+  const wer = s => ms.find(x => x.name === nameVon(s)) || null;
+  const kann = (s, q) => !q || ((wer(s) || {}).qual || []).includes(q);
+  const braucht = a => (WAREN.find(w => w.id === a.id) || {}).braucht || null;
+  const schichten = t.schichten.slice().sort((a, b) => a.von - b.von || a.bis - b.bis);
+  const aufgaben = (t.aufgaben || []).slice().sort((a, b) => (braucht(a) ? 0 : 1) - (braucht(b) ? 0 : 1) || a.von - b.von);
+  const von = Math.min(r.tagVon, ...schichten.map(s => s.von)), bis = Math.max(r.tagBis, ...schichten.map(s => s.bis));
+  const inPause = (s, m) => s.pauseVon !== null && s.pauseVon !== undefined && s.pauseVon <= m && s.pauseBis > m;
+
+  const was = schichten.map(() => ({}));            // je Schicht: Viertelstunde → {art, aufgabe}
+  const besetzt = new Map(aufgaben.map(a => [a, {wer: new Set(), fehlt: [], nebenher: {}}]));
+  const zeitpunkte = [];
+  let vorher = new Map();                           // wer eine Aufgabe angefangen hat, bleibt dabei
+  for (let m = von; m < bis; m += SL){
+    const da = schichten.map((s, n) => n).filter(n => schichten[n].von <= m && schichten[n].bis > m);
+    const frei = new Set();
+    da.forEach(n => { if (inPause(schichten[n], m)) was[n][m] = {art: "pause"}; else frei.add(n); });
+    const offen = m >= r.offenVon && m < r.offenBis;
+    // Jede Aufgabe braucht so viele Plätze wie Personen. Vergeben wird so, dass möglichst
+    // alle Plätze besetzt sind (wer nur eine Sache kann, bekommt sie zuerst) — und dann
+    // nach Vorliebe: wer schon dabei ist; wem der Planer die Aufgabe zugeschrieben hat;
+    // zuletzt, wer als Einziger kassieren könnte — die Kasse soll besetzt bleiben.
+    const jetzt = new Map();
+    const kasse = [...frei].filter(n => kann(schichten[n], "kasse"));
+    const plaetze = [];
+    aufgaben.filter(a => a.von <= m && a.bis > m).forEach(a => {
+      const schon = vorher.get(a) || [];
+      const rang = n => (schon.includes(n) ? 0 : 4) + ((schichten[n].rollen || []).includes(a.name) ? 0 : 2)
+                      + (offen && kasse.length <= 1 && kasse.includes(n) ? 1 : 0);
+      const wahl = [...frei].filter(n => kann(schichten[n], braucht(a))).sort((x, y) => rang(x) - rang(y) || x - y);
+      for (let k = 0; k < a.pers; k++) plaetze.push({a, wahl});
+      jetzt.set(a, []);
+    });
+    plaetze.sort((x, y) => x.wahl.length - y.wahl.length);
+    const platzVon = new Map();                       // Schicht → Platz
+    const setze = (p, gesehen) => {
+      for (const n of plaetze[p].wahl){
+        if (gesehen.has(n)) continue;
+        gesehen.add(n);
+        if (!platzVon.has(n) || setze(platzVon.get(n), gesehen)){ platzVon.set(n, p); return true; }
+      }
+      return false;
+    };
+    const offenePlaetze = plaetze.filter((pl, p) => !setze(p, new Set()));
+    platzVon.forEach((p, n) => {
+      const a = plaetze[p].a;
+      was[n][m] = {art: taetigkeitVon(a), aufgabe: a.name}; frei.delete(n);
+      besetzt.get(a).wer.add(nameVon(schichten[n])); jetzt.get(a).push(n);
+    });
+    // Bleibt ein Platz offen, rechnet der Planer trotzdem nicht mit einem Mangel, solange
+    // jemand mit dem Können im Laden ist — die Aufgabe läuft dann neben einer anderen her.
+    // Erst wenn es niemand kann, fehlt wirklich jemand.
+    offenePlaetze.forEach(pl => {
+      const b = besetzt.get(pl.a);
+      const n = da.find(x => !inPause(schichten[x], m) && kann(schichten[x], braucht(pl.a)) && !jetzt.get(pl.a).includes(x));
+      if (n === undefined) b.fehlt.push(m);
+      else (b.nebenher[nameVon(schichten[n])] = b.nebenher[nameVon(schichten[n])] || []).push(m);
+    });
+    frei.forEach(n => was[n][m] = {art: "kasse"});
+    vorher = jetzt;
+    const je = {kasse: 0, ware: 0, bestell: 0, sonst: 0, pause: 0};
+    da.forEach(n => je[was[n][m].art]++);
+    zeitpunkte.push({m, da: da.length, noetig: personenBedarf(t.aufgaben || [], m, offen, aussen), je});
+  }
+
+  const summen = {kasse: 0, ware: 0, bestell: 0, sonst: 0, pause: 0};
+  const reihen = schichten.map((s, n) => {
+    const segmente = [];
+    for (let m = s.von; m < s.bis; m += SL){
+      const w = was[n][m] || {art: "kasse"}, l = segmente[segmente.length - 1];
+      summen[w.art] += SL / 60;
+      if (l && l.art === w.art && l.aufgabe === (w.aufgabe || null) && l.bis === m) l.bis = m + SL;
+      else segmente.push({von: m, bis: m + SL, art: w.art, aufgabe: w.aufgabe || null});
+    }
+    return {name: nameVon(s), m: wer(s), schicht: s, segmente, stunden: s.arbeit};
+  });
+  const spitze = {};
+  TAETIGKEITEN.forEach(({id}) => { spitze[id] = zeitpunkte.reduce((b, z) => z.je[id] > b.n ? {n: z.je[id], m: z.m} : b, {n: 0, m: null}); });
+  return {von, bis, offenVon: r.offenVon, offenBis: r.offenBis, reihen, zeitpunkte, summen, spitze,
+    aufgaben: (t.aufgaben || []).slice().sort((a, b) => a.von - b.von).map(a => ({name: a.name, art: taetigkeitVon(a), von: a.von, bis: a.bis,
+      pers: a.pers, braucht: braucht(a), wer: [...besetzt.get(a).wer], fehlt: zuSpannen([...new Set(besetzt.get(a).fehlt)], SL),
+      nebenher: Object.keys(besetzt.get(a).nebenher).map(name => ({name, spannen: zuSpannen([...new Set(besetzt.get(a).nebenher[name])], SL)}))}))};
+}
+
+/* Warum es eine Schicht gibt: was an dem Tag fehlte, wenn sie wegfiele.
+   → {noetig: [{grund, spannen}], zwingend (Stunden), stunden, standard, vertretung} */
+function schichtGrund(plan, ti, schicht){
+  const t = plan.tage[ti];
+  const ohne = Object.assign({}, plan, {tage: plan.tage.map((x, n) => n === ti
+    ? Object.assign({}, x, {schichten: x.schichten.filter(s => s !== schicht)}) : x)});
+  const je = {}, zwingend = new Set();
+  tagesRaster(t).punkte.filter(m => m + 30 > schicht.von && m < schicht.bis).forEach(m => {
+    const mit = new Set(maengelGruende(plan, ti, m));
+    maengelGruende(ohne, ti, m).filter(g => !mit.has(g)).forEach(g => { (je[g] = je[g] || []).push(m); zwingend.add(m); });
+  });
+  const kappen = ([a, b]) => [Math.max(a, schicht.von), Math.min(b, schicht.bis)];
+  return {
+    noetig: Object.keys(je).map(grund => ({grund, spannen: zuSpannen(je[grund], 30).map(kappen)})),
+    zwingend: zuSpannen([...zwingend], 30).map(kappen).reduce((s, [a, b]) => s + (b - a) / 60, 0),
+    stunden: (schicht.bis - schicht.von) / 60,
+    standard: (schicht.rollen || []).includes("Standard"),
+    vertretung: (schicht.rollen || []).includes("Vertretung")
+  };
+}
+
+/* Die Begründung einer Schicht in Sätzen — für die Zeile unter der Zeitleiste.
+   reihe: eine Reihe aus tagesEinteilung; einteilung: das Ganze (für „nebenher“). */
+function schichtBegruendung(plan, ti, reihe, einteilung){
+  const g = schichtGrund(plan, ti, reihe.schicht), m = reihe.m, saetze = [];
+  const vorname = reihe.name.split(/\s+/)[0];
+  if (g.standard) saetze.push(`Feste Standardwoche: Diese Zeit ist bei ${vorname} hinterlegt.`);
+  if (g.vertretung) saetze.push("Springt ein — die Schicht kam durch eine Änderung am Plan dazu.");
+  if (g.noetig.length) saetze.push("Ohne diese Schicht fehlte: " + g.noetig.map(n =>
+    `${n.grund} (${n.spannen.map(spanneText).join(", ")})`).join("; ") + ".");
+  const aufgaben = reihe.segmente.filter(s => s.aufgabe);
+  if (aufgaben.length) saetze.push("Eingeteilt für: " + aufgaben.map(s => `${s.aufgabe} ${spanneText([s.von, s.bis])}`).join(", ") + ".");
+  const nebenher = ((einteilung && einteilung.aufgaben) || []).reduce((l, a) => l.concat(a.nebenher.filter(x => x.name === reihe.name)
+    .map(x => `${a.name} ${x.spannen.map(spanneText).join(", ")}`)), []);
+  if (nebenher.length) saetze.push("Nebenher: " + nebenher.join(", ") + ".");
+  // Welches Können dafür gebraucht wird — nur das, was diese Schicht wirklich nutzt
+  const koennen = new Set();
+  aufgaben.forEach(s => { const w = WAREN.find(x => x.name === s.aufgabe); if (w && w.braucht) koennen.add(w.braucht); });
+  ((einteilung && einteilung.aufgaben) || []).forEach(a => { if (a.braucht && a.nebenher.some(x => x.name === reihe.name)) koennen.add(a.braucht); });
+  g.noetig.forEach(n => {
+    if (n.grund === "Kasse") koennen.add("kasse");
+    if (n.grund === "Schichtführung früh") koennen.add(m && m.typ === "Filialleitung" ? "§" : "frueh");
+    if (n.grund === "Schichtführung spät") koennen.add(m && m.typ === "Filialleitung" ? "§" : "spaet");
+  });
+  if (koennen.size) saetze.push("Dafür nötig: " + [...koennen].map(q => q === "§" ? "Filialleitung (Schlüssel)"
+    : (QUAL.find(x => x[0] === q) || [q, q])[1]).join(", ") + ".");
+  const uebrig = g.stunden - g.zwingend;
+  if (!g.noetig.length && !g.standard && !g.vertretung)
+    saetze.push(`Für die Besetzung nicht zwingend — die ${h1(reihe.stunden)} h füllen Vertragsstunden auf oder gleichen das Stundenkonto aus.`);
+  else if (g.noetig.length && uebrig >= 1)
+    saetze.push(`Nur mit dieser Schicht gedeckt sind ${h1(g.zwingend)} von ${h1(g.stunden)} h. In der übrigen Zeit könnten andere die Besetzung halten — sie füllt Vertragsstunden auf.`);
+  return {grund: g, saetze};
+}
+
+// Stunden je Tätigkeit für alle Tage einer Woche — die Übersicht über der Tagesanalyse
+function wochenEinteilung(plan){
+  return plan.tage.map((t, ti) => {
+    const e = tagesEinteilung(plan, ti);
+    return {ti, key: t.key, label: t.label, datum: t.datum, feiertag: !!t.feiertag, summen: e ? e.summen : null,
+            arbeit: e ? e.summen.kasse + e.summen.ware + e.summen.bestell + e.summen.sonst : 0};
+  });
+}
+
+// ==== kern/19-assistent.js ====
+/* ---- Assistent -------------------------------------------------------------
+   Versteht Alltagssätze zum Plan der Woche — ohne KI-Dienst und ohne Verbindung nach
+   draußen: Es verlässt kein Name und keine Uhrzeit das Gerät.
+
+   Bauweise wie bei klassischen aufgabenbezogenen Gesprächssystemen (Rahmen aus Absicht
+   und Angaben):
+     1. Text vorbereiten — Schreibweisen angleichen, Tippfehler bei bekannten Wörtern
+        und Namen auffangen (aKanon, aPersonen).
+     2. Angaben herauslesen — wer, an welchen Tagen, zu welcher Zeit, aus welchem Grund.
+     3. Absicht bestimmen — jede Absicht sammelt Punkte aus Wörtern und Angaben; die mit
+        den meisten gewinnt (assistentVerstehen).
+     4. Zusammenhang — der Assistent merkt sich Person, Tag und Problem des Gesprächs
+        (eintrag.kontext). Sätze, die nur eine Angabe nachliefern („und am Freitag?“,
+        „Hans auch“), führen das Letzte fort; Antworten auf eine Rückfrage füllen den
+        offenen Rahmen.
+     5. Fehlt eine Angabe oder ist etwas mehrdeutig, stellt er genau eine Rückfrage mit
+        Antwortknöpfen — er rät nicht.
+   Die Lösungen selbst kommen aus dem Planer (Besetzung, Recht, Können, Stundenkonten).
+   Vorschläge erscheinen erst im Plan, wenn man sie antippt. */
+
+const A_TAGE = [["montag", "mo"], ["dienstag", "di"], ["mittwoch", "mi"], ["donnerstag", "do"], ["freitag", "fr"], ["samstag", "sa"]];
+
+// Wörter, die der Assistent kennt — sie werden nie für einen Namen gehalten
+const A_WORTE = new Set(("montag dienstag mittwoch donnerstag freitag samstag sonntag sonnabend heute morgen morgens übermorgen gestern woche wochenende "
+  + "krank krankgeschrieben krankmeldung krankenschein erkältet grippe fieber arzt attest urlaub ferien berufsschule schule "
+  + "frei tauschen tausche tausch wechseln ersetzen ersatz vertreten vertretung einspringen übernehmen aushelfen "
+  + "stunden stunde konto überstunden minusstunden hilfe später früher länger kürzer eher warum wieso weshalb "
+  + "arbeitet arbeiten kommt kommen bleibt bleiben geht gehen fehlt fehlen rückgängig zurück zurücknehmen niemand keiner keine keinen jemand "
+  + "anderer andere anderen anders lösung möglichkeit verhindert termin ausfall ausfallen vormittag vormittags nachmittag nachmittags "
+  + "abend abends mittag mittags notiz besetzung lücke eingeplant eingeteilt gesund wieder ganzen ganzer ganze komplett leute personen "
+  + "aushilfe azubi teilzeit vollzeit minijob filialleitung stellvertretung plan schicht frühschicht spätschicht laden kasse "
+  + "minuten halbe anderthalb zwei drei vier gleiche dasselbe genauso ebenfalls").split(" "));
+// Tippfehler werden nur zu diesen Wörtern hin verbessert — bei kurzen Alltagswörtern wäre es Raten
+const A_UNSCHARF = ("montag dienstag mittwoch donnerstag freitag samstag sonntag sonnabend übermorgen krank krankgeschrieben krankmeldung "
+  + "urlaub berufsschule tauschen tausche ersetzen vertreten einspringen übernehmen überstunden rückgängig verhindert vormittag "
+  + "nachmittag wochenende erkältet stunden").split(" ");
+const A_STOPP = new Set(("der die das den dem des ein eine einen einem einer und oder aber ist sind war hat haben hatte kann können konnte könnte "
+  + "für mit von bis ab um am an im in auf aus bei nach vor zu zum zur wer was wie wo wann sie er es wir ich du ihr ihn ihm man "
+  + "nicht auch noch nur mal doch dann wenn weil dass so da ja nein nö nee bitte danke ok okay "
+  + "soll sollen muss müssen will wollen wird werden würde mehr weniger alle alles uhr std statt denn schon erst mir dir uns "
+  + "geben gibt mach mache machen macht ganz sehr gut dich mich sich ihre seine dieser diese dieses heute hier dort").split(" "));
+
+/* JavaScript hält ä, ö, ü und ß nicht für Buchstaben: \\b fände in „früher“ das Wort „fr“
+   und vor „übermorgen“ gar keine Grenze. G() ersetzt \\b deshalb durch eine Grenze, die
+   deutsche Buchstaben kennt. Jedes Muster dieses Teils läuft durch G(). */
+const A_GRENZE = "(?:(?<=[a-zäöüß0-9])(?![a-zäöüß0-9])|(?<![a-zäöüß0-9])(?=[a-zäöüß0-9]))";
+const _aMuster = new Map();
+function G(re){
+  if (re.global) return new RegExp(re.source.replace(/\\b/g, A_GRENZE), re.flags);       // mit Stand (lastIndex) — nie teilen
+  const k = re.source + "/" + re.flags;
+  if (!_aMuster.has(k)) _aMuster.set(k, new RegExp(re.source.replace(/\\b/g, A_GRENZE), re.flags));
+  return _aMuster.get(k);
+}
+const aNeu = (quelle, schalter) => G(new RegExp(quelle, schalter));
+
+// Abstand zweier Wörter in Tippfehlern (Einfügen, Löschen, Ersetzen, Vertauschen)
+function aAbstand(a, b){
+  if (Math.abs(a.length - b.length) > 2) return 3;
+  const d = [];
+  for (let i = 0; i <= a.length; i++){
+    d[i] = [i];
+    for (let j = 1; j <= b.length; j++){
+      if (i === 0){ d[0][j] = j; continue; }
+      const k = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + k);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+
+// Ein Wort auf seine bekannte Form bringen: Umlaute ausgeschrieben, Endungen, Tippfehler
+function aKanon(w){
+  if (!G(/^[a-zäöüß]+$/).test(w)) return w;
+  if (w === "sonnabend") return "samstag";
+  if (A_WORTE.has(w) || A_STOPP.has(w)) return w;
+  const uml = w.replace(G(/ae/g), "ä").replace(G(/oe/g), "ö").replace(G(/ue/g), "ü");
+  if (A_WORTE.has(uml)) return uml === "sonnabend" ? "samstag" : uml;
+  for (const e of ["s", "en", "e", "n"]) if (uml.length - e.length >= 5 && uml.endsWith(e) && A_WORTE.has(uml.slice(0, -e.length))) return uml.slice(0, -e.length);
+  if (uml.length < 5) return w;
+  const grenze = uml.length >= 9 ? 2 : 1;
+  let best = grenze + 1, wort = null;
+  A_UNSCHARF.forEach(k => { const a = aAbstand(uml, k); if (a < best){ best = a; wort = k; } });
+  return wort ? (wort === "sonnabend" ? "samstag" : wort) : w;
+}
+
+/* Wer im Text gemeint ist. Genau (Vor- oder Nachname) geht vor Kurzform („Andi“, „Kev“),
+   Kurzform vor Tippfehler. → {personen: [Name], mehrdeutig: [[Name, Name]], stellen: Set} */
+function aPersonen(woerter){
+  const ms = state.mitarbeiter, teile = ms.map(m => m.name.toLowerCase().split(G(/\s+/)));
+  const alle = ms.map((m, i) => i);
+  const treffer = [];
+  woerter.forEach((w, pos) => {
+    if (!G(/^[a-zäöüß]+$/).test(w)) return;
+    const bekannt = A_WORTE.has(w) || A_STOPP.has(w) || A_TAGE.some(([, k]) => k === w);
+    // Vorname immer; Nachname nur, wenn er kein Wort des Assistenten ist („Aushilfe“, „Jung“ bleibt möglich)
+    const anrede = pos > 0 && (woerter[pos - 1] === "frau" || woerter[pos - 1] === "herr");       // „Frau Jung“ meint den Nachnamen
+    let k = alle.filter(i => teile[i][0] === w || ((!bekannt || anrede) && teile[i].slice(1).includes(w)));
+    if (!k.length && !bekannt){
+      const stamm = w.replace(G(/(chen|lein|le|i|y)$/), "");
+      const kurz = (vor, s) => s.length >= 3 && vor.startsWith(s) && (s.length >= 4 || vor.length - s.length <= 3);
+      // Koseform: „Evi“ für Eva, „Hansi“ für Hans — der Stamm darf bei kurzen Namen zwei Buchstaben haben
+      const kose = (vor, s) => kurz(vor, s) || (s.length === 2 && vor.startsWith(s) && vor.length <= 4);
+      k = alle.filter(i => kurz(teile[i][0], w) || (stamm !== w && kose(teile[i][0], stamm)));
+      if (!k.length && w.length >= 4){
+        const grenze = w.length >= 8 ? 2 : 1;
+        let best = grenze + 1;
+        alle.forEach(i => teile[i].forEach(t => {
+          if (t.length < 4) return;
+          const a = aAbstand(w, t);
+          if (a < best){ best = a; k = [i]; } else if (a === best && a <= grenze && !k.includes(i)) k.push(i);
+        }));
+        if (best > grenze) k = [];
+      }
+    }
+    if (k.length) treffer.push({pos, k});
+  });
+  // Vor- und Nachname hintereinander meinen dieselbe Person
+  for (let n = treffer.length - 1; n > 0; n--){
+    const a = treffer[n - 1], b = treffer[n];
+    const beide = a.k.filter(i => b.k.includes(i));
+    if (b.pos === a.pos + 1 && beide.length){ a.k = beide; a.bis = b.pos; treffer.splice(n, 1); }
+  }
+  const personen = [], mehrdeutig = [], stellen = new Set();
+  treffer.forEach(t => {
+    stellen.add(t.pos); if (t.bis) stellen.add(t.bis);
+    if (t.k.length === 1){ if (!personen.includes(ms[t.k[0]].name)) personen.push(ms[t.k[0]].name); }
+    else mehrdeutig.push(t.k.map(i => ms[i].name));
+  });
+  return {personen, mehrdeutig, stellen};
+}
+
+/* Tage im Text → {tage: [0–5], sonntag, andereWoche, ausserhalb} */
+function aTage(t, mo){
+  const tage = new Set();
+  const wort = A_TAGE.map(([lang, kurz]) => lang + "|" + kurz).join("|");
+  const index = w => A_TAGE.findIndex(([lang, kurz]) => w === lang || w === kurz);
+  const heute = new Date(); heute.setHours(12, 0, 0, 0);
+  const hi = Math.round((heute - mo) / 864e5);            // heute als Tag der Woche (kann außerhalb liegen)
+  let ausserhalb = false, r;
+  const nimm = k => { if (k >= 0 && k < 6) tage.add(k); else ausserhalb = true; };
+  const sonntag = G(/\bsonntags?\b/).test(t);
+  const andereWoche = G(/\b(nächste[nr]?|kommende[nr]?|übernächste[nr]?|letzte[nr]?|vorige[nr]?) woche\b/).test(t);
+  t = t.replace(G(/\bheute (morgen|früh)\b/g), "heute").replace(G(/\bmorgen früh\b/g), "morgen");
+
+  const bereich = aNeu(`\\b(${wort})\\b ?(?:-|bis(?: einschließlich| zum)?) ?\\b(${wort})\\b`, "g");
+  while ((r = bereich.exec(t))){ const a = index(r[1]), b = index(r[2]); for (let k = Math.min(a, b); k <= Math.max(a, b); k++) tage.add(k); }
+  t = t.replace(bereich, " ");
+  const ab = aNeu(`\\b(?:ab|seit) (${wort}|heute|morgen|übermorgen)\\b`).exec(t);
+  const bis = aNeu(`\\bbis (${wort})\\b`).exec(t);
+  const rest = G(/\brest der woche\b|\brestliche[nr]? woche\b|\bende der woche\b|\bbis auf weiteres\b|\bbis samstag\b/).test(t);
+  const rel = w => w === "heute" ? hi : w === "morgen" ? hi + 1 : w === "übermorgen" ? hi + 2 : index(w);
+  if (ab || bis || rest){
+    const von = ab ? rel(ab[1]) : Math.max(0, hi), ende = bis ? index(bis[1]) : 5;
+    if (von > 5) ausserhalb = true;
+    for (let k = Math.max(0, von); k <= ende; k++) tage.add(k);
+    t = t.replace(aNeu(`\\b(?:ab|seit|bis) (${wort}|heute|morgen|übermorgen)\\b`, "g"), " ");
+  }
+  if (G(/\bganze[nr]? woche\b|\bkomplette[nr]? woche\b|\bdie woche\b|\balle tage\b|\bjeden tag\b|\bganze[nr]? woche\b|\bwoche lang\b/).test(t)) A_TAGE.forEach((_, k) => tage.add(k));
+  if (G(/\bwochenende\b/).test(t)) tage.add(5);
+  const einzel = aNeu(`\\b(${wort})\\b`, "g");
+  while ((r = einzel.exec(t))) tage.add(index(r[1]));
+  if (G(/\bheute\b/).test(t)) nimm(hi);
+  if (G(/\bübermorgen\b/).test(t)) nimm(hi + 2);
+  else if (G(/\bmorgen\b/).test(t)) nimm(hi + 1);
+  if (G(/\bgestern\b/).test(t)) nimm(hi - 1);
+  const datum = /\b(\d{1,2})\.(\d{1,2})\./g;
+  while ((r = datum.exec(t))){ const d = new Date(mo); d.setMonth(+r[2] - 1, +r[1]); nimm(Math.round((d - mo) / 864e5)); }
+  const tagImMonat = /\bam (\d{1,2})\.(?!\d)/g;
+  while ((r = tagImMonat.exec(t))){
+    const k = [0, 1, 2, 3, 4, 5].find(n => new Date(mo.getTime() + n * 864e5).getDate() === +r[1]);
+    nimm(k === undefined ? -1 : k);
+  }
+  return {tage: [...tage].sort((a, b) => a - b), sonntag, andereWoche, ausserhalb};
+}
+
+/* Uhrzeiten im Text → {von, bis} | {nurAb, nurBis} | {relativ: {art, min, ende}} | {dauer} */
+function aZeit(t){
+  t = t.replace(G(/\b\d{1,2}\.\d{1,2}\.(\d{2,4})?/g), " ").replace(G(/\bam \d{1,2}\.(?!\d)/g), " ");     // Datum ist keine Uhrzeit
+  t = t.replace(G(/\bhalb (\d{1,2})\b/g), (_, h) => `${h - 1}:30`).replace(G(/\b(ab|bis|um|gegen) mittags?\b/g), "$1 12");
+  t = t.replace(G(/(\d) ?h\b/g), "$1 stunden").replace(G(/(\d{1,2}) uhr (\d{2})\b/g), "$1:$2");
+  const z = "(\\d{1,2})(?:[:.](\\d{2}))?";
+  const min = (h, m) => (+h) * 60 + (m ? +m : 0);
+  const nachmittag = m => m >= 60 && m < 5 * 60 ? m + 12 * 60 : m;          // „bis 3“ meint 15 Uhr
+  const raus = {};
+  // Dauer: „eine Stunde“, „30 Minuten“, „anderthalb Stunden“
+  const zahl = {"eine halbe": 0.5, "halbe": 0.5, "anderthalb": 1.5, "eineinhalb": 1.5, "eine": 1, "einer": 1, "ein": 1, "zwei": 2, "drei": 3, "vier": 4};
+  const d = G(/\b(\d+(?:[.,]\d+)?|eine halbe|halbe|anderthalb|eineinhalb|eine|einer|ein|zwei|drei|vier) ?(stunden?|std|minuten|min)\b/).exec(t);
+  let dauer = null;
+  if (d){
+    const n = zahl[d[1]] !== undefined ? zahl[d[1]] : parseFloat(d[1].replace(",", "."));
+    dauer = Math.round(G(/^min/).test(d[2]) ? n : n * 60);
+    t = t.replace(d[0], " ");
+  }
+  const richtung = G(/\b(später|früher|eher|länger|kürzer)\b/).exec(t);
+  const r = aNeu(`(?:von )?\\b${z} ?(?:uhr)? ?(?:-|bis) ?${z}`).exec(t);
+  if (r && +r[1] < 24 && +r[3] <= 24){
+    let von = min(r[1], r[2]), bis = min(r[3], r[4]);
+    if (bis <= von && bis <= 12 * 60) bis += 12 * 60;
+    return {von, bis};
+  }
+  const bis = aNeu(`\\bbis ?(?:um |gegen )?${z}`).exec(t);
+  const ab = aNeu(`\\b(?:ab|um|gegen)\\s*${z}`).exec(t);
+  // „geht um 15“ ist ein Ende, „kommt um 9“ ein Anfang
+  const ende = G(/\b(geht|gehen|feierabend|schluss|aufhören|hört auf|weg|los)\b/).test(t);
+  if (bis) raus.nurBis = nachmittag(min(bis[1], bis[2]));
+  if (ab){ if (ende && !bis) raus.nurBis = nachmittag(min(ab[1], ab[2])); else raus.nurAb = nachmittag(min(ab[1], ab[2])); }
+  if (raus.nurAb === undefined && raus.nurBis === undefined){
+    if (G(/\bnur vormittags?\b|\bvormittags\b/).test(t)) raus.nurBis = 13 * 60;
+    if (G(/\bnur nachmittags?\b|\bnachmittags\b/).test(t)) raus.nurAb = 13 * 60;
+  }
+  if (raus.nurAb !== undefined || raus.nurBis !== undefined)
+    return {nurAb: raus.nurAb === undefined ? null : raus.nurAb, nurBis: raus.nurBis === undefined ? null : raus.nurBis};
+  if (richtung){
+    const anfang = G(/\b(kommt|kommen|fängt|anfangen|anfängt|beginnt|beginnen|startet|da sein)\b/).test(t);
+    const schluss = ende || G(/\b(bleibt|bleiben|länger|kürzer)\b/).test(t);
+    return {relativ: {art: richtung[1] === "eher" ? "früher" : richtung[1], min: dauer, seite: anfang ? "von" : schluss ? "bis" : null}};
+  }
+  return dauer !== null ? {dauer} : {};
+}
+
+const aHatZeit = z => !!z && (z.von !== undefined || (z.nurAb !== null && z.nurAb !== undefined) || (z.nurBis !== null && z.nurBis !== undefined) || !!z.relativ);
+
+function aGrund(t){
+  if (G(/\bkrank|krankgeschrieben|krankmeldung|krankenschein|erkältet|grippe|fieber|migräne|\barzt\b|attest|liegt flach|magen|verletzt|\bau\b|übergeben|gesundheitlich/).test(t)) return "krank";
+  if (G(/\burlaub|\bferien\b|frei genommen|freigenommen/).test(t)) return "urlaub";
+  if (G(/berufsschule|\bschule\b|blockunterricht/).test(t)) return "schule";
+  if (G(/kann nicht|kann (?:\S+ ){0,4}nicht|können nicht|fällt (?:\S+ ){0,3}aus|\bausfall\b|\bausfallen\b|nicht da\b|verhindert|\btermin\b|kommt nicht|kommt (?:\S+ ){0,3}nicht|\bfehlt\b|abgesagt|sagt ab|schafft es nicht|ist raus\b|nicht kommen|nicht arbeiten|\babsage\b/).test(t)) return "nicht";
+  return null;
+}
+
+/* Den Text lesen: Angaben und Absicht. Ändert nichts.
+   → {absicht, punkte, personen, mehrdeutig, tage, tagInfo, zeit, grund, teil, pronomen, nurAngaben, notiz, norm} */
+function assistentVerstehen(text, mo){
+  let roh = String(text || "").toLowerCase().replace(G(/[–—]/g), "-").replace(G(/[,;!?()"„“”'…]/g), " ").replace(G(/\s+/g), " ").trim();
+  const notiz = (G(/\b(?:notiz|notiere|notier|vermerk)\b[^:]*:\s*(.+)$/i).exec(String(text || "").trim()) || [])[1] || null;
+  const gruss = G(/^(hallo|hi|hey|moin|servus|guten (morgen|tag|abend)|danke|dankeschön|vielen dank|super|top|prima|perfekt|alles klar|passt|okay|ok)\b/).test(roh);
+  roh = roh.replace(G(/\bguten (morgen|tag|abend)\b/g), " ").replace(G(/\bmoin moin\b/g), " ");
+  // Wörter trennen: „mo-mi“ → „mo - mi“, Punkt am Wortende weg („Mo.“), Doppelpunkt nach Wörtern weg
+  const woerter = roh.replace(G(/([a-zäöüß])-([a-zäöüß])/g), "$1 - $2").split(" ").filter(Boolean)
+    .map(w => G(/^[a-zäöüß]+[.:]$/).test(w) ? w.slice(0, -1) : w);
+  const leute = aPersonen(woerter);
+  const norm = " " + woerter.map((w, n) => leute.stellen.has(n) ? w : aKanon(w)).join(" ") + " ";
+  const ohneNamen = " " + woerter.map((w, n) => leute.stellen.has(n) ? "" : aKanon(w)).join(" ").replace(G(/\s+/g), " ") + " ";
+  const tagInfo = aTage(ohneNamen, mo), tage = tagInfo.tage;
+  const zeit = aZeit(ohneNamen);
+  const grund = aGrund(ohneNamen);
+  const t = ohneNamen;
+  const teil = G(/\bganze[rn]? tag\b|\bden ganzen tag\b|\bkomplett\b|\bganztags\b|\bgar nicht\b/).test(t) ? "ganz"
+    : G(/\bkommt später\b|\bspäter kommen\b|\berst später\b/).test(t) ? "spaeter" : G(/\bgeht früher\b|\bfrüher gehen\b|\bfrüher weg\b/).test(t) ? "frueher" : null;
+  const pronomen = G(/\b(sie|er|ihn|ihm|ihr|ihre|seine|dieselbe|derselbe|die gleiche|der gleiche)\b/).test(t);
+  const zurueck = G(/\bdoch nicht\b|\bwieder gesund\b|\bwieder da\b|\bwieder fit\b|\bkommt doch\b|\bkann doch\b|rückgängig|zurücknehmen|\bnimm\b.*\b(raus|zurück|weg)\b|\bstreich|\bvergiss\b|\blösch|war falsch|\birrtum\b|stimmt nicht|war ein fehler|\bzurück damit\b|\bmach das weg\b/).test(t);
+
+  // Punkte je Absicht: Wörter und Angaben
+  const p = {};
+  const plus = (a, n) => { p[a] = (p[a] || 0) + n; };
+  const hatLeute = leute.personen.length || leute.mehrdeutig.length;
+  if (G(/\bhilfe\b|was kannst du|wie geht das|wie funktionier|\bbeispiele?\b|was kann ich (fragen|schreiben|sagen)/).test(t)) plus("hilfe", 10);
+  if (zurueck) plus("zurueck", 9);
+  if (G(/\bwarum\b|\bwieso\b|\bweshalb\b|\bwozu\b|aus welchem grund|\berklär/).test(t)) plus("erklaeren", 9);
+  if (notiz !== null || G(/\bnotiz\b/).test(t)) plus("notiz", 9);
+  if (G(/was fehlt|was ist (noch )?offen|noch zu tun|\bprobleme?\b|passt (der plan|alles|das so)|stimmt (der plan|alles)|alles (ok|okay|in ordnung|gut)\b|\bwo (ist|sind|gibt)\b.*(lücke|rot|problem)|\bwas ist rot\b|\bnoch lücken?\b|gibt es (noch )?(lücken?|probleme?)/).test(t) && !hatLeute) plus("offen", 8);
+  if (G(/tausch|\bwechseln\b.*\bmit\b|\bstatt\b/).test(t)) plus("tausch", leute.personen.length >= 2 ? 9 : 6);
+  if (G(/\bwer (arbeitet|macht|kommt|steht im plan)|\bwer hat (?:\S+ ){0,3}(dienst|schicht|frühschicht|spätschicht)\b|\bwer ist (?:\S+ ){0,3}(da|dran|eingeplant|eingeteilt|im laden)\b|wie viele (leute|personen)|\bbesetzung\b|\bwann (arbeitet|kommt|ist|hat|muss|fängt)\b|\bwie (arbeitet|ist .* eingeplant)\b|\barbeitet .* (heute|morgen)\b.*\?/).test(String(text || "").toLowerCase().replace(G(/[^a-zäöüß0-9?]+/g), " ")) || G(/\bwer arbeitet\b|\bwann arbeitet\b|\bwann kommt\b|\bwann muss\b/).test(t)) plus("wer", 8);
+  if (G(/\bwer kann\b|\bwer (hat|hätte) (?:\S+ ){0,4}zeit\b|\bwer könnte\b|\bwer springt\b|ersetz|vertret|einspring|übernehm|übernimm|\bersatz\b|aushelfen|\bbrauche? (jemand|wen|einen|eine|ersatz)|jemand(en)? (finden|suchen|für)|lücke (füllen|schließen|stopfen)|\bwer noch\b.*\bkann\b/).test(t)) plus("ersatz", 8);
+  if (G(/\bstundenkonto\b|\bkonto\b|\büberstunden\b|\bminusstunden\b|wie viele? stunden|\bstunden hat\b|\bstunden von\b|\bkonten\b/).test(t)) plus("konto", 8);
+  // „Hans kann auch nicht“ setzt etwas fort — das ist ein Nein zu einem Vorschlag, kein neuer Ausfall
+  if (G(/\b(keiner|keine|niemand|nein|nö|nee)\b|leider nicht|\bgeht nicht\b|klappt nicht|können (?:\S+ ){0,2}nicht|\bauch nicht\b|will nicht|wollen nicht|hat abgesagt|haben abgesagt/).test(t))
+    plus("nein", G(/\bauch nicht\b/).test(t) ? 9 : hatLeute && grund && !G(/\bkeiner\b|\bniemand\b/).test(t) ? 3 : 7);
+  if (G(/\bsonst\b|andere[nrs]? (möglichkeit|lösung|weg|idee|vorschl)|\balternativ|jemand anders|jemand anderes|\bwer noch\b|\bwer sonst\b|\bnoch (jemand|wer|was|eine|einen)\b|\bweitere\b|was (geht|ginge) noch|wie (geht|ginge) es|anders lösen|\banders\b/).test(t)) plus("sonst", 7);
+  if (grund) plus("ausfall", hatLeute ? 8 : 6);
+  if (G(/\bfrei\b|freigeben|soll nicht arbeiten|nicht einplanen|rausnehmen|aus dem plan/).test(t) && zeit.von === undefined && grund !== "urlaub") plus("frei", 7);
+  if (aHatZeit(zeit)) plus("zeit", 6 + (G(/\b(arbeitet|arbeiten|kommt|kommen|bleibt|bleiben|geht|gehen|fängt|anfangen|schluss|feierabend|länger|früher|später|kürzer)\b/).test(t) ? 1 : 0));
+  if (G(/\bübernehmen\b.*\b(plan|entwurf)\b|\bspeichern\b|\bfertig\b|\bverwerfen\b/).test(t) && !hatLeute) plus("abschluss", 7);
+  // Ein Ersatz-Satz mit Grund („Wer kann für Eva einspringen, sie ist krank“) bleibt eine Frage nach Ersatz
+  if (p.ersatz && p.ausfall) p.ausfall -= 3;
+  // „kann nicht“ als Antwort auf Vorschläge ist ein Nein, kein neuer Ausfall — das entscheidet der Zusammenhang
+  if (p.zeit && p.ausfall && grund === "nicht") p.zeit += 3;                // „kann erst ab 12“
+  if (p.konto && zeit.relativ) p.konto = 0;
+  let absicht = null, punkte = 0;
+  Object.keys(p).forEach(a => { if (p[a] > punkte){ punkte = p[a]; absicht = a; } });
+  // Nur Angaben, sonst nichts: „und am Freitag?“, „Hans auch“, „Dienstag“
+  const restText = (" " + woerter.map((w, n) => leute.stellen.has(n) ? "" : aKanon(w)).join(" ") + " ")
+    .replace(G(/\d{1,2}([:.]\d{2})?|\d{1,2}\.\d{1,2}\./g), " ")
+    .replace(aNeu(`\\b(${A_TAGE.map(x => x.join("|")).join("|")}|heute|morgen|übermorgen|und|auch|am|an|dann|bitte|für|den|die|der|das|noch|was ist mit|wie sieht es|aus|mit|ist|uhr|bis|ab|von|um|genauso|ebenfalls|gleiche|dasselbe|ganze[rn]? tag|ganze[rn]? woche|kommt später|geht früher|stunden?|minuten|eine|halbe|zwei|drei|\\-|\\?)\\b`, "g"), " ").trim();
+  const nurAngaben = !restText && !!(hatLeute || tage.length || aHatZeit(zeit) || zeit.dauer !== undefined || teil);
+  if (gruss && !absicht && !nurAngaben) absicht = "gruss";
+  return {absicht, punkte, personen: leute.personen, mehrdeutig: leute.mehrdeutig, tage, tagInfo, zeit, grund, teil, pronomen, nurAngaben, notiz, norm};
+}
+
+/* ---- Lösungsarten: welche Art von Lösung in dieser Filiale meist gewählt wird ----
+   Gezählt wird nur die Art (verlängern, verschieben, jemand kommt zusätzlich …), nie,
+   wer für wen eingesprungen ist — es entsteht keine Auswertung je Person. */
+const LOESUNGSARTEN = {zusatz: "jemand kommt zusätzlich", verlaengern: "eine Schicht verlängern", verschieben: "eine Schicht verschieben",
+  gemischt: "mehrere ändern ihre Zeiten", umplanen: "über mehrere Tage umplanen"};
+function wegArt(schritte){
+  const arten = new Set((schritte || []).map(x => x.art === "neu" ? "zusatz"
+    : (x.bis - x.von) > (x.alt[1] - x.alt[0]) ? "verlaengern" : "verschieben"));
+  return arten.size === 1 ? [...arten][0] : "gemischt";
+}
+function lernenMerken(art){
+  if (!LOESUNGSARTEN[art]) return;
+  state.lernen = state.lernen || {arten: {}};
+  state.lernen.arten[art] = (state.lernen.arten[art] || 0) + 1;
+}
+// Vollständige Wege: die meistgewählte Art nach oben — erst ab drei Entscheidungen, vorher gilt die Rechnung
+function wegeOrdnen(wege){
+  const arten = (state.lernen || {}).arten || {};
+  const summe = Object.keys(arten).reduce((s, k) => s + arten[k], 0);
+  wege.forEach(w => { w.art = wegArt(w.schritte); w.gelernt = false; });
+  if (summe < 3) return wege;
+  const anteil = w => (arten[w.art] || 0) / summe;
+  const voll = wege.filter(w => w.voll), rest = wege.filter(w => !w.voll);
+  const liebste = voll.reduce((b, w) => anteil(w) > anteil(b) ? w : b, voll[0]);
+  if (liebste && voll[0] !== liebste && anteil(liebste) > anteil(voll[0]) && anteil(liebste) >= 0.5){
+    voll.splice(voll.indexOf(liebste), 1); voll.unshift(liebste); liebste.gelernt = true;
+  }
+  wege.splice(0, wege.length, ...voll, ...rest);
+  return wege;
+}
+
+// Das Nötigste eines Wegs für die Anzeige in einer Karte (ohne die Plantage)
+const wegKurz = w => ({zeilen: w.zeilen, voll: w.voll, offen: w.offen, luecke: w.luecke, mehr: w.mehr, konto: w.konto,
+  passt: `${w.voll ? "Schließt die Lücke ganz" : "Schließt die Lücke teilweise"}, ${w.mehr > 0.01 ? `kostet ${h1(w.mehr)} h mehr`
+    : w.mehr < -0.01 ? `spart ${h1(-w.mehr)} h` : "kostet keine Stunde mehr"}${w.gelernt ? " — diese Art wählst du meist" : ""}.`});
+
+const ASSISTENT_HILFE = "Schreib, wie du es sagen würdest. Zum Beispiel: „Eva ist morgen krank“, „Wer kann für sie einspringen?“, "
+  + "„Hans hat Mi bis Fr Urlaub“, „Bernd Mittwoch 8–14“, „Carla geht Freitag eine Stunde früher“, „Tausche Eva und Hans am Mittwoch“, "
+  + "„Wer arbeitet Samstag?“, „Warum ist Dirk am Dienstag eingeplant?“, „Was fehlt noch?“ — und nachfragen: „Keiner von denen kann“, "
+  + "„Und am Freitag?“, „Doch nicht“.";
+const ASSISTENT_START = ["Jemand fällt aus", "Wer kann einspringen?", "Was fehlt noch?", "Was kannst du?"];
+
+function assistent(text, sl, kurz, eintrag){
+  const mo = montagDer(kurz.mo);
+  const pr = entwurfPruefen(sl, kurz, eintrag), plan = pr.plan;
+  const k = eintrag.kontext = eintrag.kontext || {};
+  const v = assistentVerstehen(text, mo);
+  const vor = name => name.split(G(/\s+/))[0];
+  const heuteTi = (() => { const h = new Date(); h.setHours(12, 0, 0, 0); return Math.round((h - mo) / 864e5); })();
+
+  // ---- Rahmen: neue Absicht, Antwort auf eine Rückfrage oder Fortsetzung des Letzten ----
+  let f = {absicht: v.absicht, personen: v.personen, tage: v.tage, zeit: v.zeit, grund: v.grund, teil: v.teil, notiz: v.notiz};
+  const angaben = alt => ({absicht: alt.absicht,
+    personen: v.personen.length ? v.personen : alt.personen || [],
+    tage: v.tage.length ? v.tage : alt.tage || [],
+    zeit: aHatZeit(v.zeit) ? v.zeit
+      : v.zeit.dauer !== undefined && alt.zeit && alt.zeit.relativ ? {relativ: Object.assign({}, alt.zeit.relativ, {min: v.zeit.dauer})} : alt.zeit || {},
+    grund: v.grund || alt.grund || null, teil: v.teil || alt.teil || null, notiz: v.notiz || alt.notiz || null});
+  const offen = k.offen; k.offen = null;
+  let fortsetzung = false;
+  if (offen && (v.nurAngaben || !v.absicht || (v.teil && v.absicht !== "hilfe") || (v.absicht === "zeit" && offen.absicht !== "zeit" && !v.personen.length))){
+    f = angaben(offen.angaben); fortsetzung = true;
+    if (offen.frage === "seite" && G(/\bkommt\b|\bkommen\b|\banfang/).test(v.norm)) f.zeit = {relativ: Object.assign({}, f.zeit.relativ, {seite: "von"})};
+    if (offen.frage === "seite" && G(/\bgeht\b|\bgehen\b|\bende\b|\bschluss\b/).test(v.norm)) f.zeit = {relativ: Object.assign({}, f.zeit.relativ, {seite: "bis"})};
+  } else if (v.nurAngaben && k.letzte && !v.absicht){
+    f = angaben(k.letzte); fortsetzung = true;
+  } else if (v.nurAngaben && k.letzte && v.absicht === "zeit" && !v.personen.length && !v.tage.length){
+    f = angaben(k.letzte); f.absicht = "zeit"; fortsetzung = true;
+  }
+  // „sie“, „er“ — oder gar kein Name — meint die Person, um die es gerade ging
+  const mitKontextPerson = () => { if (!f.personen.length && k.person && personIndex(k.person) >= 0) f.personen = [k.person]; };
+  if (v.pronomen) mitKontextPerson();
+
+  // ---- Bausteine der Antwort ----
+  const karte = (a, text) => Object.assign({id: aenderungsId(), aktiv: false, quelle: "assistent", text}, a);
+  // Das Thema merken — Nachfragen („keiner kann“, „wie sonst?“) lassen es stehen
+  const merk = () => {
+    if (!["nein", "sonst", "hilfe", "gruss", "offen", "abschluss", "zurueck"].includes(f.absicht))
+      k.letzte = {absicht: f.absicht, personen: f.personen, tage: f.tage, zeit: f.zeit, grund: f.grund, teil: f.teil};
+    if (f.personen.length && f.absicht !== "nein") k.person = f.personen[0];
+    if (f.tage.length) k.ti = f.tage[0];
+  };
+  const antwort = (text, karten, knoepfe) => { merk(); k.karten = (karten || []).map(a => a.id);
+    return {antwort: text, karten: karten || [], knoepfe: knoepfe || [], aus: [], verstanden: f}; };
+  const frage = (text, knoepfe, art) => {
+    k.offen = {absicht: f.absicht, frage: art || null, angaben: {absicht: f.absicht, personen: f.personen, tage: f.tage, zeit: f.zeit, grund: f.grund, teil: f.teil, notiz: f.notiz}};
+    return {antwort: text, karten: [], knoepfe: knoepfe || [], aus: [], verstanden: f, rueckfrage: true};
+  };
+  const tagKnoepfe = name => {
+    const ab = Math.max(0, Math.min(5, heuteTi));
+    let tage = [0, 1, 2, 3, 4, 5].filter(ti => ti >= ab && !plan.tage[ti].feiertag && (!name || schichtenVon(plan, name, ti).length));
+    if (!tage.length) tage = [0, 1, 2, 3, 4, 5].filter(ti => !plan.tage[ti].feiertag && (!name || schichtenVon(plan, name, ti).length));
+    if (!tage.length) tage = [0, 1, 2, 3, 4, 5].filter(ti => !plan.tage[ti].feiertag);
+    return tage.map(tagName).concat(name && tage.length > 1 ? ["Rest der Woche"] : []);
+  };
+  const leuteKnoepfe = tage => {
+    const ti = tage && tage.length ? tage[0] : (heuteTi >= 0 && heuteTi < 6 ? heuteTi : null);
+    if (state.mitarbeiter.length <= 12) return state.mitarbeiter.map(m => vor(m.name));
+    const da = state.mitarbeiter.filter(m => ti === null || schichtenVon(plan, m.name, ti).length);
+    return (da.length ? da : state.mitarbeiter).slice(0, 12).map(m => vor(m.name));
+  };
+  const tageText = tage => tage.map(tagName).join(", ");
+  // Karten für die Wege einer Lücke (gleiche Rechnung wie bei den Lösungen)
+  const wegKarten = (wege, fuer) => wege.map(w => karte({typ: "loesung", fuer: fuer || null, ti: w.ti, schritte: w.schritte,
+    titel: w.titel, art: w.art, weg: wegKurz(w)}, `${tagName(w.ti)}: ${w.titel}${w.voll ? "" : ` (${spannenText(w.offen)} bleibt offen)`}`));
+  const lueckenWege = (ti, ausschluss) => {
+    const extra = (ausschluss || []).map(name => ({aktiv: true, typ: "abwesend", name, ti, grund: "nicht"}));
+    return mitEntwurfsAbwesenheiten(sl, {aenderungen: eintrag.aenderungen.concat(extra)}, () =>
+      wegeFuerTag(plan, ti, null, {maengel: tagesMaengel(kurz, ti), punkte: fehlzeiten(kurz, ti)}, null));
+  };
+  const keinWeg = ti => `Mit dem vorhandenen Personal lässt sich die Lücke am ${tagName(ti)}${
+      (pr.luecken[ti] || k.luecke || []).length ? " (" + spannenText(pr.luecken[ti] || k.luecke) + ")" : ""} ohne Regelverstoß nicht schließen. `
+    + "Was bleibt: unter „Lösungen“ über mehrere Tage umplanen lassen, jemanden fragen, der eine Ausnahme machen kann "
+    + "(z. B. Filialleitung bleibt länger — dann Mehrarbeit mit Ausgleich), oder die Bereichsleitung um Unterstützung aus einer Nachbarfiliale bitten.";
+  // Was die Karten im Plan auslösen würden: neue Lücken, verletzte Regeln
+  const folgen = karten => {
+    const probe = Object.assign({}, eintrag, {aenderungen: eintrag.aenderungen.concat(karten.map(a => Object.assign({}, a, {aktiv: true})))});
+    const danach = entwurfPruefen(sl, kurz, probe);
+    const neu = danach.offen.filter(o => (o.art === "luecke" || o.art === "recht") && !pr.offen.some(x => x.text === o.text));
+    const luecke = neu.find(o => o.art === "luecke");
+    if (luecke){ k.ti = luecke.ti; k.luecke = luecke.punkte; k.kandidaten = []; }
+    return {text: neu.length ? " Achtung: " + neu.map(o => o.text).join(" ") : " Besetzung und Gesetz passen damit weiter.", luecke};
+  };
+  const ausserhalb = () => v.tagInfo.andereWoche ? `Hier geht es um KW ${kwVon(mo)}. Für eine andere Woche oben die Woche wechseln — dann gilt, was du schreibst, für sie.`
+    : v.tagInfo.sonntag ? "Sonntags ist die Filiale geschlossen — für den Tag gibt es keinen Plan."
+    : v.tagInfo.ausserhalb ? `Der Tag liegt nicht in KW ${kwVon(mo)} (${deVon(mo)} bis ${deVon(new Date(mo.getTime() + 5 * 864e5))}). Meinst du einen Tag dieser Woche?` : null;
+
+  // Mehrdeutiger Name: nachfragen, wer gemeint ist
+  if (v.mehrdeutig.length && !f.personen.length)
+    return frage(`Wen meinst du — ${v.mehrdeutig[0].join(" oder ")}?`, v.mehrdeutig[0]);
+  if (!f.tage.length && !fortsetzung && (v.tagInfo.andereWoche || v.tagInfo.sonntag || v.tagInfo.ausserhalb)){
+    const t = ausserhalb();
+    if (t) return Object.assign(frage(t, v.tagInfo.ausserhalb ? tagKnoepfe(f.personen[0]) : []), {rueckfrage: !!v.tagInfo.ausserhalb});
+  }
+
+  /* Wege für einen Ausfall — auch für einen, der erst vorgeschlagen und noch nicht im Plan ist.
+     ohne: Personen, die dafür nicht in Frage kommen („keiner von denen kann“). */
+  const ausfallGruppe = (aus, ohne) => {
+    const extra = (ohne || []).map(name => ({id: "x" + name, aktiv: true, typ: "abwesend", name, ti: aus.ti, grund: "nicht", quelle: "assistent"}));
+    const probe = Object.assign({}, eintrag, {aenderungen: eintrag.aenderungen.filter(a => a.id !== aus.id)
+      .concat(Object.assign({}, aus, {aktiv: true}), extra)});
+    return entwurfVorschlaege(sl, kurz, probe, 0).find(x => x.fuer.id === aus.id) || null;
+  };
+
+  // ---- Ein Ausfall mit seinen Lösungen: die Person fehlt an den Tagen ----
+  const ausfallAntwort = (namen, tage, grund, alsErsatz) => {
+    const karten = [], saetze = [];
+    let gerechnet = 0, offeneTage = 0;
+    k.kandidaten = []; k.ausgeschlossen = []; k.problem = null;
+    namen.forEach(name => tage.filter(ti => !plan.tage[ti].feiertag).forEach(ti => {
+      const schon = eintrag.aenderungen.find(a => a.typ === "abwesend" && a.name === name && a.ti === ti && a.aktiv);
+      const s = schichtenVon(plan, name, ti);
+      if (schon && !s.length) return;
+      // Ein schon vorgeschlagener Ausfall wird weiterverwendet — nicht doppelt angelegt
+      const aus = eintrag.aenderungen.find(a => a.typ === "abwesend" && a.name === name && a.ti === ti && a.quelle === "assistent" && !a.aktiv)
+        || karte({typ: "abwesend", name, ti, grund}, `${name} ${tagName(ti)}: ${GRUND_NAME[grund]}`);
+      karten.push(aus);
+      if (!s.length) return;
+      if (gerechnet >= 3){ offeneTage++; return; }
+      gerechnet++;
+      const g = ausfallGruppe(aus);
+      const zeit = `${hhmm(s[0].von)}–${hhmm(s[s.length - 1].bis)}`;
+      if (!g || !g.luecke.length){ saetze.push(`${tagName(ti)} (${zeit}): Es entsteht keine Lücke — niemand muss einspringen.`); return; }
+      if (!k.problem){ k.problem = {aus: aus.id, name, ti, grund}; k.ti = ti; k.luecke = g.luecke; k.kandidaten = [...new Set(g.wege.flatMap(w => w.zeilen.map(z => z.name)))]; }
+      if (!g.wege.length){ saetze.push(`${tagName(ti)} (${zeit}): Ohne ${vor(name)} ist ${spannenText(g.luecke)} nicht richtig besetzt — ${g.fehlt}. ` + keinWeg(ti)); return; }
+      saetze.push(`${tagName(ti)} (${zeit}): Ohne ${vor(name)} ist ${spannenText(g.luecke)} nicht richtig besetzt — ${g.fehlt}.`);
+      wegKarten(g.wege, aus.id).forEach(c => karten.push(c));
+    }));
+    if (!karten.length) return antwort(`${namen.map(vor).join(" und ")} ${namen.length > 1 ? "sind" : "ist"} an ${tage.length > 1 ? "diesen Tagen" : "dem Tag"} schon als abwesend eingetragen.`);
+    const betroffen = karten.some(c => c.typ === "loesung") || saetze.length;
+    return antwort((alsErsatz ? `Ersatz für ${namen.join(" und ")} am ${tageText(tage)}. ` : `${namen.join(" und ")}: ${GRUND_NAME[grund]} am ${tageText(tage)}. `)
+      + (betroffen ? saetze.join(" ") + (karten.some(c => c.typ === "loesung") ? " Antippen zeigt eine Lösung im Plan — der Ausfall wird mit eingetragen." : " Antippen trägt den Ausfall ein.")
+                   : `${namen.length > 1 ? "Sie sind" : vor(namen[0]) + " ist"} an ${tage.length > 1 ? "den Tagen" : "dem Tag"} nicht eingeplant — antippen vermerkt es trotzdem.`)
+      + (offeneTage ? ` Für ${offeneTage === 1 ? "einen weiteren Tag" : offeneTage + " weitere Tage"} stehen die Lösungen unter „Lösungen“, sobald der Ausfall im Plan ist.` : ""),
+      karten, karten.some(c => c.typ === "loesung") ? ["Keiner von denen kann", "Wie geht es sonst?"] : []);
+  };
+
+  switch (f.absicht){
+  case "hilfe": return antwort(ASSISTENT_HILFE, [], ASSISTENT_START.slice(0, 3));
+  case "gruss": return antwort("Gern. Was soll sich am Plan ändern?", [], ASSISTENT_START.slice(0, 3));
+  case "abschluss": return antwort("Das machst du oben: „Übernehmen“ macht den Entwurf zum gültigen Plan, „Entwurf verwerfen“ lässt alles, wie es war.");
+  case "offen":
+    if (!pr.offen.length) return antwort("Im Entwurf ist nichts offen — Besetzung, Gesetz und Abwesenheiten passen.");
+    { const l = pr.offen.find(o => o.art === "luecke"); if (l){ k.ti = l.ti; k.luecke = l.punkte; } }
+    return antwort("Offen ist noch: " + pr.offen.map(o => o.text).join(" "), [], pr.offen.some(o => o.art === "luecke") ? ["Wer kann einspringen?"] : []);
+
+  case "zurueck": {
+    // Mit Namen: was für die Person (an dem Tag) im Entwurf steht. Ohne: das zuletzt Vorgeschlagene.
+    let ziele = eintrag.aenderungen.filter(a => a.aktiv && (f.personen.length
+      ? f.personen.includes(a.name) && (!f.tage.length || f.tage.includes(a.ti))
+      : (k.karten || []).includes(a.id)));
+    if (!ziele.length && !f.personen.length) ziele = eintrag.aenderungen.filter(a => a.aktiv && a.quelle === "assistent").slice(-1);
+    if (!ziele.length) return antwort(f.personen.length ? `Für ${f.personen.map(vor).join(" und ")} steht im Entwurf nichts, das ich zurücknehmen könnte.`
+      : "Im Entwurf steht nichts von mir, das ich zurücknehmen könnte.");
+    const fest = ziele.filter(a => a.quelle === "abwesenheit");
+    const erg = antwort(`Zurückgenommen: ${ziele.map(a => a.text).join("; ")}.`
+      + (fest.length ? " Der Eintrag unter „Urlaub & Krankheit“ bleibt bestehen — dort lässt er sich löschen. Bis dahin steht die Schicht als „noch zu tun“ im Entwurf." : ""));
+    erg.aus = ziele.map(a => a.id);
+    return erg;
+  }
+
+  case "erklaeren": {
+    mitKontextPerson();
+    if (!f.personen.length){
+      if (pr.offen.length) return antwort("Rot ist, was noch nicht passt: " + pr.offen.map(o => o.text).join(" "));
+      return frage("Bei wem soll ich erklären, warum er oder sie eingeplant ist?", leuteKnoepfe(f.tage));
+    }
+    const name = f.personen[0];
+    let tage = f.tage.length ? f.tage : [0, 1, 2, 3, 4, 5].filter(ti => schichtenVon(plan, name, ti).length);
+    tage = tage.filter(ti => !plan.tage[ti].feiertag);
+    const voll = plan;
+    const teile = tage.map(ti => {
+      const e = tagesEinteilung(voll, ti), reihe = e && e.reihen.find(r => r.name === name);
+      if (!reihe) return f.tage.length ? `${tagName(ti)}: ${vor(name)} hat frei.` : null;
+      const b = schichtBegruendung(voll, ti, reihe, e);
+      return `${tagName(ti)} ${hhmm(reihe.schicht.von)}–${hhmm(reihe.schicht.bis)}: ` + (f.tage.length ? b.saetze.join(" ") : b.saetze[0]);
+    }).filter(Boolean);
+    if (!teile.length) return antwort(`${name} ist in dieser Woche nicht eingeplant.`);
+    return antwort(teile.join(" ") + (f.tage.length ? "" : " Für die ganze Begründung einen Tag nennen — oder unter „Analyse“ in die Tagesanalyse schauen."));
+  }
+
+  case "notiz": {
+    if (!f.tage.length) return frage("Für welchen Tag ist die Notiz?", tagKnoepfe());
+    if (!f.notiz) return frage(`Was soll am ${tagName(f.tage[0])} in der Zeile „Notiz“ stehen? Schreib: „Notiz ${tagName(f.tage[0])}: …“`);
+    return antwort("Antippen schreibt die Notiz in den Plan.", f.tage.map(ti =>
+      karte({typ: "notiz", ti, notiz: f.notiz}, `Notiz ${tagName(ti)}: ${f.notiz}`)));
+  }
+
+  case "wer": {
+    if (f.personen.length){
+      const teile = f.personen.map(name => {
+        const tage = (f.tage.length ? f.tage : [0, 1, 2, 3, 4, 5]).map(ti => [ti, schichtText(plan, name, ti)]).filter(x => x[1] || f.tage.length);
+        return `${name}: ` + (tage.length ? tage.map(([ti, s]) => `${TAGE[ti][1]} ${s || "frei"}`).join(", ") : "in dieser Woche nicht eingeplant") + ".";
+      });
+      return antwort(teile.join(" "));
+    }
+    const tage = f.tage.length ? f.tage : (heuteTi >= 0 && heuteTi < 6 ? [heuteTi] : []);
+    if (!tage.length) return frage("Für welchen Tag?", tagKnoepfe());
+    return antwort(tage.map(ti => plan.tage[ti].feiertag ? `${tagName(ti)}: Feiertag.` : `${tagName(ti)}: `
+      + (state.mitarbeiter.map(m => [m.name, schichtText(plan, m.name, ti)]).filter(x => x[1]).map(([n, s]) => `${vor(n)} ${s}`).join(", ") || "niemand eingeplant") + ".").join(" "));
+  }
+
+  case "konto": {
+    if (v.pronomen) mitKontextPerson();
+    const zeile = name => {
+      const m = state.mitarbeiter[personIndex(name)], x = kontoNach(plan, platzImPlan(plan, name));
+      if (!x) return `${name}: keine Vertragsstunden hinterlegt.`;
+      return `${name} hat im Entwurf ${h1(x.ist)} h in dieser Woche (Soll ${h1(x.soll)} h). Konto danach: ${ueText(x.ende) || "0,0"} h`
+        + (darfUeberstunden(m) ? "." : " — macht keine Überstunden.");
+    };
+    if (f.personen.length) return antwort(f.personen.map(zeile).join(" "));
+    const alle = state.mitarbeiter.map(m => [m.name, kontoNach(plan, platzImPlan(plan, m.name))]).filter(x => x[1]);
+    return antwort("Konten nach dieser Woche: " + alle.map(([n, x]) => `${vor(n)} ${ueText(x.ende) || "0,0"} h`).join(" · ") + ".");
+  }
+
+  case "nein":
+  case "sonst": {
+    const ti = f.tage.length ? f.tage[0] : k.ti;
+    // Geht es um einen bestimmten Ausfall? Dann zählt er mit — auch wenn er noch nicht angetippt ist
+    const pb = k.problem && k.problem.ti === ti ? k.problem : null;
+    const aus = pb && (eintrag.aenderungen.find(a => a.id === pb.aus) || {id: pb.aus, typ: "abwesend", name: pb.name, ti, grund: pb.grund, quelle: "assistent"});
+    if (ti === undefined || (!pb && !pr.luecken[ti])){
+      if (ti !== undefined && f.absicht === "sonst") return antwort(`Am ${tagName(ti)} ist im Entwurf nichts offen — es gibt keine Lücke zu schließen.`);
+      return frage("Worum geht es — wer fällt aus, oder für welchen Tag suchst du jemanden?", ASSISTENT_START.slice(0, 2));
+    }
+    k.ti = ti;
+    const rechne = () => {
+      const g = aus ? ausfallGruppe(aus, k.ausgeschlossen) : null;
+      const wege = aus ? (g ? g.wege : []) : lueckenWege(ti, k.ausgeschlossen);
+      k.kandidaten = [...new Set(wege.flatMap(w => w.zeilen.map(z => z.name)))];
+      return wege;
+    };
+    if (f.absicht === "nein"){
+      // Genannte Personen fallen heraus — sonst alle, die gerade vorgeschlagen waren
+      const raus = v.personen.length ? v.personen : (k.kandidaten || []);
+      if (raus.length){
+        k.ausgeschlossen = [...new Set([...(k.ausgeschlossen || []), ...raus])];
+        const vermerk = raus.map(name => karte({typ: "abwesend", name, ti, grund: "nicht"}, `${name} ${tagName(ti)}: kann nicht`));
+        const wege = rechne();
+        if (!wege.length) return antwort(`Verstanden — ${raus.map(vor).join(", ")} ${raus.length > 1 ? "können" : "kann"} ${tagName(ti)} nicht. ` + keinWeg(ti), vermerk);
+        return antwort(`Verstanden — ohne ${raus.map(vor).join(", ")}. So ginge es trotzdem:`, wegKarten(wege, aus && aus.id).concat(vermerk), ["Die können auch nicht", "Wie geht es sonst?"]);
+      }
+    }
+    const wege = rechne();
+    if (!wege.length) return antwort(keinWeg(ti));
+    return antwort(`${f.absicht === "sonst" ? "Andere Wege" : "Diese Wege gibt es"} für ${tagName(ti)}:`, wegKarten(wege, aus && aus.id), ["Keiner von denen kann"]);
+  }
+
+  case "ersatz": {
+    // „für sie“ meint die Person von eben — ohne Namen nur, wenn es gerade um ihren Ausfall ging
+    if (v.pronomen || (k.letzte && k.letzte.absicht === "ausfall" && !fortsetzung)) mitKontextPerson();
+    if (!f.tage.length && k.ti !== undefined) f.tage = [k.ti];
+    if (!f.tage.length) return frage(f.personen.length ? `An welchem Tag soll jemand für ${vor(f.personen[0])} einspringen?` : "Für welchen Tag suchst du jemanden?",
+      tagKnoepfe(f.personen[0]));
+    const ti = f.tage[0];
+    if (plan.tage[ti].feiertag) return antwort(`${tagName(ti)} ist ein Feiertag — die Filiale ist geschlossen.`);
+    // Steht im Entwurf schon eine Lücke und ist niemand genannt, geht es um sie
+    if (!v.personen.length && pr.luecken[ti] && !aHatZeit(f.zeit)){
+      k.problem = null; k.luecke = pr.luecken[ti]; k.ausgeschlossen = [];
+      const wege = lueckenWege(ti, []);
+      k.kandidaten = [...new Set(wege.flatMap(w => w.zeilen.map(z => z.name)))];
+      if (wege.length) return antwort(`${tagName(ti)} ist ${spannenText(pr.luecken[ti])} nicht richtig besetzt. Diese Wege schließen die Lücke — antippen zeigt sie im Plan:`,
+        wegKarten(wege), ["Keiner von denen kann"]);
+    }
+    // „Wer kann Eva ersetzen?“ — der Ausfall dieser Person, mit allen Wegen
+    const fehlt = f.personen.find(name => schichtenVon(plan, name, ti).length);
+    if (fehlt) return ausfallAntwort([fehlt], f.tage.filter(x => schichtenVon(plan, fehlt, x).length), f.grund || "nicht", true);
+    if (f.personen.length && !aHatZeit(f.zeit) && !pr.luecken[ti])
+      return antwort(`${f.personen.map(vor).join(" und ")} ${f.personen.length > 1 ? "sind" : "ist"} am ${tagName(ti)} nicht eingeplant — es gibt nichts zu ersetzen.`);
+    const von = f.zeit.von !== undefined ? f.zeit.von : (pr.luecken[ti] ? Math.min(...pr.luecken[ti]) : null);
+    const bis = f.zeit.bis !== undefined ? f.zeit.bis : (pr.luecken[ti] ? Math.max(...pr.luecken[ti]) + 30 : null);
+    const ausgeschlossen = k.ausgeschlossen || [];
+    const frei = state.mitarbeiter.filter(m => !schichtenVon(plan, m.name, ti).length && !ausgeschlossen.includes(m.name)).filter(m => {
+      if (von === null) return true;
+      return mitEntwurfsAbwesenheiten(sl, eintrag, () => {
+        const p = tagKopie(plan, ti);
+        return ausfallErlaubt(p, planPlatz(p, personIndex(m.name)), ti, von, Math.max(bis, von + MINSCHICHT * 60));
+      });
+    });
+    k.kandidaten = frei.map(m => m.name);
+    if (!frei.length){
+      const wege = von === null ? [] : lueckenWege(ti, ausgeschlossen);
+      if (!wege.length) return antwort(`${tagName(ti)}${von !== null ? " " + hhmm(von) + "–" + hhmm(bis) : ""} kann niemand zusätzlich kommen. ` + keinWeg(ti));
+      return antwort(`${tagName(ti)} kann niemand zusätzlich kommen — aber so ginge es:`, wegKarten(wege), ["Keiner von denen kann"]);
+    }
+    const lang = von === null ? null : Math.max(bis, von + MINSCHICHT * 60);
+    const karten = von === null ? [] : frei.slice(0, 4).map(m =>
+      karte({typ: "schicht", name: m.name, ti, von, bis: lang}, `${m.name} ${tagName(ti)} ${hhmm(von)}–${hhmm(lang)}`));
+    return antwort(`${tagName(ti)}${von !== null ? " " + hhmm(von) + "–" + hhmm(bis) : ""} haben frei und dürften kommen: ${frei.map(m => m.name).join(", ")}`
+      + (von !== null && lang > bis ? ` (mindestens ${MINSCHICHT} Stunden, also bis ${hhmm(lang)})` : "") + ". Ob sie wirklich können, weiß nur die Person selbst.",
+      karten, ["Keiner von denen kann"]);
+  }
+
+  case "tausch": {
+    if (f.personen.length < 2) return frage(f.personen.length ? `Mit wem soll ${vor(f.personen[0])} tauschen?` : "Wer soll mit wem tauschen?", leuteKnoepfe(f.tage));
+    if (!f.tage.length && k.ti !== undefined && fortsetzung) f.tage = [k.ti];
+    if (!f.tage.length) return frage(`An welchem Tag tauschen ${vor(f.personen[0])} und ${vor(f.personen[1])}?`, tagKnoepfe());
+    const [a, b] = f.personen, karten = [];
+    f.tage.forEach(ti => {
+      const sa = schichtenVon(plan, a, ti)[0], sb = schichtenVon(plan, b, ti)[0];
+      if ((!sa && !sb) || plan.tage[ti].feiertag) return;
+      karten.push(karte(sb ? {typ: "schicht", name: a, ti, von: sb.von, bis: sb.bis} : {typ: "frei", name: a, ti},
+        `${a} ${tagName(ti)} ${sb ? hhmm(sb.von) + "–" + hhmm(sb.bis) : "frei"}`));
+      karten.push(karte(sa ? {typ: "schicht", name: b, ti, von: sa.von, bis: sa.bis} : {typ: "frei", name: b, ti},
+        `${b} ${tagName(ti)} ${sa ? hhmm(sa.von) + "–" + hhmm(sa.bis) : "frei"}`));
+    });
+    if (!karten.length) return antwort(`${a} und ${b} haben an dem Tag beide frei — da gibt es nichts zu tauschen.`);
+    return antwort(`Tausch zwischen ${a} und ${b}: beide Karten antippen, dann steht es im Plan.` + folgen(karten).text, karten);
+  }
+
+  case "ausfall": {
+    if (!f.personen.length && (fortsetzung || v.pronomen)) mitKontextPerson();
+    if (!f.personen.length) return frage("Wer fällt aus?", leuteKnoepfe(f.tage));
+    if (!f.tage.length) return frage(`An welchem Tag fällt ${f.personen.map(vor).join(" und ")} aus?`, tagKnoepfe(f.personen[0]));
+    const eingeplant = f.personen.some(name => f.tage.some(ti => schichtenVon(plan, name, ti).length));
+    // „kann nicht“ mit Uhrzeit oder „kommt später“ ist kein ganzer Ausfall, sondern eine andere Zeit
+    if (f.grund === "nicht" && (aHatZeit(f.zeit) || f.teil === "spaeter" || f.teil === "frueher")){ f.absicht = "zeit"; break; }
+    if (f.grund === "nicht" && !f.teil && eingeplant && f.tage.length === 1 && f.personen.length === 1)
+      return frage(`Fällt ${vor(f.personen[0])} am ${tagName(f.tage[0])} den ganzen Tag aus — oder nur einen Teil?`, ["Ganzer Tag", "Kommt später", "Geht früher"], "teil");
+    return ausfallAntwort(f.personen, f.tage, f.grund || "nicht");
+  }
+
+  case "frei": {
+    if (!f.personen.length && (fortsetzung || v.pronomen)) mitKontextPerson();
+    if (!f.personen.length) return frage("Wer soll frei bekommen?", leuteKnoepfe(f.tage));
+    if (!f.tage.length) return frage(`An welchem Tag soll ${vor(f.personen[0])} frei haben?`, tagKnoepfe(f.personen[0]));
+    const karten = [];
+    f.personen.forEach(name => f.tage.forEach(ti => { if (schichtenVon(plan, name, ti).length) karten.push(karte({typ: "frei", name, ti}, `${name} ${tagName(ti)} frei`)); }));
+    if (!karten.length) return antwort(`${f.personen.map(vor).join(" und ")} ${f.personen.length > 1 ? "haben" : "hat"} am ${tageText(f.tage)} ohnehin frei.`);
+    const fo = folgen(karten);
+    return antwort(`${f.personen.join(" und ")} ${f.personen.length > 1 ? "bekommen" : "bekommt"} frei am ${tageText(f.tage)}.` + fo.text, karten, fo.luecke ? ["Wer kann einspringen?"] : []);
+  }
+  case "zeit": break;
+
+  default: {
+    // Nur ein Name, sonst nichts Verständliches: fragen, was für die Person gelten soll
+    if (f.personen.length && !fortsetzung){
+      const n = vor(f.personen[0]);
+      k.person = f.personen[0];
+      return {antwort: `Was soll für ${n} gelten?`, karten: [], aus: [], verstanden: f, rueckfrage: true,
+        knoepfe: [`${n} fällt aus`, `${n} bekommt frei`, `Wann arbeitet ${n}?`, `Warum ist ${n} eingeplant?`]};
+    }
+    return {antwort: "Das habe ich nicht verstanden. Worum geht es?", karten: [], aus: [], verstanden: f, knoepfe: ASSISTENT_START};
+  }
+  }
+
+  // ---- Andere Zeit für eine Schicht: von–bis, ab, bis, „eine Stunde länger“ ----
+  if (!f.personen.length) mitKontextPerson();
+  if (!f.personen.length) return frage("Für wen gilt die Zeit?", leuteKnoepfe(f.tage));
+  if (!f.tage.length && k.ti !== undefined && (fortsetzung || v.pronomen)) f.tage = [k.ti];
+  const name = f.personen[0];
+  if (!f.tage.length) return frage(`An welchem Tag gilt das für ${vor(name)}?`, tagKnoepfe(name));
+  const z = f.zeit || {};
+  const erste = schichtenVon(plan, name, f.tage[0])[0];
+  if (!aHatZeit(z)){
+    if (f.teil === "spaeter") return frage(`Ab wann kann ${vor(name)} am ${tagName(f.tage[0])} kommen?`,
+      erste ? [60, 120, 180].map(d => "ab " + hhmm(erste.von + d)).filter((x, n) => erste.von + (n + 1) * 60 < erste.bis - 60) : [], "zeit");
+    if (f.teil === "frueher") return frage(`Bis wann kann ${vor(name)} am ${tagName(f.tage[0])} bleiben?`,
+      erste ? [180, 120, 60].map(d => "bis " + hhmm(erste.bis - d)).filter((x, n) => erste.bis - (3 - n) * 60 > erste.von + 60) : [], "zeit");
+    return frage(`Welche Zeit soll für ${vor(name)} am ${tagName(f.tage[0])} gelten? Zum Beispiel „8–14“, „ab 10“ oder „eine Stunde länger“.`);
+  }
+  if (z.von === undefined && aHatZeit(z) && !f.tage.some(ti => schichtenVon(plan, name, ti).length))
+    return antwort(`${name} hat am ${tageText(f.tage)} keine Schicht, die sich verlängern oder verkürzen ließe. Mit Uhrzeit von–bis geht es: „${vor(name)} ${tagName(f.tage[0])} 8–14“.`);
+  if (z.relativ && z.relativ.min === null) return frage(`Wie viel ${z.relativ.art}?`, ["30 Minuten", "1 Stunde", "2 Stunden"], "dauer");
+  if (z.relativ && !z.relativ.seite && (z.relativ.art === "früher" || z.relativ.art === "später"))
+    return frage(`${vor(name)} kommt ${z.relativ.art} — oder geht ${z.relativ.art}?`, [`Kommt ${z.relativ.art}`, `Geht ${z.relativ.art}`], "seite");
+  if (z.von !== undefined && !(z.bis > z.von)) return antwort("Das Ende muss nach dem Beginn liegen.");
+  const karten = [], ohne = [];
+  f.tage.filter(ti => !plan.tage[ti].feiertag).forEach(ti => {
+    const s = schichtenVon(plan, name, ti)[0];
+    let von, bis;
+    if (z.von !== undefined){ von = z.von; bis = z.bis; }
+    else if (!s){ ohne.push(ti); return; }
+    else if (z.relativ){
+      const seite = z.relativ.seite || "bis", d = (z.relativ.art === "später" || z.relativ.art === "länger" ? 1 : -1) * z.relativ.min;
+      von = seite === "von" ? s.von + d : s.von; bis = seite === "bis" ? s.bis + d : s.bis;
+    } else { von = z.nurAb !== null && z.nurAb !== undefined ? z.nurAb : s.von; bis = z.nurBis !== null && z.nurBis !== undefined ? z.nurBis : s.bis; }
+    if (bis > von) karten.push(karte({typ: "schicht", name, ti, von, bis}, `${name} ${tagName(ti)} ${hhmm(von)}–${hhmm(bis)}`));
+  });
+  if (!karten.length) return antwort(`${name} hat am ${tageText(ohne.length ? ohne : f.tage)} keine Schicht, die sich verlängern oder verkürzen ließe. Mit Uhrzeit von–bis geht es: „${vor(name)} ${tagName(f.tage[0])} 8–14“.`);
+  const fo = folgen(karten);
+  return antwort(`${name}: ${karten.map(c => `${tagName(c.ti)} ${hhmm(c.von)}–${hhmm(c.bis)}`).join(", ")}; die Pause legt der Planer nach Gesetz.` + fo.text,
+    karten, fo.luecke ? ["Wer kann einspringen?"] : []);
 }
 
 // ==== app/20-zustand.js ====
@@ -6627,8 +7415,10 @@ function pruefen(){
     <div class="head"><span class="eyebrow">Auswertung</span>
       <h1 style="margin-top:6px">Analyse</h1>
       <p class="lede">Reicht das Personal für den Bedarf — auch wenn jemand Urlaub hat oder krank ist?
-      Was sagen die Stundenkonten? Daraus folgen Empfehlungen für die nächsten Personalentscheidungen.</p></div>
+      Was sagen die Stundenkonten? Daraus folgen Empfehlungen für die nächsten Personalentscheidungen.
+      Die Tagesanalyse zeigt für jeden Tag eines Plans, wofür die Stunden gebraucht werden und warum wer eingeplant ist.</p></div>
     <h2 class="abschnitt">Empfehlungen</h2><div id="empf"></div>
+    <h2 class="abschnitt">Tagesanalyse — woher die Stunden kommen</h2><div id="tage"></div>
     <h2 class="abschnitt">Bedarf und Personal je Woche</h2><div id="bedarf"></div>
     <h2 class="abschnitt">Stunden je Wochentag</h2><div id="wochentage"></div>
     <h2 class="abschnitt">Stundenkonten</h2><div id="konten"></div>
@@ -6639,6 +7429,9 @@ function pruefen(){
     <details class="aufklapp"><summary>Woraus der Mindestbedarf besteht</summary><div id="aufbau"></div></details>
     <details class="aufklapp"><summary>Was in der Einrichtung auffällt</summary><div id="notes"></div><div id="offen"></div></details>
   </div>`);
+
+  // ---- Tagesanalyse ----
+  p.querySelector("#tage").appendChild(tagesAnalyse());
 
   // ---- Empfehlungen ----
   const empf = p.querySelector("#empf");
@@ -6765,9 +7558,138 @@ function pruefen(){
   return p;
 }
 
+// ==== app/36-tagesanalyse.js ====
+/* Tagesanalyse in der Analyse: die Woche auf einen Blick, dann ein Tag im Einzelnen —
+   Besetzung im Zeitverlauf, je Person ein Balken nach Tätigkeit, darunter je Schicht,
+   warum es sie gibt. Gerechnet wird in kern/18-tagesanalyse.js. */
+
+let analyseWoche = null;   // Wochenschlüssel der betrachteten Woche
+let analyseTag = null;     // Tag (0 = Mo) der betrachteten Woche
+
+const taetigkeitName = id => id === "pause" ? "Pause" : (TAETIGKEITEN.find(x => x.id === id) || {name: id}).name;
+
+function tagesAnalyse(){
+  const box = el(`<div class="tagesanalyse"></div>`);
+  const plaene = state.plaene || {};
+  const wochen = Object.keys(plaene).sort();
+  if (!wochen.length){
+    box.appendChild(el(`<p class="empty">Noch kein Plan — die Tagesanalyse zeigt, woher die Stunden eines erstellten Plans kommen.</p>`));
+    return box;
+  }
+  const gezeigt = wochenSchluessel(zeigeWoche ? montagDer(zeigeWoche) : aktuellerMontag());
+  if (!analyseWoche || !plaene[analyseWoche]){ analyseWoche = plaene[gezeigt] ? gezeigt : wochen[wochen.length - 1]; analyseTag = null; }
+
+  const zeichnen = () => {
+    box.innerHTML = "";
+    const plan = planLaden(plaene[analyseWoche]);
+    const woche = wochenEinteilung(plan);
+    if (analyseTag === null || !woche[analyseTag] || woche[analyseTag].feiertag){
+      // heute, wenn es die laufende Woche ist — sonst der erste offene Tag
+      const heute = (new Date().getDay() + 6) % 7;
+      analyseTag = analyseWoche === wochenSchluessel(montagDer(null)) && woche[heute] && !woche[heute].feiertag
+        ? heute : Math.max(0, woche.findIndex(w => !w.feiertag));
+    }
+
+    // ---- Woche wählen, Legende ----
+    const kopf = el(`<div class="ta-kopf">
+      <label class="f wochenwahl">Woche<select>${wochen.map(sl => { const d = montagAusSchluessel(sl);
+        return `<option value="${sl}"${sl === analyseWoche ? " selected" : ""}>KW ${kwVon(d)} · ${deVon(d)}</option>`; }).join("")}</select></label>
+      <div class="ta-legende" aria-label="Farben der Tätigkeiten">${TAETIGKEITEN.map(t => `<span><i class="t-${t.id}"></i>${esc(t.name)}</span>`).join("")}
+        <span><i class="t-pause"></i>Pause</span></div></div>`);
+    kopf.querySelector("select").onchange = e => { analyseWoche = e.target.value; analyseTag = null; zeichnen(); };
+    box.appendChild(kopf);
+
+    // ---- Die Woche auf einen Blick: je Tag ein Balken aus den Stunden je Tätigkeit ----
+    const max = Math.max(1, ...woche.map(w => w.arbeit));
+    const liste = el(`<div class="ta-woche" role="group" aria-label="Tag wählen"></div>`);
+    woche.forEach(w => {
+      const d = w.datum, an = w.ti === analyseTag;
+      const z = el(`<button class="ta-tag" type="button" aria-pressed="${an}"${w.feiertag ? " disabled" : ""}>
+        <span class="ta-tagname"><b>${esc(w.label)}</b> ${d.getDate()}.${d.getMonth() + 1}.</span>
+        <span class="ta-stapel">${w.feiertag ? `<em>Feiertag</em>` : TAETIGKEITEN.filter(t => w.summen[t.id] > 0).map(t =>
+          `<i class="t-${t.id}" style="width:${(w.summen[t.id] / max * 100).toFixed(2)}%" title="${esc(t.name)}: ${h1(w.summen[t.id])} h"></i>`).join("")}</span>
+        <span class="ta-summe">${w.feiertag ? "" : h1(w.arbeit) + " h"}</span></button>`);
+      z.onclick = () => { analyseTag = w.ti; zeichnen(); };
+      liste.appendChild(z);
+    });
+    box.appendChild(liste);
+
+    const e = tagesEinteilung(plan, analyseTag);
+    if (!e){ box.appendChild(el(`<p class="empty">An diesem Tag ist die Filiale geschlossen.</p>`)); return; }
+    const tag = plan.tage[analyseTag];
+    box.appendChild(el(`<h3 class="ta-titel">${esc(TAGNAMEN[tag.key])}, ${deVon(tag.datum)}
+      <span>${h1(woche[analyseTag].arbeit)} h Arbeit · ${new Set(e.reihen.map(r => r.name)).size} Personen</span></h3>`));
+
+    // ---- Summe je Tätigkeit ----
+    box.appendChild(el(`<div class="ta-summen">${TAETIGKEITEN.map(t => {
+      const sp = e.spitze[t.id];
+      return `<div class="ta-kachel"><span class="ta-kachelname"><i class="t-${t.id}"></i>${esc(t.name)}</span>
+        <b>${h1(e.summen[t.id])} h</b>
+        <span>${sp.n ? `bis zu ${sp.n} ${sp.n === 1 ? "Person" : "Personen"} gleichzeitig (${hhmm(sp.m)} Uhr)` : "an diesem Tag nicht geplant"}</span></div>`; }).join("")}</div>`));
+
+    // ---- Zeitleiste: oben die Besetzung, darunter je Person ein Balken ----
+    const dauer = e.bis - e.von;
+    const x = m => ((m - e.von) / dauer * 100).toFixed(3) + "%";
+    const w = (a, b) => ((b - a) / dauer * 100).toFixed(3) + "%";
+    const hoch = Math.max(1, ...e.zeitpunkte.map(z => Math.max(z.da, z.noetig)));
+    const zu = (e.offenVon > e.von ? `<i class="ta-zu" style="left:0;width:${w(e.von, e.offenVon)}"></i>` : "")
+             + (e.offenBis < e.bis ? `<i class="ta-zu" style="left:${x(e.offenBis)};width:${w(e.offenBis, e.bis)}"></i>` : "");
+    const stunden = [];
+    for (let m = Math.ceil(e.von / 60) * 60; m <= e.bis; m += 60) stunden.push(m);
+    const raster = stunden.map(m => `<i class="ta-linie" style="left:${x(m)}"></i>`).join("");
+
+    const besetzung = `<div class="ta-reihe ta-besetzung"><span class="ta-name"><b>Im Laden</b><span>Linie = nötig</span></span>
+      <span class="ta-spur" role="img" aria-label="Besetzung im Tagesverlauf">${zu}${raster}<span class="ta-saeulen">${e.zeitpunkte.map(z =>
+        `<span class="ta-saeule" title="${hhmm(z.m)} Uhr · ${z.da} im Laden, mindestens nötig ${z.noetig}${
+          TAETIGKEITEN.concat([{id: "pause"}]).filter(t => z.je[t.id]).map(t => ` · ${taetigkeitName(t.id)} ${z.je[t.id]}`).join("")}">${
+          TAETIGKEITEN.concat([{id: "pause"}]).filter(t => z.je[t.id]).map(t =>
+            `<i class="t-${t.id}" style="height:${(z.je[t.id] / hoch * 100).toFixed(2)}%"></i>`).join("")}
+          <u style="bottom:${(z.noetig / hoch * 100).toFixed(2)}%"${z.da < z.noetig ? ' class="knapp"' : ""}></u></span>`).join("")}</span></span>
+      <span class="ta-zeit">bis zu ${Math.max(...e.zeitpunkte.map(z => z.da))}</span></div>`;
+
+    const reihen = e.reihen.map(r => {
+      const typ = !r.m ? "" : istAzubi(r.m) ? "Azubi" : r.m.typ.replace(/\s*\(.*\)$/, "");
+      return `<div class="ta-reihe"><span class="ta-name"><b>${esc(r.name.split(/\s+/)[0])}</b><span>${esc(typ)}</span></span>
+        <span class="ta-spur">${zu}${raster}${r.segmente.map(s =>
+          `<i class="ta-seg t-${s.art}" style="left:${x(s.von)};width:${w(s.von, s.bis)}" title="${esc(s.aufgabe || taetigkeitName(s.art))} · ${hhmm(s.von)}–${hhmm(s.bis)}"></i>`).join("")}</span>
+        <span class="ta-zeit">${hhmm(r.schicht.von)}–${hhmm(r.schicht.bis)}<span>${h1(r.stunden)} h</span></span></div>`; }).join("");
+
+    const achse = `<div class="ta-reihe ta-achse"><span class="ta-name"></span><span class="ta-spur">${stunden.map(m =>
+      `<span class="ta-uhr" style="left:${x(m)}">${m / 60}</span>`).join("")}</span><span class="ta-zeit"></span></div>`;
+    box.appendChild(el(`<div class="ta-leiste">${besetzung}${reihen}${achse}</div>`));
+
+    // Was auffällt: Aufgaben, die neben einer anderen herlaufen — und solche, die niemand kann
+    const koennen = a => a.braucht ? `„${(QUAL.find(x => x[0] === a.braucht) || [, a.braucht])[1]}“` : "";
+    const nebenher = e.aufgaben.filter(a => a.nebenher.length);
+    if (nebenher.length) box.appendChild(el(`<div class="note info"><span class="ic">i</span><span><b>Läuft nebenher:</b>
+      ${nebenher.map(a => `${esc(a.name)} (${a.nebenher.map(x => `${esc(x.name.split(/\s+/)[0])} ${x.spannen.map(spanneText).join(", ")}`).join("; ")})`).join(" · ")}.
+      Zu diesen Zeiten ist niemand mit dem nötigen Können frei — wer es kann, ist schon für eine andere Aufgabe eingeteilt.
+      Der Planer verlangt nur, dass jemand mit dem Können im Laden ist.</span></div>`));
+    e.aufgaben.filter(a => a.fehlt.length).forEach(a => box.appendChild(el(`<div class="note warn"><span class="ic">!</span><span>
+      <b>${esc(a.name)}, ${a.fehlt.map(spanneText).join(", ")}:</b> Niemand ${a.braucht ? `mit ${esc(koennen(a))} ` : ""}ist dafür im Laden
+      — gebraucht ${a.pers === 1 ? "wird eine Person" : `werden ${a.pers} Personen`}.</span></div>`)));
+
+    // ---- Warum wer eingeplant ist ----
+    box.appendChild(el(`<h3 class="ta-titel">Warum wer eingeplant ist</h3>`));
+    const gruende = el(`<div class="ta-gruende"></div>`);
+    e.reihen.forEach(r => {
+      const b = schichtBegruendung(plan, analyseTag, r, e);
+      gruende.appendChild(el(`<div class="ta-grund"><div class="ta-grundkopf"><b>${esc(r.name)}</b>
+        <span>${hhmm(r.schicht.von)}–${hhmm(r.schicht.bis)} · ${h1(r.stunden)} h</span></div>
+        ${b.saetze.map(s => `<p>${esc(s)}</p>`).join("")}</div>`));
+    });
+    box.appendChild(gruende);
+    box.appendChild(el(`<p class="hint">Die Farben zeigen, wie der Planer die Besetzung rechnet: wer eine Aufgabe abdecken kann und dafür da ist.
+      „Kasse & Laden“ ist die Zeit ohne feste Aufgabe — Kasse, Kunden, Fläche. Wer im Laden tatsächlich was macht, entscheidest du.
+      „Ohne diese Schicht fehlte …“ ist dieselbe Prüfung wie beim Planen, nur ohne die Schicht.</p>`));
+  };
+  zeichnen();
+  return box;
+}
+
 // ==== app/40-startseite.js ====
-/* Übersicht: was zu erledigen ist, wer heute im Laden steht, darunter der Plan der Woche
-   als Aushang. Die Bereiche stehen links in der Leiste (Telefon: Reiter unten).
+/* Übersicht: das Dashboard (zu erledigen, Vorfälle der Woche), wer heute im Laden steht,
+   darunter der Plan der Woche als Aushang. Die Bereiche stehen links in der Leiste (Telefon: Reiter unten).
 
    Der Plan hier ist immer der gültige. Geändert wird er nur unter „Plan ändern“ —
    dort entsteht ein Entwurf, der erst mit „Übernehmen“ hierher kommt. */
@@ -6784,8 +7706,10 @@ function planGitter(plan, o){
   const liefer = r.lieferungen.map(l => `<tr class="liefer">
     <th class="zeilenkopf">${esc(l.name)}<span class="klein"> ${esc(l.zeit)}</span></th><td></td><td></td>
     ${l.tage.map(x => `<td colspan="2">${esc(x)}</td>`).join("")}<td></td><td></td></tr>`).join("");
+  // Bestellungen ausgeschrieben, je Frist ein Block — die Zeile wächst mit, nichts wird gekürzt
   const bestell = r.mitBestellung ? `<tr class="bestell"><th class="zeilenkopf">Bestellung</th><td></td><td></td>
-    ${r.bestellung.map(x => `<td colspan="2">${x.map(esc).join("<br>")}</td>`).join("")}<td></td><td></td></tr>` : "";
+    ${r.bestellungVoll.map(tag => `<td colspan="2">${tag.map(([frist, namen]) => `<div class="b-gruppe">${
+      frist ? `<b>${esc(frist)}</b>` : ""}${namen.map(n => `<span>${esc(n)}</span>`).join("")}</div>`).join("")}</td>`).join("")}<td></td><td></td></tr>` : "";
   const notizen = plan.notizen || {};
   const aufg = (o.notizImmer || plan.tage.some(t => notizen[t.key])) ? `<tr class="aufgabenzeile"><th class="zeilenkopf">Notiz</th><td></td><td></td>${
     plan.tage.map((t, ti) => `<td colspan="2"${t.feiertag ? "" : ` data-notiz="${ti}"`}>${t.feiertag ? "Feiertag"
@@ -6940,17 +7864,35 @@ function urfassungZellen(kurz){
 // Nach „Übernehmen“ in „Plan ändern“: einmal oben sagen, dass der Plan jetzt gilt (Woche)
 let startHinweis = null;
 
-/* ---- Zu erledigen: jeder offene Punkt ein Satz und der Weg dorthin ---- */
-function zuErledigenKarte(marken){
+/* ---- Was in der gezeigten Woche Besonderes ist — Auskunft, keine Aufgabe ----
+   Krank und Urlaub stehen nur hier, in der Ansicht der Filialleitung; nie im Ausdruck. */
+function wochenVorfaelle(mo){
+  const sl = wochenSchluessel(mo), kurz = (state.plaene || {})[sl], raus = [];
+  ereignisseDerWoche(sl).forEach(e => raus.push({art: e.text, text: `${e.name} — ${tageText(e.tage)}`}));
+  // nach dem Erstellen geändert: alte Zeit → neue Zeit
+  Object.keys((kurz && kurz.urfassung) || {}).map(k => { const [name, ti] = k.split("|"); return {name, ti: +ti, alt: kurz.urfassung[k]}; })
+    .sort((x, y) => x.ti - y.ti || (x.name < y.name ? -1 : 1))
+    .forEach(x => raus.push({art: "Geändert", text: `${x.name}, ${TAGE[x.ti][1]}: ${x.alt || "frei"} → ${schichtText(kurz, x.name, x.ti) || "frei"}`}));
+  TAGE.forEach(([, kurzName], ti) => {
+    const d = new Date(mo); d.setDate(mo.getDate() + ti);
+    const f = feiertagName(d);
+    if (f) raus.push({art: "Feiertag", text: `${kurzName} ${d.getDate()}.${d.getMonth() + 1}. — ${f}`});
+  });
+  const ph = phaseNormal(kurz ? kurz.phase : (state.phasen || {})[sl]);
+  if (ph.art !== "normal") raus.push({art: ph.art === "sparen" ? "Stunden sparen" : "Mehr Stunden", text: phasenText(ph)});
+  return raus;
+}
+
+/* ---- Dashboard: oben, was zu tun ist (ein Satz und der Weg dorthin) —
+        darunter, was diese Woche Besonderes ist ---- */
+function dashboardKarte(marken, mo){
   const alle = Object.keys(marken).reduce((a, ziel) => a.concat(marken[ziel].map(x => Object.assign({ziel}, x))), []);
   alle.sort((a, b) => (a.art === "neu") - (b.art === "neu"));     // erst, was zu tun ist — dann, was neu ist
-  const k = el(`<section class="karte zutun"><div class="karte-kopf"><h2>Zu erledigen</h2>${zahlHtml(alle)}</div>
-    <div class="zt-liste"></div></section>`);
+  const k = el(`<section class="karte dashboard">
+    <div class="db-teil"><div class="karte-kopf"><h2>Zu erledigen</h2>${zahlHtml(alle)}</div><div class="zt-liste"></div></div>
+    <div class="db-teil"><div class="karte-kopf"><h2>Diese Woche</h2><span class="pille">KW ${kwVon(mo)}</span></div><div class="vf-liste"></div></div>
+  </section>`);
   const box = k.querySelector(".zt-liste");
-  if (!alle.length){
-    box.appendChild(el(`<p class="zt-leer">${symbol("haken")}<span>Nichts offen.</span></p>`));
-    return k;
-  }
   const zeile = x => {
     const wohin = (NAV_PUNKTE.find(n => n.ziel === x.ziel) || {}).titel || "";
     const tun = x.art === "neu" ? "Ansehen" : x.ziel === "aendern" ? "Lösen" : x.ziel === "planen" ? "Erstellen" : "Öffnen";
@@ -6960,11 +7902,23 @@ function zuErledigenKarte(marken){
     b.onclick = () => geheZu(x.ziel, x);
     return b;
   };
+  if (!alle.length) box.appendChild(el(`<p class="zt-leer">${symbol("haken")}<span>Nichts offen.</span></p>`));
   alle.slice(0, 5).forEach(x => box.appendChild(zeile(x)));
   if (alle.length > 5){
     const d = el(`<details class="zt-rest"><summary>${alle.length - 5} weitere</summary></details>`);
     alle.slice(5).forEach(x => d.appendChild(zeile(x)));
     box.appendChild(d);
+  }
+
+  const vBox = k.querySelector(".vf-liste");
+  const vorfaelle = wochenVorfaelle(mo);
+  const vZeile = v => el(`<div class="vf-zeile"><span class="vf-art">${esc(v.art)}</span><span>${esc(v.text)}</span></div>`);
+  if (!vorfaelle.length) vBox.appendChild(el(`<p class="zt-leer"><span>Keine Vorfälle — alles läuft nach Plan.</span></p>`));
+  vorfaelle.slice(0, 6).forEach(v => vBox.appendChild(vZeile(v)));
+  if (vorfaelle.length > 6){
+    const d = el(`<details class="zt-rest"><summary>${vorfaelle.length - 6} weitere</summary></details>`);
+    vorfaelle.slice(6).forEach(v => d.appendChild(vZeile(v)));
+    vBox.appendChild(d);
   }
   return k;
 }
@@ -7069,10 +8023,6 @@ function planKarte(mo, pdfIstHaupt){
     const s = planSummen(plan);
     if (Object.keys(geaendert).length) inhalt.appendChild(el(`<div class="legende"><span><i class="geaendert"></i> nach dem Erstellen geändert
       — darunter klein die ursprüngliche Zeit</span></div>`));
-    // Besondere Ereignisse der Woche — rot und immer sichtbar
-    const ereignisse = ereignisseDerWoche(sl);
-    if (ereignisse.length) inhalt.appendChild(el(`<div class="note bad ereignisliste"><span class="ic">!</span>
-      <span><b>Besondere Ereignisse</b>${ereignisse.map(e => `<br>${esc(e.text)}: ${esc(e.name)} — ${tageText(e.tage)}`).join("")}</span></div>`));
     // Die Messlatte: wie viele Stunden die Woche mindestens bräuchte
     const b = plan.berechnung;
     if (b && b.mindest !== null && b.mindest !== undefined){
@@ -7153,7 +8103,7 @@ function startseite(o){
 
   if (!nurPlan){
     const oben = el(`<div class="startraster"></div>`);
-    oben.appendChild(zuErledigenKarte(marken));
+    oben.appendChild(dashboardKarte(marken, mo));
     oben.appendChild(heuteKarte());
     p.appendChild(oben);
   }
@@ -8238,7 +9188,8 @@ function aendernAnsicht(){
   p.appendChild(status);
 
   // Oben über die ganze Breite: was zu tun ist und der Entwurf im Filialformular.
-  // Darunter zweispaltig: Lösungen | eigene Änderungen und Assistent.
+  // Darunter zweispaltig: Lösungen | Assistent. Zurückgenommen wird eine Änderung dort, wo sie
+  // entstanden ist: an der Zelle („wie im gültigen Plan“), an der Lösungs- oder Assistentenkarte.
   const oben = el(`<div class="aendern-oben"></div>`);
   p.appendChild(oben);
   const raster = el(`<div class="aendern-raster"><div class="aendern-haupt"></div><div class="aendern-seite"></div></div>`);
@@ -8283,19 +9234,6 @@ function aendernAnsicht(){
     oder den Assistenten —, steht hier, was fehlt und wie es sich lösen lässt.</p>`));
   gruppen.forEach(g => vBox.appendChild(loesungsGruppe(g, sl, kurz, eintrag, neuZeichnen)));
   haupt.appendChild(vk);
-
-  // ---- Deine Änderungen ----
-  const ak = el(`<section class="karte"><h3>${symbol("stift")} Deine Änderungen</h3><div></div></section>`);
-  const liste = eintrag.aenderungen.filter(a => a.aktiv || a.quelle === "abwesenheit");
-  if (!liste.length) ak.querySelector("div").appendChild(el(`<p class="hint">Noch keine. Jede Änderung lässt sich hier einzeln zurücknehmen.</p>`));
-  liste.forEach(a => {
-    const z = el(`<div class="aend-zeile${pr.passtNicht.has(a.id) ? " passt-nicht" : ""}${a.aktiv ? "" : " aus"}"><span class="aend-quelle">${
-      {hand: "von Hand", vorschlag: "Lösung", assistent: "Assistent", abwesenheit: "Abwesenheit"}[a.quelle] || ""}</span>
-      <span>${esc(a.text)}</span><button class="btn ghost small" type="button" title="${a.aktiv ? "zurücknehmen" : "wieder einschalten"}">${a.aktiv ? "×" : "↺"}</button></div>`);
-    z.querySelector("button").onclick = () => { if (a.aktiv) aenderungAus(eintrag, a.id); else a.aktiv = true; neuZeichnen(); };
-    ak.querySelector("div").appendChild(z);
-  });
-  seite.appendChild(ak);
 
   // ---- Assistent ----
   seite.appendChild(assistentKarte(sl, kurz, eintrag, neuZeichnen));
@@ -8517,22 +9455,41 @@ function notizBearbeiten(eintrag, ti, plan, fertig){
   inhalt.querySelector("[data-abbrechen]").onclick = () => d.remove();
 }
 
-// Der Assistent: Gespräch und Karten zum Antippen
+// Der Assistent: Gespräch, Karten zum Antippen und — bei einer Rückfrage — Antwortknöpfe
 function assistentKarte(sl, kurz, eintrag, fertig){
-  eintrag.chat = eintrag.chat || [{wer: "assistent", text: "Was soll sich am Plan ändern? " + ASSISTENT_HILFE}];
+  eintrag.chat = eintrag.chat || [{wer: "assistent", text: "Was soll sich am Plan ändern? Schreib es, wie du es sagen würdest.", knoepfe: ASSISTENT_START}];
   const k = el(`<section class="karte assistent"><h3>${symbol("funke")} Assistent</h3>
     <div class="chat"></div>
-    <form class="chat-eingabe"><input type="text" placeholder="z. B. Wer kann Eva am Dienstag ersetzen?" aria-label="Nachricht an den Assistenten">
+    <form class="chat-eingabe"><input type="text" placeholder="z. B. Eva ist morgen krank" aria-label="Nachricht an den Assistenten">
       <button class="btn" type="submit" title="senden">${symbol("senden")}</button></form>
     <p class="hint">Rechnet nur auf diesem Gerät — es geht nichts ins Internet.</p></section>`);
   const chat = k.querySelector(".chat");
-  eintrag.chat.forEach(n => {
+  const senden = text => {
+    text = String(text || "").trim();
+    if (!text) return;
+    const erg = assistent(text, sl, kurz, eintrag);
+    erg.karten.forEach(a => { if (!eintrag.aenderungen.includes(a)) eintrag.aenderungen.push(a); });
+    (erg.aus || []).forEach(id => aenderungAus(eintrag, id));
+    eintrag.chat.push({wer: "du", text}, {wer: "assistent", text: erg.antwort, karten: erg.karten.map(a => a.id), knoepfe: erg.knoepfe || []});
+    // Kürzen, aber nichts, woran noch eine eingeschaltete Karte hängt
+    while (eintrag.chat.length > 40 && !(eintrag.chat[0].karten || []).some(id => (eintrag.aenderungen.find(x => x.id === id) || {}).aktiv)) eintrag.chat.shift();
+    // Vorschläge, die kein Gesprächsteil mehr zeigt und die nicht im Plan sind, wegräumen
+    const gezeigt = new Set(eintrag.chat.reduce((l, n) => l.concat(n.karten || []), []));
+    eintrag.aenderungen = eintrag.aenderungen.filter(a => a.quelle !== "assistent" || a.aktiv || gezeigt.has(a.id));
+    fertig();
+    setTimeout(() => {
+      const c = document.querySelector(".assistent .chat"); if (c) c.scrollTop = c.scrollHeight;
+      const f = document.querySelector(".assistent input"); if (f && matchMedia("(pointer:fine)").matches) f.focus({preventScroll: true});
+    }, 0);
+  };
+  eintrag.chat.forEach((n, nr) => {
     const b = el(`<div class="blase ${n.wer}"><p>${esc(n.text)}</p></div>`);
     (n.karten || []).forEach(id => {
       const a = eintrag.aenderungen.find(x => x.id === id);
       if (!a) return;
       const kn = el(`<button class="chatkarte${a.aktiv ? " an" : ""}" type="button" aria-pressed="${a.aktiv}">${esc(a.text)}
-        ${a.weg ? `<span class="chat-weg">${a.weg.zeilen.map(z => `${esc(z.name.split(" ")[0])}: ${z.vorher ? `<s>${esc(z.vorher)}</s> → ` : ""}${esc(z.nachher || "frei")}`).join(" · ")}</span>` : ""}
+        ${a.weg ? `<span class="chat-weg">${a.weg.zeilen.map(z => `${esc(z.name.split(" ")[0])}: ${z.vorher ? `<s>${esc(z.vorher)}</s> → ` : ""}${esc(z.nachher || "frei")}`).join(" · ")}</span>
+          ${a.weg.passt ? `<span class="chat-weg">${esc(a.weg.passt)}</span>` : ""}` : ""}
         <span>${a.aktiv ? "✓ im Plan · antippen entfernt" : "antippen zeigt es im Plan"}</span></button>`);
       kn.onclick = () => {
         if (a.aktiv) aenderungAus(eintrag, a.id);
@@ -8549,23 +9506,16 @@ function assistentKarte(sl, kurz, eintrag, fertig){
       };
       b.appendChild(kn);
     });
+    // Antwortknöpfe nur an der letzten Nachricht — ältere Fragen sind erledigt
+    if (nr === eintrag.chat.length - 1 && (n.knoepfe || []).length){
+      const reihe = el(`<div class="chat-knoepfe"></div>`);
+      n.knoepfe.forEach(t => { const kn = el(`<button class="btn ghost small" type="button">${esc(t)}</button>`); kn.onclick = () => senden(t); reihe.appendChild(kn); });
+      b.appendChild(reihe);
+    }
     chat.appendChild(b);
   });
   const feld = k.querySelector("input");
-  k.querySelector("form").onsubmit = e => {
-    e.preventDefault();
-    const text = feld.value.trim();
-    if (!text) return;
-    const erg = assistent(text, sl, kurz, eintrag);
-    erg.karten.forEach(a => eintrag.aenderungen.push(a));
-    eintrag.chat.push({wer: "du", text}, {wer: "assistent", text: erg.antwort, karten: erg.karten.map(a => a.id)});
-    if (eintrag.chat.length > 40) eintrag.chat = eintrag.chat.slice(-40);
-    fertig();
-    setTimeout(() => {
-      const c = document.querySelector(".assistent .chat"); if (c) c.scrollTop = c.scrollHeight;
-      const f = document.querySelector(".assistent input"); if (f) f.focus({preventScroll: true});
-    }, 0);
-  };
+  k.querySelector("form").onsubmit = e => { e.preventDefault(); senden(feld.value); };
   setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 0);
   return k;
 }
@@ -8597,7 +9547,7 @@ function planRaster(plan){
 
   // Bestellungen: je Tag, was bis wann raus muss — nach Frist gruppiert, damit
   // es bei sechs Bestellungen nicht sechs Zeilen werden
-  const bestellung = plan.tage.map(t => {
+  const bestellGruppen = feld => plan.tage.map(t => {
     if (t.feiertag) return [];
     const gruppen = new Map();
     WAREN.filter(w => w.gruppe === "bestellung").forEach(w => {
@@ -8607,12 +9557,15 @@ function planRaster(plan){
       const frist = a.zeitArt === "spanne" && hatZeit(a.fBis) ? "bis " + a.fBis
                   : a.zeitArt === "fest" && hatZeit(a.zeit) ? "um " + a.zeit : "";
       if (!gruppen.has(frist)) gruppen.set(frist, []);
-      gruppen.get(frist).push(w.kurz);
+      gruppen.get(frist).push(w[feld]);
     });
     return [...gruppen.entries()]
-      .sort((x,y) => (x[0].slice(-5) || "99") < (y[0].slice(-5) || "99") ? -1 : 1)
-      .map(([frist, namen]) => namen.join(", ") + (frist ? " " + frist : ""));
+      .sort((x,y) => (x[0].slice(-5) || "99") < (y[0].slice(-5) || "99") ? -1 : 1);
   });
+  // Kurz für Ausdruck und Telefon (dort ist der Platz knapp) …
+  const bestellung = bestellGruppen("kurz").map(tag => tag.map(([frist, namen]) => namen.join(", ") + (frist ? " " + frist : "")));
+  // … ausgeschrieben für den Plan am Rechner: [[Frist, [Namen]], …] je Tag
+  const bestellungVoll = bestellGruppen("anzeige");
   const mitBestellung = bestellung.some(x => x.length);
 
   // Die Zeile unter den Lieferungen bleibt leer — dort trägt die Filialleitung
@@ -8651,7 +9604,7 @@ function planRaster(plan){
     oeffnung:`Öffnungszeiten: ${state.von} Uhr – ${state.bis} Uhr`,
     filiale:`N ${state.nr}`, ort: state.ort || "",
     kw, jahr: plan.mo.getFullYear(), datum,
-    lieferungen, bestellung, mitBestellung, aufgabenZeile, leute,
+    lieferungen, bestellung, bestellungVoll, mitBestellung, aufgabenZeile, leute,
     phase: plan.phase && plan.phase.art !== "normal" ? phasenText(plan.phase) : "",
     summen: s.proTag.map(x => x.bezahlt),
     summeWoche: s.bezahlt
