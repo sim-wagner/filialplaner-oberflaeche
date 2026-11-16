@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-13-6-test",
+  "fassung": "2026-11-16-1-test",
   "datei": "filialplaner.html",
-  "pruefsumme": "3b3648d3dce7cc094ced2b496e34290db77c30453c9f075f131f0f3f9aa57723",
-  "hinweis": "Überarbeitung: Lösungen klar formuliert mit Tagesbalken, alte Zeit durchgestrichen, Zurück-Knopf, Änderungen orange auf der Startseite, Personal als Liste, Filialformular-Raster, Assistent mit Gesprächsverlauf"
+  "pruefsumme": "6ffb1a8ac9819c5bca72a3c07fffb9ac5aee89466e7e258891e5967bd8f252aa",
+  "hinweis": "Neue Gestaltung: Leiste links, Übersicht mit „Zu erledigen“ und „Heute im Laden“, Plan als Aushang, Hausfarben"
 }
