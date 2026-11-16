@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-16-3-test">
+<meta name="fassung" content="2026-11-16-4-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -889,48 +889,63 @@ table.kompakt th,table.kompakt td{overflow-wrap:break-word;hyphens:auto;-webkit-
 @container (min-width:481px){ tr.k-zusatz td{font-size:.72rem} }
 .planbox{overflow-x:auto}
 
-/* ---- Tagesanalyse (16.11.2026) ---- */
-.t-kasse{background:var(--t-kasse)} .t-ware{background:var(--t-ware)} .t-bestell{background:var(--t-bestell)} .t-sonst{background:var(--t-sonst)}
+/* ---- Tagesanalyse (16.11.2026): Zeitleisten je Aufgabe und je Person ----
+   Farbe je Art (Kasse, Ware, Bestellen, Aufbau/Backen/Abend), der Name steht im Balken. */
+.t-kasse{--t:var(--t-kasse)} .t-ware{--t:var(--t-ware)} .t-bestell{--t:var(--t-bestell)} .t-sonst{--t:var(--t-sonst)} .t-laden{--t:var(--ton-500)}
+.t-kasse,.t-ware,.t-bestell,.t-sonst{background:var(--t)}
+.t-laden{background:var(--ton-200)}
 .t-pause{background:repeating-linear-gradient(135deg,var(--ton-200) 0 3px,transparent 3px 6px)}
 .tagesanalyse{display:flex;flex-direction:column;gap:14px}
-.ta-kopf{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
-.ta-legende{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:.78rem;font-weight:600;color:var(--ink-2)}
-.ta-legende span,.ta-kachelname{display:inline-flex;align-items:center;gap:6px}
-.ta-legende i,.ta-kachelname i{width:12px;height:12px;border-radius:3px;flex:none}
-.ta-woche{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-.ta-tag{display:grid;grid-template-columns:92px minmax(0,1fr) 64px;gap:12px;align-items:center;min-height:38px;padding:5px 12px;border:0;
-  border-top:1px solid var(--line-2);background:var(--surface);font:inherit;color:var(--ink);text-align:left;cursor:pointer}
-.ta-tag:first-child{border-top:0}
-.ta-tag:hover:not(:disabled){background:var(--ton-50)}
-.ta-tag[aria-pressed="true"]{background:var(--ton-100);box-shadow:inset 3px 0 0 var(--gelb)}
-.ta-tag:disabled{cursor:default;color:var(--muted)}
-.ta-tagname{font-size:.84rem;font-variant-numeric:tabular-nums}
-.ta-stapel{display:flex;gap:2px;height:14px}
+.ta-kopf{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.ta-wahl{display:inline-flex;border:1.5px solid var(--ton-200);border-radius:var(--r-s);overflow:hidden}
+.ta-plan{display:flex;flex-direction:column;align-items:flex-start;gap:0;min-width:150px;padding:7px 14px;border:0;background:var(--surface);
+  font:inherit;color:var(--ink);cursor:pointer;text-align:left}
+.ta-plan + .ta-plan{border-left:1.5px solid var(--ton-200)}
+.ta-plan b{font-size:.88rem} .ta-plan span{font-size:.72rem;color:var(--muted);font-weight:600}
+.ta-plan[aria-pressed="true"]{background:var(--voll);color:var(--auf-voll)}
+.ta-plan[aria-pressed="true"] span{color:inherit;opacity:.75}
+.ta-kennzahl{display:flex;gap:18px;flex-wrap:wrap;font-size:.86rem;color:var(--ink-2);font-weight:600}
+.ta-kennzahl b{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+.ta-hinweise{display:flex;flex-direction:column;gap:6px}
+.ta-tage{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.ta-tag{display:grid;grid-template-columns:auto 1fr;gap:1px 6px;align-items:baseline;padding:9px 11px;border:1.5px solid var(--line);border-radius:var(--r);
+  background:var(--surface);font:inherit;color:var(--ink);text-align:left;cursor:pointer;min-height:68px}
+.ta-tag b{font-size:.95rem} .ta-datum{font-size:.76rem;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+.ta-tag .ta-stapel{grid-column:1/-1;display:flex;gap:1px;height:8px;margin:5px 0 3px}
 .ta-stapel i{display:block;height:100%;border-radius:2px;min-width:2px}
-.ta-stapel em{font-style:normal;font-size:.76rem;color:var(--muted)}
-.ta-summe{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.82rem;font-weight:700;text-align:right}
-.ta-titel{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;font-size:1rem;margin-top:8px}
-.ta-titel span{font-size:.8rem;font-weight:600;color:var(--muted)}
-.ta-summen{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-@media(max-width:900px){.ta-summen{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.ta-kachel{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--surface-2)}
-.ta-kachelname{font-size:.76rem;font-weight:700;color:var(--ink-2)}
-.ta-kachel b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:1.25rem;letter-spacing:-.02em}
-.ta-kachel > span:last-child{font-size:.72rem;color:var(--muted);font-weight:600}
-.ta-leiste{display:flex;flex-direction:column;gap:5px;border:1px solid var(--line);border-radius:var(--r);padding:12px 12px 6px;background:var(--surface)}
-.ta-reihe{display:grid;grid-template-columns:118px minmax(0,1fr) 104px;gap:10px;align-items:center}
-.ta-name{display:flex;flex-direction:column;min-width:0;line-height:1.2}
-.ta-name b{font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ta-name span{font-size:.66rem;color:var(--muted);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ta-spur{position:relative;display:block;height:20px;background:var(--line-2);border-radius:4px}
+.ta-tag .ta-summe{grid-column:1/-1;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.78rem;font-weight:700}
+.ta-tag:hover:not(:disabled){border-color:var(--ton-500)}
+.ta-tag[aria-selected="true"]{border-color:var(--voll);box-shadow:inset 0 -4px 0 var(--gelb)}
+.ta-tag:disabled{cursor:default;color:var(--muted);background:var(--surface-2)}
+.ta-tagkopf h3{font-size:1.15rem}
+.ta-tagkopf p{display:flex;gap:4px 14px;flex-wrap:wrap;align-items:center;margin-top:4px;font-size:.84rem;color:var(--ink-2);font-weight:600}
+.ta-teil{display:inline-flex;align-items:center;gap:6px}
+.ta-teil i{width:12px;height:12px;border-radius:3px;flex:none}
+.ta-block{display:flex;flex-direction:column;gap:8px}
+.ta-titel{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;font-size:1rem;margin-top:6px}
+.ta-titel span{font-size:.76rem;font-weight:600;color:var(--muted)}
+.ta-leiste{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:var(--r);padding:10px 14px 12px;background:var(--surface)}
+.ta-reihe{display:grid;grid-template-columns:190px minmax(0,1fr) 128px;gap:12px;align-items:center}
+.ta-name{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.ta-name b{font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ta-name span{font-size:.68rem;color:var(--muted);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ta-spur{position:relative;display:block;height:30px;background:var(--line-2);border-radius:5px}
 .ta-spur > i{position:absolute;top:0;bottom:0}
-.ta-zu{background:var(--surface);opacity:.6}
+.ta-zu{background:var(--surface);opacity:.62}
 .ta-linie{width:1px;background:var(--surface);opacity:.9}
-.ta-seg{border-radius:3px;box-shadow:inset -1.5px 0 0 var(--surface)}
-.ta-zeit{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.76rem;font-weight:600;text-align:right;white-space:nowrap}
-.ta-zeit span{display:block;font-size:.66rem;color:var(--muted);font-weight:500}
-.ta-besetzung{align-items:end;margin-bottom:6px}
-.ta-besetzung .ta-spur{height:76px;background:none;border-bottom:1.5px solid var(--line)}
+.ta-fenster{border:1.5px dashed var(--ton-500);border-radius:5px;background:none}
+/* Balken: getönte Fläche, kräftiger Rand links, der Name in normaler Schrift — lesbar in hell und dunkel */
+.ta-seg{display:flex;align-items:center;overflow:hidden;border-radius:4px;font-style:normal;
+  background:color-mix(in srgb,var(--t) 26%,var(--surface));box-shadow:inset 3px 0 0 var(--t),inset -1.5px 0 0 var(--surface)}
+.ta-seg span{padding:0 5px 0 8px;font-size:.72rem;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ta-seg.t-laden{background:var(--ton-100);box-shadow:inset -1.5px 0 0 var(--surface)}
+.ta-seg.t-pause{background:repeating-linear-gradient(135deg,var(--ton-200) 0 3px,transparent 3px 6px);box-shadow:none}
+.ta-seg.t-pause span,.ta-seg.t-laden span{color:var(--muted);font-weight:600}
+.ta-seg.ta-fehlt{box-shadow:inset 3px 0 0 var(--zutun),inset 0 0 0 1.5px var(--zutun)}
+.ta-zeit{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.78rem;font-weight:600;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ta-zeit span{display:block;font-family:var(--sans);font-size:.7rem;color:var(--muted);font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.ta-besetzung{align-items:end;margin:2px 0 6px}
+.ta-besetzung .ta-spur{height:70px;background:none;border-bottom:1.5px solid var(--line);border-radius:0}
 .ta-saeulen{position:absolute;inset:0;display:flex;align-items:flex-end}
 .ta-saeule{position:relative;flex:1;height:100%;display:flex;flex-direction:column-reverse;gap:1px;min-width:0}
 .ta-saeule i{display:block;width:100%}
@@ -938,26 +953,70 @@ table.kompakt th,table.kompakt td{overflow-wrap:break-word;hyphens:auto;-webkit-
 .ta-saeule u.knapp{background:var(--zutun);height:3px}
 .ta-saeule:hover{outline:1.5px solid var(--ink);outline-offset:-1px;z-index:1}
 .ta-achse .ta-spur{height:16px;background:none}
-.ta-uhr{position:absolute;top:1px;transform:translateX(-50%);font-family:var(--mono);font-size:.64rem;color:var(--muted)}
+.ta-uhr{position:absolute;top:1px;transform:translateX(-50%);font-family:var(--mono);font-size:.68rem;color:var(--muted)}
 .ta-gruende{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 @media(max-width:900px){.ta-gruende{grid-template-columns:1fr}}
 .ta-grund{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--surface)}
-.ta-grundkopf{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:4px}
+.ta-grundkopf{display:flex;justify-content:space-between;gap:2px 10px;align-items:baseline;margin-bottom:4px;flex-wrap:wrap}
 .ta-grundkopf b{font-size:.9rem}
-.ta-grundkopf span{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.76rem;color:var(--muted);white-space:nowrap}
+.ta-grundkopf span{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.76rem;color:var(--muted)}
+.ta-grund{min-width:0}
 .ta-grund p{font-size:.82rem;line-height:1.45;color:var(--ink-2);font-weight:500}
 .ta-grund p + p{margin-top:3px}
+.ta-grund .note{margin-top:8px;font-size:.8rem}
+@media(max-width:1100px){.ta-reihe{grid-template-columns:150px minmax(0,1fr) 108px}}
 @media(max-width:640px){
-  .ta-reihe{grid-template-columns:62px minmax(0,1fr)}
+  .ta-tage{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ta-reihe{grid-template-columns:1fr;gap:2px}
   .ta-reihe > .ta-zeit{display:none}
-  .ta-tag{grid-template-columns:70px minmax(0,1fr) 52px;gap:8px;padding:5px 8px}
-  .ta-leiste{padding:10px 8px 4px}
+  .ta-name{flex-direction:row;gap:8px;align-items:baseline}
+  .ta-achse .ta-name,.ta-besetzung .ta-name span{display:none}
+  .ta-leiste{padding:8px 8px 10px;gap:8px}
+  .ta-plan{min-width:0;flex:1}
+  .ta-wahl{display:flex;width:100%}
 }
 
 /* ---- Assistent: Antwortknöpfe unter einer Rückfrage ---- */
 .chat-knoepfe{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .chat-knoepfe .btn{border-radius:999px;padding:6px 12px}
 .chat{max-height:460px}
+
+/* ---- Planentwurf (16.11.2026): Vertragsstunden bewusst auffüllen ---- */
+.pe-liste{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.pe-liste > .zt-leer{grid-column:1/-1}
+.pe-person{padding:12px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.pe-kopf{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.pe-kopf > b{font-size:.92rem}
+.pe-kopf span{font-size:.78rem;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+.pe-kopf span b{color:var(--ink)}
+.pe-vorschlaege{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.pe-vorschlag{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;width:100%;text-align:left;padding:9px 11px;
+  border:1.5px solid var(--line);border-radius:var(--r-s);background:var(--surface-2);font:inherit;color:var(--ink);cursor:pointer}
+.pe-vorschlag:hover{border-color:var(--ton-500);background:var(--surface)}
+.pe-was{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pe-was b{font-size:.86rem}
+.pe-grund{grid-column:1;font-size:.76rem;color:var(--muted);font-weight:600;line-height:1.35}
+.pe-tun{grid-column:2;grid-row:1/3;font-size:.8rem;font-weight:700;color:var(--link);white-space:nowrap}
+.pe-dazu{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.pe-zeile{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:.84rem;font-weight:600}
+.planentwurf .aendern-status{flex-wrap:wrap}
+
+/* ---- Assistent (neu gestaltet 16.11.2026): Feld oben, darunter die letzte Antwort ---- */
+.assistent h3{margin-bottom:10px}
+.assistent .chat-eingabe{margin-top:0}
+.assistent .chat-eingabe input{min-height:44px}
+.assistent .chat-eingabe .btn{min-width:46px}
+.as-antwort:empty{display:none}
+.as-antwort{margin-top:14px}
+.as-paar{display:flex;flex-direction:column;gap:2px}
+.as-frage{font-size:.76rem;font-weight:700;color:var(--muted)}
+.as-frage::before{content:"› "}
+.as-text{font-size:.88rem;line-height:1.5;color:var(--ink);margin-bottom:2px}
+.as-verlauf{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.as-verlauf summary{cursor:pointer;font-size:.8rem;font-weight:700;color:var(--muted)}
+.as-verlauf .as-paar{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2)}
+.as-verlauf .as-paar:first-of-type{border-top:0;padding-top:0}
+.as-verlauf .as-text{color:var(--ink-2)}
 </style>
 
 <div class="markenband" aria-hidden="true"></div>
@@ -1080,7 +1139,7 @@ const WAREN = [
 const TAGNAMEN = {mo:"Montag", di:"Dienstag", mi:"Mittwoch", do:"Donnerstag", fr:"Freitag", sa:"Samstag"};
 
 // Was je Tag verschieden sein darf, wenn „an den Tagen unterschiedlich“ an ist
-const TAGESFELDER = ["zeitArt","zeit","fVon","fBis","dauer","personen"];
+const TAGESFELDER = ["zeitArt","zeit","fertig","fVon","fBis","dauer","personen"];
 
 const ZEITARTEN = [["fest","feste Uhrzeit"],["spanne","Zeitspanne"],["egal","Uhrzeit egal"]];
 
@@ -1400,55 +1459,75 @@ function aufgabeAm(a, tag){
   return Object.assign({}, a, a.proTag[tag]);
 }
 
-// Was eine Aufgabe an einem Tag verlangt: Zeitfenster und Personenzahl.
-// vorgabe (aus wochenVorgabe) bringt die Art der Woche mit: in einer Sparwoche
-// werden die Aufgaben kürzer gerechnet, bei Mehrbedarf kommen Zusatzaufgaben dazu.
+/* Die Aufgaben eines Tages mit ihrer Zeit — so, dass möglichst wenige gleichzeitig laufen.
+
+   Jede Aufgabe hat ein Fenster: einen frühesten Beginn und ein „spätestens fertig bis“.
+     · feste Uhrzeit — sie ist der früheste Beginn. Fertig sein muss die Aufgabe bis zur
+       eingetragenen Zeit „spätestens fertig bis“; ohne Angabe bis zur Ladenöffnung, wenn
+       sie davor beginnt, sonst darf sie bis zu zwei Stunden später anfangen.
+     · Zeitspanne — frühestens/spätestens wie eingetragen.
+     · Uhrzeit egal — irgendwann während der Öffnung.
+   Innerhalb des Fensters rückt eine Aufgabe dorthin, wo sie keine zusätzliche Person
+   braucht: Eine Person erledigt Aufgaben nacheinander. Mehrere gleichzeitig gibt es nur,
+   wenn eine Aufgabe selbst mehrere verlangt oder die Zeit sonst nicht reicht. (Bis
+   16.11.2026 lag jede Aufgabe mit fester Uhrzeit genau auf ihrer Uhrzeit — vier Aufgaben
+   um 05:00 hießen vier Personen um 05:00.)
+
+   vorgabe (aus wochenVorgabe) bringt die Art der Woche mit: in einer Sparwoche werden die
+   Aufgaben kürzer gerechnet, bei Mehrbedarf kommen Zusatzaufgaben dazu. */
+const AUFGABEN_SPIELRAUM = 120;      // Minuten, die eine Aufgabe mit fester Uhrzeit später beginnen darf
+
+// Fenster einer Aufgabe an einem Tag: [frühester Beginn, spätestens fertig]
+function aufgabenFenster(a, dauer, tagVon, tagBis){
+  if (a.zeitArt === "fest" && hatZeit(a.zeit)){
+    const von = minuten(a.zeit);
+    const fertig = hatZeit(a.fertig) ? minuten(a.fertig) : von < tagVon ? tagVon : von + dauer + AUFGABEN_SPIELRAUM;
+    return [von, Math.max(von + dauer, fertig)];
+  }
+  const von = a.zeitArt === "spanne" && hatZeit(a.fVon) ? minuten(a.fVon) : tagVon;
+  const bis = a.zeitArt === "spanne" && hatZeit(a.fBis) ? minuten(a.fBis) : tagBis;
+  return [von, Math.max(von + dauer, bis)];
+}
+
 function aufgabenAmTag(tag, tagVon, tagBis, vorgabe){
-  const fest = [], flex = [];
+  const SL = 15, liste = [];
   const kuerzer = vorgabe && vorgabe.faktor ? vorgabe.faktor : 1;
   WAREN.forEach(w => {
     const a0 = state.aufgaben[w.id];
     if (!a0.aktiv || !a0.tage.includes(tag)) return;
     const a = aufgabeAm(a0, tag);
     if (!hat(a.dauer) || !hat(a.personen)) return;
-    let dauer = nz(a.dauer) * 60;
-    if (kuerzer !== 1) dauer = Math.max(15, Math.round(dauer * kuerzer / 15) * 15);
+    let dauer = Math.max(SL, Math.round(nz(a.dauer) * 60 / SL) * SL);
+    if (kuerzer !== 1) dauer = Math.max(SL, Math.round(dauer * kuerzer / SL) * SL);
     const pers = Math.max(1, Math.round(nz(a.personen)));
-    const roh = {id:w.id, name:w.name, braucht:w.braucht, dauer, pers};
-    if (a.zeitArt === "fest" && hatZeit(a.zeit)){
-      const von = minuten(a.zeit);
-      fest.push(Object.assign(roh, {von, bis: von + dauer, flex:false}));
-    } else {
-      const fVon = (a.zeitArt === "spanne" && hatZeit(a.fVon)) ? minuten(a.fVon) : tagVon;
-      const fBis = (a.zeitArt === "spanne" && hatZeit(a.fBis)) ? minuten(a.fBis) : null;
-      flex.push(Object.assign(roh, {fVon, fBis, flex:true}));
-    }
+    const [frueh, spaet] = aufgabenFenster(a, dauer, tagVon, tagBis);
+    liste.push({id:w.id, name:w.name, braucht:w.braucht, dauer, pers, frueh, spaet,
+                flex: !(a.zeitArt === "fest" && hatZeit(a.zeit))});
   });
 
-
-  // Flexible Aufgaben dorthin legen, wo am wenigsten los ist. Früher kamen sie an den
-  // Tagesbeginn — genau auf die Lieferungen —, und morgens standen sieben Leute im
-  // Laden, nachmittags zwei. Jetzt wird für jede Aufgabe die Zeit gesucht, in der sie
-  // die wenigsten zusätzlichen Leute verlangt.
-  const SL = 30, last = {};
+  // Wie viele Personen eine Viertelstunde braucht: die Aufgaben, während der Öffnung
+  // dazu die Kasse — und nie weniger als die Mindestbesetzung
+  const last = {};
   const offen = m => m >= tagVon && m < tagBis;
   const bedarfBei = (m, extra) => {
     const auf = (last[m] || 0) + extra;
     return offen(m) ? Math.max(MIN_BESETZUNG, auf + 1) : auf;
   };
   const eintragen = a => { for (let m = a.von; m < a.bis; m += SL) last[m] = (last[m] || 0) + a.pers; };
-  fest.forEach(eintragen);
+  // Kosten einer Lage: jede zusätzliche Person zählt umso mehr, je mehr schon da sind —
+  // so verteilt sich die Arbeit, statt sich zu stapeln
+  const kosten = (a, st) => {
+    let k = 0;
+    for (let m = st; m < st + a.dauer; m += SL){ const v = bedarfBei(m, 0), n = bedarfBei(m, a.pers); k += n * n - v * v; }
+    return k;
+  };
 
-  // Lange und personalintensive Aufgaben zuerst, sie haben am wenigsten Spielraum
-  flex.sort((x,y) => (y.dauer * y.pers) - (x.dauer * x.pers));
-  flex.forEach(a => {
-    // „Uhrzeit egal" heißt: irgendwann während der Öffnung
-    const frueh = a.fBis === null ? Math.max(a.fVon, tagVon) : a.fVon;
-    const spaet = (a.fBis === null ? tagBis : a.fBis) - a.dauer;
-    let beste = frueh, besteKosten = Infinity;
-    for (let st = Math.ceil(frueh/SL)*SL; st <= spaet; st += SL){
-      let k = 0;
-      for (let m = st; m < st + a.dauer; m += SL) k += bedarfBei(m, a.pers) - bedarfBei(m, 0);
+  // Wer am wenigsten Spielraum hat, wird zuerst gelegt; bei Gleichstand die größere Aufgabe
+  const spiel = a => a.spaet - a.frueh - a.dauer;
+  liste.slice().sort((x, y) => spiel(x) - spiel(y) || (y.dauer * y.pers) - (x.dauer * x.pers)).forEach(a => {
+    let beste = a.frueh, besteKosten = Infinity;
+    for (let st = Math.ceil(a.frueh / SL) * SL; st + a.dauer <= a.spaet; st += SL){
+      const k = kosten(a, st);
       if (k < besteKosten - 0.001){ besteKosten = k; beste = st; }
     }
     a.von = beste; a.bis = beste + a.dauer;
@@ -1461,24 +1540,28 @@ function aufgabenAmTag(tag, tagVon, tagBis, vorgabe){
   // wenigsten Aufgaben liegen, bei Gleichstand eher später am Tag.
   const zusatz = ((vorgabe && vorgabe.zusatz && vorgabe.zusatz[tag]) || []).map(z => {
     let beste = tagVon, besteK = Infinity;
-    for (let st = Math.ceil(tagVon/SL)*SL; st + z.dauer <= tagBis; st += SL){
+    for (let st = Math.ceil(tagVon/30)*30; st + z.dauer <= tagBis; st += 30){
       let k = 0;
       for (let m = st; m < st + z.dauer; m += SL) k += last[m] || 0;
       if (k <= besteK){ besteK = k; beste = st; }
     }
     const a = {id:"zusatz", name:z.name, braucht:null, dauer:z.dauer, pers:z.pers,
-               von:beste, bis:beste + z.dauer, flex:true};
+               von:beste, bis:beste + z.dauer, frueh:tagVon, spaet:tagBis, flex:true};
     // Wie viele die Standardwoche zu diesen Zeiten im Haus hätte
     const vgl = vorgabe.basisPlan && vorgabe.basisPlan.tage.find(t => t.key === tag);
     if (vgl){
       a.basis = {};
-      for (let m = a.von; m < a.bis; m += SL) a.basis[m] = vgl.schichten.filter(s => s.von <= m && s.bis > m).length;
+      for (let m = a.von; m < a.bis; m += 30) a.basis[m] = vgl.schichten.filter(s => s.von <= m && s.bis > m).length;
     }
     return a;
   });
 
-  return fest.concat(flex, zusatz).sort((x,y) => x.von - y.von);
+  return liste.concat(zusatz).sort((x,y) => x.von - y.von || x.bis - y.bis);
 }
+
+// Läuft die Aufgabe in der halben Stunde ab m? (Aufgaben liegen im Viertelstundenraster,
+// geprüft wird die Besetzung je halbe Stunde.)
+const aufgabeLaeuft = (a, m) => a.von < m + 30 && a.bis > m;
 
 function auswertung(){
   const ms = state.mitarbeiter;
@@ -1639,8 +1722,8 @@ function baueWoche(montagISO, rnd, vorgabe){
     const auf = aufgabenAmTag(key, offenVon, offenBis, vorgabe);
     tag.aufgaben = auf;
     const vortagEnde = letztesEnde.slice();     // für die Ruhezeit, wenn Schichten wachsen
-    const tagVon = Math.min(offenVon, ...auf.map(a => a.von));
-    const tagBis = Math.max(offenBis, ...auf.map(a => a.bis));
+    const tagVon = Math.floor(Math.min(offenVon, ...auf.map(a => a.von)) / 30) * 30;
+    const tagBis = Math.ceil(Math.max(offenBis, ...auf.map(a => a.bis)) / 30) * 30;
 
     const belegt = [];
     const schichtenVon = i => belegt.filter(b => b.mi === i);
@@ -1685,7 +1768,7 @@ function baueWoche(montagISO, rnd, vorgabe){
       if (art === "aufgabe"){
         const frei = aufFlaeche(m);
         for (const a of auf){
-          if (a.von > m || a.bis <= m || !a.braucht) continue;
+          if (!aufgabeLaeuft(a, m) || !a.braucht) continue;
           if (frei.filter(b => kann(b.mi, a.braucht)).length < a.pers) return {art:"aufgabe:"+a.name, qual:a.braucht};
         }
         return null;
@@ -2110,8 +2193,8 @@ function tagesMaengel(plan, ti){
   const wechsel  = hatZeit(state.wechsel) ? minuten(state.wechsel) : Math.round((offenVon + offenBis)/2);
   const aussen   = state.allein ? 1 : MIN_BESETZUNG;
   const auf = t.aufgaben || [];
-  const tagVon = Math.min(offenVon, ...auf.map(a => a.von));
-  const tagBis = Math.max(offenBis, ...auf.map(a => a.bis));
+  const tagVon = Math.floor(Math.min(offenVon, ...auf.map(a => a.von)) / 30) * 30;
+  const tagBis = Math.ceil(Math.max(offenBis, ...auf.map(a => a.bis)) / 30) * 30;
   // Gespeicherte Pläne kennen die Leute beim Namen — wer inzwischen fehlt, zählt ohne Funktionen
   const wer    = s => (plan.namen ? ms.find(x => x.name === plan.namen[s.mi]) : ms[s.mi]) || {qual:[]};
   const kann   = (s,q) => !q || (wer(s).qual || []).includes(q);
@@ -2124,7 +2207,7 @@ function tagesMaengel(plan, ti){
     if (!da.some(s => fuehrt(s, m < wechsel ? "frueh" : "spaet"))) n++;
     if (drin && !fl.some(s => kann(s, "kasse"))) n++;
     for (const a of auf){
-      if (a.von > m || a.bis <= m) continue;
+      if (!aufgabeLaeuft(a, m)) continue;
       const br = (WAREN.find(w => w.id === a.id) || {}).braucht;
       if (br && fl.filter(s => kann(s, br)).length < a.pers){ n++; break; }
     }
@@ -2138,12 +2221,15 @@ function tagesMaengel(plan, ti){
 // brauchen. Eine Zusatzaufgabe (Woche mit Mehrbedarf) verlangt jemanden zusätzlich
 // zu denen, die die Standardwoche dort ohnehin hätte (basis) — sonst liefe sie bei
 // Leuten mit, die schon da sind, und es gäbe keine einzige Stunde mehr.
+/* Wie viele Personen eine halbe Stunde braucht.
+   Aufgaben, die in dieser halben Stunde nacheinander liegen (05:00–05:15, 05:15–05:30),
+   macht eine Person — gezählt wird deshalb je Viertelstunde, und die vollere zählt. */
 function personenBedarf(auf, m, drin, aussen){
-  let aufPers = 0;
-  auf.forEach(a => { if (a.id !== "zusatz" && a.von <= m && a.bis > m) aufPers += a.pers; });
+  const last = q => auf.reduce((n, a) => n + (a.id !== "zusatz" && a.von <= q && a.bis > q ? a.pers : 0), 0);
+  const aufPers = Math.max(last(m), last(m + 15));
   let n = drin ? Math.max(MIN_BESETZUNG, aufPers + 1) : Math.max(aussen, aufPers);
   auf.forEach(a => {
-    if (a.id !== "zusatz" || a.von > m || a.bis <= m) return;
+    if (a.id !== "zusatz" || !aufgabeLaeuft(a, m)) return;
     n = a.basis ? Math.max(n, (a.basis[m] || 0) + a.pers) : n + a.pers;
   });
   return n;
@@ -2390,9 +2476,11 @@ function nachrechnen(plan){
 
 // summe: wohin die Woche in Stunden soll — {bis} kürzen, {auf} auffüllen. Ohne
 // Angabe wird nur bei denen aufgefüllt, die unter ihrem Ziel liegen.
-function erzeugePlanRoh(montagISO, phase, summe, basisPlan){
+// nurNoetig: nichts auffüllen — nur, was Besetzung, Aufgaben, Standardwochen und Gesetz verlangen.
+function erzeugePlanRoh(montagISO, phase, summe, basisPlan, nurNoetig){
   const vorgabe = wochenVorgabe(montagDer(montagISO), phase);
   vorgabe.basisPlan = basisPlan || null;
+  vorgabe.nurNoetig = !!nurNoetig;
   let beste = null, besteGuete = Infinity;
   for (let n = 0; n < ENTWUERFE; n++){
     const entwurf = baueWoche(montagISO, n === 0 ? null : wuerfel(n * 2654435761), vorgabe);
@@ -2402,7 +2490,7 @@ function erzeugePlanRoh(montagISO, phase, summe, basisPlan){
   ausgleichen(beste);
   const ph = vorgabe.phase;
   if (ph.art === "sparen") sparenKuerzen(beste, summe ? summe.bis : 0);
-  else {
+  else if (!nurNoetig){
     // Die Stundenliste der Bereichsleitung ist die Obergrenze fürs Auffüllen
     const liste = (state.listen || {})[wochenSchluessel(beste.mo)];
     const vorgabeListe = liste ? TAGE.reduce((x,[k]) => x + nz(liste.stunden[k]), 0) : 0;
@@ -2418,9 +2506,9 @@ function erzeugePlanRoh(montagISO, phase, summe, basisPlan){
   return beste;
 }
 
-function erzeugePlan(montagISO, phase){
+function erzeugePlan(montagISO, phase, nurNoetig){
   const ph = phaseNormal(phase);
-  if (ph.art === "normal") return erzeugePlanRoh(montagISO, ph);
+  if (ph.art === "normal") return erzeugePlanRoh(montagISO, ph, undefined, undefined, nurNoetig);
   // In einer besonderen Woche zum Vergleich auch die normale rechnen — sonst weiß
   // niemand, was die Einstellung gebracht hat. Die Sparwoche braucht sie ohnehin:
   // „15 Stunden weniger“ heißt weniger als die Standardwoche.
@@ -2429,7 +2517,7 @@ function erzeugePlan(montagISO, phase){
   const summe = ph.art === "mehr" ? {auf: normal + Math.max(0, nz(ph.mehr))}
               : ph.sparArt === "stunden" ? {bis: normal - Math.max(0, nz(ph.stunden))}
               : {bis: 0};                                  // Prozent: so weit es geht
-  const plan = erzeugePlanRoh(montagISO, ph, summe, ph.art === "mehr" ? normalPlan : null);
+  const plan = erzeugePlanRoh(montagISO, ph, summe, ph.art === "mehr" ? normalPlan : null, nurNoetig);
   phasenMeldung(plan, ph, normal);
   return plan;
 }
@@ -2496,7 +2584,7 @@ function schichtWerkzeug(plan){
     const auf = plan.tage[ti].aufgaben || [];
     const offenVon = hatZeit(state.von) ? minuten(state.von) : 8*60;
     const offenBis = hatZeit(state.bis) ? minuten(state.bis) : 21*60;
-    return [Math.min(offenVon, ...auf.map(a => a.von)), Math.max(offenBis, ...auf.map(a => a.bis))];
+    return [Math.floor(Math.min(offenVon, ...auf.map(a => a.von)) / 30) * 30, Math.ceil(Math.max(offenBis, ...auf.map(a => a.bis)) / 30) * 30];
   };
   // Schichten, die man anfassen darf: keine Standardschicht, kein geteilter Tag
   const beweglich = (t, sch) => !(sch.rollen || []).includes("Standard")
@@ -2742,7 +2830,7 @@ const ueText = n => n === null || n === undefined ? ""
 /* Pläne speichern, laden, nach Änderung von Hand prüfen */
 
 // Plan für die Ablage in ein schlichtes Format bringen und zurück
-function planSpeichern(plan){
+function planKurz(plan){
   const kurz = {
     mo: isoVon(plan.mo),
     erstellt: new Date().toISOString(),
@@ -2754,11 +2842,18 @@ function planSpeichern(plan){
     tage: plan.tage.map(tg => ({
       key: tg.key, label: tg.label, datum: isoVon(tg.datum), feiertag: tg.feiertag,
       aufgaben: tg.aufgaben.map(a => Object.assign({id:a.id, name:a.name, von:a.von, bis:a.bis, pers:a.pers},
+                                                   a.frueh === undefined ? {} : {frueh:a.frueh, spaet:a.spaet},
                                                    a.basis ? {basis:a.basis} : {})),
       schichten: tg.schichten.map(s => ({mi:s.mi, von:s.von, bis:s.bis, pauseVon:s.pauseVon,
         pauseBis:s.pauseBis, pause:s.pause, arbeit:s.arbeit, rollen:s.rollen, mehrarbeit:s.mehrarbeit}))
     }))
   };
+  einteilungFestschreiben(kurz);            // wer welche Aufgabe macht
+  return kurz;
+}
+// Als gültigen Plan der Woche ablegen
+function planSpeichern(plan){
+  const kurz = planKurz(plan);
   state.plaene[wochenSchluessel(plan.mo)] = kurz;
   return kurz;
 }
@@ -3200,8 +3295,8 @@ function tagesRaster(tag){
   const offenVon = hatZeit(state.von) ? minuten(state.von) : 8*60;
   const offenBis = hatZeit(state.bis) ? minuten(state.bis) : 21*60;
   const auf = tag.aufgaben || [];
-  const tagVon = Math.min(offenVon, ...auf.map(a => a.von));
-  const tagBis = Math.max(offenBis, ...auf.map(a => a.bis));
+  const tagVon = Math.floor(Math.min(offenVon, ...auf.map(a => a.von)) / 30) * 30;
+  const tagBis = Math.ceil(Math.max(offenBis, ...auf.map(a => a.bis)) / 30) * 30;
   const punkte = [];
   for (let m = tagVon; m < tagBis; m += 30) punkte.push(m);
   return {offenVon, offenBis, tagVon, tagBis, punkte};
@@ -3333,7 +3428,7 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
       merke(luecke(da.filter(([k]) => fuehrt(k.i, q)).map(([, n]) => [1, v(n)]), 1, "f", ti, m), "fuehrung", "die Schichtführung");
       if (drin) merke(luecke(da.filter(([k]) => kann(k.i, "kasse")).map(([, n]) => [1, v(n)]), 1, "k", ti, m), "kasse", "die Kasse");
       tag.aufgaben.forEach((a, ai) => {
-        if (a.von > m || a.bis <= m || !a.braucht) return;
+        if (!aufgabeLaeuft(a, m) || !a.braucht) return;
         merke(luecke(da.filter(([k]) => kann(k.i, a.braucht)).map(([, n]) => [1, v(n)]), a.pers, "a" + ai, ti, m), "aufgabe", a.name);
       });
       merke(luecke(da.map(([, n]) => [1, v(n)]), personenBedarf(tag.aufgaben, m, drin, aussen), "n", ti, m), "anzahl", "die Mindestbesetzung");
@@ -3373,7 +3468,10 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
       if (!eigene.length) return;
       const ziel = vorgabe.ziel[i] || 0;
       const st = (vorgabe.start && vorgabe.start[i]) || 0;
-      const gewichtUnter = (sparen ? 0.5 : OPT.unterZiel) * (1 + Math.max(0, -st) / 8);
+      // Nur das Nötige: eine fehlende Vertragsstunde kostet weniger als eine geplante — es wird
+      // also nichts aufgefüllt, aber was nötig ist, bekommt zuerst, wer unter seinem Vertrag liegt
+      const gewichtUnter = vorgabe.nurNoetig ? Math.min(0.8, 0.3 * (1 + Math.max(0, -st) / 8))
+                         : (sparen ? 0.5 : OPT.unterZiel) * (1 + Math.max(0, -st) / 8);
       const gewichtUeber = OPT.ueberZiel * ueberGewicht(m) * (1 + Math.max(0, st) / 8);
       nb.push({name: `ziel${i}`, op: "=", rechts: ziel,
                terme: eigene.map(([k, n]) => [k.arbeit, v(n)]).concat([[-1, "o" + i], [1, "u" + i]])});
@@ -3478,12 +3576,13 @@ function rollenLegen(plan){
 
 /* Ein Plan aus dem Optimierer, im selben Format wie baueWoche. null, wenn HiGHS fehlt
    oder keine Lösung findet. */
-async function optimiereRoh(montagISO, phase, summe, basisPlan){
+async function optimiereRoh(montagISO, phase, summe, basisPlan, nurNoetig){
   const highs = await highsLaden();
   if (!highs) return null;
   const mo = montagDer(montagISO);
   const vorgabe = wochenVorgabe(mo, phase);
   vorgabe.basisPlan = basisPlan || null;
+  vorgabe.nurNoetig = !!nurNoetig;
   const modell = wochenModell(mo, vorgabe, "plan", summe);
   let erg;
   try { erg = loese(highs, modell); } catch(e){ return null; }
@@ -3534,22 +3633,25 @@ async function mindestStunden(montagISO, phase){
 /* Der Plan für die App: Optimierer und Planer rechnen beide; genommen wird der bessere
    nach derselben Gütezahl (Abweichung von den Zielen, unbesetzte Halbstunden, Zahl der
    Schichten). Dazu die Messlatte: Mindeststunden der Woche. */
-async function erzeugePlanBest(montagISO, phase, fortschritt){
+/* nurNoetig (seit 16.11.2026 der Weg der App): Der Plan enthält nur, was Besetzung, Aufgaben,
+   Standardwochen und Gesetz verlangen. Vertragsstunden füllt die Filialleitung danach im
+   Entwurf selbst auf (kern/19-planentwurf.js). */
+async function erzeugePlanBest(montagISO, phase, fortschritt, nurNoetig){
   const melde = t => { if (fortschritt) fortschritt(t); };
   melde("Planer rechnet …");
-  const planer = erzeugePlan(montagISO, phase);
+  const planer = erzeugePlan(montagISO, phase, nurNoetig);
   melde("Optimierer rechnet …");
   const ph = phaseNormal(phase);
   let opt = null;
   try {
-    if (ph.art === "normal") opt = await optimiereRoh(montagISO, ph);
+    if (ph.art === "normal") opt = await optimiereRoh(montagISO, ph, undefined, undefined, nurNoetig);
     else {
       const normal = await optimiereRoh(montagISO, {art: "normal"});
       if (normal){
         const n = planSummen(normal).bezahlt;
         const summe = ph.art === "mehr" ? {auf: n + Math.max(0, nz(ph.mehr))}
                     : ph.sparArt === "stunden" ? {bis: n - Math.max(0, nz(ph.stunden))} : {bis: 0};
-        opt = await optimiereRoh(montagISO, ph, summe, ph.art === "mehr" ? normal : null);
+        opt = await optimiereRoh(montagISO, ph, summe, ph.art === "mehr" ? normal : null, nurNoetig);
         if (opt) phasenMeldung(opt, ph, n);
       }
     }
@@ -3563,6 +3665,7 @@ async function erzeugePlanBest(montagISO, phase, fortschritt){
     const lo = planMaengel(opt), lp = planMaengel(planer);
     if (lo !== lp) return lo < lp;
     if (ph.art === "sparen") return planSummen(opt).bezahlt <= planSummen(planer).bezahlt + 0.01;
+    if (nurNoetig && Math.abs(planSummen(opt).bezahlt - planSummen(planer).bezahlt) > 0.01) return planSummen(opt).bezahlt < planSummen(planer).bezahlt;
     return guete(opt) <= guete(planer);
   };
   if (opt && besser()){ plan = opt; verfahren = "Optimierer"; }
@@ -3629,7 +3732,7 @@ function maengelGruende(plan, ti, m){
   if (!da.some(s => fuehrt(s, m < wechsel ? "frueh" : "spaet"))) raus.push(m < wechsel ? "Schichtführung früh" : "Schichtführung spät");
   if (drin && !fl.some(s => kann(s, "kasse"))) raus.push("Kasse");
   for (const a of t.aufgaben || []){
-    if (a.von > m || a.bis <= m) continue;
+    if (!aufgabeLaeuft(a, m)) continue;
     const br = (WAREN.find(w => w.id === a.id) || {}).braucht;
     if (br && fl.filter(s => kann(s, br)).length < a.pers){ raus.push(a.name || "Wochenaufgabe"); break; }
   }
@@ -4231,10 +4334,13 @@ function aenderungAnwenden(plan, a){
   const i = personIndex(a.name);
   if (i < 0) return false;
   const j = planPlatz(plan, i);
+  const bisher = tag.schichten.find(s => s.mi === j);
   tag.schichten = tag.schichten.filter(s => s.mi !== j);
   if (a.typ === "schicht"){
     if (!(a.bis > a.von)) return false;
-    const s = {mi: j, von: a.von, bis: a.bis, rollen: ["Vertretung"], mehrarbeit: false};
+    // a.rolle (z. B. „Vertragsstunden“ beim Auffüllen im Planentwurf): die Schicht behält, wofür sie da war
+    const rollen = a.rolle ? [...new Set([...((bisher && bisher.rollen) || []), a.rolle])] : ["Vertretung"];
+    const s = {mi: j, von: a.von, bis: a.bis, rollen, mehrarbeit: false};
     tag.schichten.push(s);
     schichtSetzen(plan, a.ti, s, a.von, a.bis);
     tag.schichten.sort((x, y) => x.von - y.von || x.mi - y.mi);
@@ -4547,6 +4653,7 @@ function entwurfUebernehmen(sl){
     .map(a => ({am: new Date().toISOString(), was: a.typ === "notiz" ? "Notiz" : a.text})));
   // Welche Art von Lösung gewählt wurde — nur die Art, nie die Personen (siehe wegeOrdnen)
   aktiv.forEach(a => { if (a.typ === "loesung") lernenMerken(a.art || wegArt(a.schritte)); else if (a.typ === "tage") lernenMerken("umplanen"); });
+  einteilungFestschreiben(neu);             // die Schichten haben sich geändert — neu festhalten, wer was macht
   state.plaene[sl] = neu;
   delete state.entwuerfe[sl];
   return neu;
@@ -4718,29 +4825,36 @@ function analyseEmpfehlungen(){
 // ==== kern/18-tagesanalyse.js ====
 /* Tagesanalyse: woher die Stunden eines Tages kommen.
 
-   Der Planer hält je Tag fest, welche Aufgaben wann wie viele Personen brauchen
-   (tag.aufgaben), und je Schicht, wofür sie gesetzt wurde (rollen). Daraus entsteht hier
-     · die Einteilung: wer in welcher Viertelstunde eine Aufgabe abdeckt, wer für Kasse
-       und Laden frei ist, wer Pause hat — nach denselben Regeln, mit denen der Planer
-       die Besetzung prüft (Können, Personenzahl, Kasse besetzt);
+   Der Planer legt je Tag fest, welche Aufgabe wann liegt (tag.aufgaben), und beim Speichern
+   des Plans, wer sie macht (aufgabe.wer). Daraus entsteht hier
+     · die Einteilung: wer in welcher Viertelstunde welche Aufgabe macht, wer für die Kasse
+       eingeplant ist, wer ohne feste Aufgabe im Laden steht, wer Pause hat — nach denselben
+       Regeln, mit denen der Planer die Besetzung prüft (Können, Personenzahl, Kasse besetzt);
      · die Begründung je Schicht: was fehlte, wenn es sie nicht gäbe. Das ist keine
        nachträgliche Deutung, sondern dieselbe Prüfung (maengelGruende) ohne die Schicht.
    Wer im Laden tatsächlich was macht, entscheidet die Filialleitung — die Einteilung
    zeigt, wie gerechnet wurde. */
 
 const TAETIGKEITEN = [
-  {id: "kasse",   name: "Kasse & Laden"},
+  {id: "kasse",   name: "Kasse"},
   {id: "ware",    name: "Ware"},
   {id: "bestell", name: "Bestellen"},
-  {id: "sonst",   name: "Weitere Aufgaben"}
+  {id: "sonst",   name: "Aufbau, Backen, Abend"},
+  {id: "laden",   name: "im Laden, ohne feste Aufgabe"}
 ];
 
-// Zu welcher Tätigkeit eine Wochenaufgabe zählt
+// Zu welcher Farbe eine Wochenaufgabe gehört
 function taetigkeitVon(aufgabe){
   const w = WAREN.find(x => x.id === aufgabe.id);
   if (w && w.gruppe === "bestellung") return "bestell";
-  if (w && (w.lieferung || w.braucht === "verraeumen")) return "ware";
-  return "sonst";                                   // Backen, Abendprogramm, MHD, Zusatzaufgaben
+  if (w && w.braucht === "verraeumen") return "ware";       // Lieferungen, Obst und Gemüse
+  return "sonst";                                            // Aufbau, Backen, Abendprogramm, MHD, Zusatzaufgaben
+}
+// Der Name einer Aufgabe, wie er in einen Balken passt
+function aufgabeKurz(aufgabe){
+  const w = WAREN.find(x => x.id === aufgabe.id);
+  if (!w) return aufgabe.name;
+  return w.gruppe === "bestellung" ? "Best. " + w.anzeige : (w.kurz || w.name).replace(/\s*\(.*\)$/, "");
 }
 
 // [m, m, …] im Raster `schritt` → [[von, bis], …]
@@ -4755,10 +4869,12 @@ function zuSpannen(punkte, schritt){
 const spanneText = ([von, bis]) => hhmm(von) + "–" + hhmm(bis);
 
 /* Die Einteilung eines Tages.
-   → {von, bis, offenVon, offenBis, reihen: [{name, m, schicht, segmente, stunden}],
-      zeitpunkte: [{m, da, noetig, je}], summen: {kasse, ware, bestell, sonst, pause},
-      spitze: {art: {n, m}},
-      aufgaben: [{name, art, von, bis, pers, wer, fehlt, nebenher: [{name, spannen}]}]} */
+   → {von, bis, offenVon, offenBis,
+      reihen: [{name, m, schicht, segmente: [{von, bis, art, aufgabe, kurz}], stunden}],
+      zeitpunkte: [{m, da, noetig, je}], summen: {kasse, laden, ware, bestell, sonst, pause},
+      kasse: [{name, von, bis}],
+      aufgaben: [{quelle, name, kurz, art, von, bis, frueh, spaet, pers, braucht, teile: [{name, von, bis}],
+                  wer, fehlt, nebenher: [{name, spannen}]}]} */
 function tagesEinteilung(plan, ti){
   const t = plan && plan.tage[ti];
   if (!t || t.feiertag) return null;
@@ -4772,11 +4888,13 @@ function tagesEinteilung(plan, ti){
   const aufgaben = (t.aufgaben || []).slice().sort((a, b) => (braucht(a) ? 0 : 1) - (braucht(b) ? 0 : 1) || a.von - b.von);
   const von = Math.min(r.tagVon, ...schichten.map(s => s.von)), bis = Math.max(r.tagBis, ...schichten.map(s => s.bis));
   const inPause = (s, m) => s.pauseVon !== null && s.pauseVon !== undefined && s.pauseVon <= m && s.pauseBis > m;
+  // Was beim Speichern des Plans festgehalten wurde, gilt zuerst
+  const festgelegt = (a, n, m) => (a.wer || []).some(x => x.name === nameVon(schichten[n]) && x.von <= m && x.bis > m);
 
-  const was = schichten.map(() => ({}));            // je Schicht: Viertelstunde → {art, aufgabe}
-  const besetzt = new Map(aufgaben.map(a => [a, {wer: new Set(), fehlt: [], nebenher: {}}]));
-  const zeitpunkte = [];
-  let vorher = new Map();                           // wer eine Aufgabe angefangen hat, bleibt dabei
+  const was = schichten.map(() => ({}));            // je Schicht: Viertelstunde → {art, ref}
+  const besetzt = new Map(aufgaben.map(a => [a, {fehlt: [], nebenher: {}}]));
+  const zeitpunkte = [], kasseTeile = [];
+  let vorher = new Map(), kassierer = null;         // wer etwas angefangen hat, bleibt dabei
   for (let m = von; m < bis; m += SL){
     const da = schichten.map((s, n) => n).filter(n => schichten[n].von <= m && schichten[n].bis > m);
     const frei = new Set();
@@ -4784,14 +4902,14 @@ function tagesEinteilung(plan, ti){
     const offen = m >= r.offenVon && m < r.offenBis;
     // Jede Aufgabe braucht so viele Plätze wie Personen. Vergeben wird so, dass möglichst
     // alle Plätze besetzt sind (wer nur eine Sache kann, bekommt sie zuerst) — und dann
-    // nach Vorliebe: wer schon dabei ist; wem der Planer die Aufgabe zugeschrieben hat;
-    // zuletzt, wer als Einziger kassieren könnte — die Kasse soll besetzt bleiben.
+    // nach Vorliebe: wie im Plan festgehalten; wer schon dabei ist; wem der Planer die
+    // Aufgabe zugeschrieben hat; zuletzt, wer als Einziger kassieren könnte.
     const jetzt = new Map();
     const kasse = [...frei].filter(n => kann(schichten[n], "kasse"));
     const plaetze = [];
     aufgaben.filter(a => a.von <= m && a.bis > m).forEach(a => {
       const schon = vorher.get(a) || [];
-      const rang = n => (schon.includes(n) ? 0 : 4) + ((schichten[n].rollen || []).includes(a.name) ? 0 : 2)
+      const rang = n => (festgelegt(a, n, m) ? 0 : 8) + (schon.includes(n) ? 0 : 4) + ((schichten[n].rollen || []).includes(a.name) ? 0 : 2)
                       + (offen && kasse.length <= 1 && kasse.includes(n) ? 1 : 0);
       const wahl = [...frei].filter(n => kann(schichten[n], braucht(a))).sort((x, y) => rang(x) - rang(y) || x - y);
       for (let k = 0; k < a.pers; k++) plaetze.push({a, wahl});
@@ -4810,8 +4928,7 @@ function tagesEinteilung(plan, ti){
     const offenePlaetze = plaetze.filter((pl, p) => !setze(p, new Set()));
     platzVon.forEach((p, n) => {
       const a = plaetze[p].a;
-      was[n][m] = {art: taetigkeitVon(a), aufgabe: a.name}; frei.delete(n);
-      besetzt.get(a).wer.add(nameVon(schichten[n])); jetzt.get(a).push(n);
+      was[n][m] = {art: taetigkeitVon(a), ref: a}; frei.delete(n); jetzt.get(a).push(n);
     });
     // Bleibt ein Platz offen, rechnet der Planer trotzdem nicht mit einem Mangel, solange
     // jemand mit dem Können im Laden ist — die Aufgabe läuft dann neben einer anderen her.
@@ -4822,30 +4939,64 @@ function tagesEinteilung(plan, ti){
       if (n === undefined) b.fehlt.push(m);
       else (b.nebenher[nameVon(schichten[n])] = b.nebenher[nameVon(schichten[n])] || []).push(m);
     });
-    frei.forEach(n => was[n][m] = {art: "kasse"});
+    // Die Kasse: während der Öffnung eine Person, die kassieren kann und keine Aufgabe hat —
+    // am liebsten dieselbe wie eben
+    let k = null;
+    if (offen){
+      const wahl = [...frei].filter(n => kann(schichten[n], "kasse"));
+      k = wahl.includes(kassierer) ? kassierer : wahl.sort((x, y) =>
+        ((schichten[x].rollen || []).includes("Kasse") ? 0 : 1) - ((schichten[y].rollen || []).includes("Kasse") ? 0 : 1) || schichten[y].bis - schichten[x].bis)[0];
+      if (k !== undefined && k !== null){ was[k][m] = {art: "kasse"}; frei.delete(k); kasseTeile.push([nameVon(schichten[k]), m]); } else k = null;
+    }
+    kassierer = k;
+    frei.forEach(n => was[n][m] = {art: "laden"});
     vorher = jetzt;
-    const je = {kasse: 0, ware: 0, bestell: 0, sonst: 0, pause: 0};
+    const je = {kasse: 0, laden: 0, ware: 0, bestell: 0, sonst: 0, pause: 0};
     da.forEach(n => je[was[n][m].art]++);
-    zeitpunkte.push({m, da: da.length, noetig: personenBedarf(t.aufgaben || [], m, offen, aussen), je});
+    zeitpunkte.push({m, da: da.length, noetig: personenBedarf(t.aufgaben || [], m - m % 30, offen, aussen), je});
   }
 
-  const summen = {kasse: 0, ware: 0, bestell: 0, sonst: 0, pause: 0};
+  const summen = {kasse: 0, laden: 0, ware: 0, bestell: 0, sonst: 0, pause: 0};
+  const teileVon = new Map(aufgaben.map(a => [a, []]));
   const reihen = schichten.map((s, n) => {
     const segmente = [];
     for (let m = s.von; m < s.bis; m += SL){
-      const w = was[n][m] || {art: "kasse"}, l = segmente[segmente.length - 1];
+      const w = was[n][m] || {art: "laden"}, l = segmente[segmente.length - 1];
       summen[w.art] += SL / 60;
-      if (l && l.art === w.art && l.aufgabe === (w.aufgabe || null) && l.bis === m) l.bis = m + SL;
-      else segmente.push({von: m, bis: m + SL, art: w.art, aufgabe: w.aufgabe || null});
+      if (l && l.art === w.art && l.ref === (w.ref || null) && l.bis === m) l.bis = m + SL;
+      else segmente.push({von: m, bis: m + SL, art: w.art, ref: w.ref || null});
     }
+    segmente.forEach(g => {
+      g.aufgabe = g.ref ? g.ref.name : null;
+      g.kurz = g.ref ? aufgabeKurz(g.ref) : g.art === "kasse" ? "Kasse" : g.art === "pause" ? "Pause" : "";
+      if (g.ref) teileVon.get(g.ref).push({name: nameVon(s), von: g.von, bis: g.bis});
+      delete g.ref;
+    });
     return {name: nameVon(s), m: wer(s), schicht: s, segmente, stunden: s.arbeit};
   });
-  const spitze = {};
-  TAETIGKEITEN.forEach(({id}) => { spitze[id] = zeitpunkte.reduce((b, z) => z.je[id] > b.n ? {n: z.je[id], m: z.m} : b, {n: 0, m: null}); });
-  return {von, bis, offenVon: r.offenVon, offenBis: r.offenBis, reihen, zeitpunkte, summen, spitze,
-    aufgaben: (t.aufgaben || []).slice().sort((a, b) => a.von - b.von).map(a => ({name: a.name, art: taetigkeitVon(a), von: a.von, bis: a.bis,
-      pers: a.pers, braucht: braucht(a), wer: [...besetzt.get(a).wer], fehlt: zuSpannen([...new Set(besetzt.get(a).fehlt)], SL),
-      nebenher: Object.keys(besetzt.get(a).nebenher).map(name => ({name, spannen: zuSpannen([...new Set(besetzt.get(a).nebenher[name])], SL)}))}))};
+  // Die Kasse als durchgehende Abschnitte je Person
+  const kasse = [];
+  kasseTeile.forEach(([name, m]) => { const l = kasse[kasse.length - 1]; if (l && l.name === name && l.bis === m) l.bis = m + SL; else kasse.push({name, von: m, bis: m + SL}); });
+  return {von, bis, offenVon: r.offenVon, offenBis: r.offenBis, reihen, zeitpunkte, summen, kasse,
+    aufgaben: (t.aufgaben || []).slice().sort((a, b) => a.von - b.von || a.bis - b.bis).map(a => {
+      const teile = teileVon.get(a).sort((x, y) => x.von - y.von);
+      return {quelle: a, name: a.name, kurz: aufgabeKurz(a), art: taetigkeitVon(a), von: a.von, bis: a.bis,
+        frueh: a.frueh === undefined ? a.von : a.frueh, spaet: a.spaet === undefined ? a.bis : a.spaet,
+        pers: a.pers, braucht: braucht(a), teile, wer: [...new Set(teile.map(x => x.name))],
+        fehlt: zuSpannen([...new Set(besetzt.get(a).fehlt)], SL),
+        nebenher: Object.keys(besetzt.get(a).nebenher).map(name => ({name, spannen: zuSpannen([...new Set(besetzt.get(a).nebenher[name])], SL)}))};
+    })};
+}
+
+/* Beim Speichern eines Plans festhalten, wer welche Aufgabe macht (aufgabe.wer).
+   Die Analyse zeigt danach genau das — auch wenn sich Personal oder Regeln später ändern. */
+function einteilungFestschreiben(kurz){
+  (kurz.tage || []).forEach((t, ti) => {
+    (t.aufgaben || []).forEach(a => delete a.wer);
+    const e = tagesEinteilung(kurz, ti);
+    if (e) e.aufgaben.forEach(a => { a.quelle.wer = a.teile; });
+  });
+  return kurz;
 }
 
 /* Warum es eine Schicht gibt: was an dem Tag fehlte, wenn sie wegfiele.
@@ -4865,7 +5016,8 @@ function schichtGrund(plan, ti, schicht){
     zwingend: zuSpannen([...zwingend], 30).map(kappen).reduce((s, [a, b]) => s + (b - a) / 60, 0),
     stunden: (schicht.bis - schicht.von) / 60,
     standard: (schicht.rollen || []).includes("Standard"),
-    vertretung: (schicht.rollen || []).includes("Vertretung")
+    vertretung: (schicht.rollen || []).includes("Vertretung"),
+    aufgefuellt: (schicht.rollen || []).includes("Vertragsstunden")
   };
 }
 
@@ -4876,6 +5028,7 @@ function schichtBegruendung(plan, ti, reihe, einteilung){
   const vorname = reihe.name.split(/\s+/)[0];
   if (g.standard) saetze.push(`Feste Standardwoche: Diese Zeit ist bei ${vorname} hinterlegt.`);
   if (g.vertretung) saetze.push("Springt ein — die Schicht kam durch eine Änderung am Plan dazu.");
+  if (g.aufgefuellt) saetze.push("Vertragsstunden: Diese Zeit hast du im Entwurf dazugenommen.");
   if (g.noetig.length) saetze.push("Ohne diese Schicht fehlte: " + g.noetig.map(n =>
     `${n.grund} (${n.spannen.map(spanneText).join(", ")})`).join("; ") + ".");
   const aufgaben = reihe.segmente.filter(s => s.aufgabe);
@@ -4895,8 +5048,8 @@ function schichtBegruendung(plan, ti, reihe, einteilung){
   if (koennen.size) saetze.push("Dafür nötig: " + [...koennen].map(q => q === "§" ? "Filialleitung (Schlüssel)"
     : (QUAL.find(x => x[0] === q) || [q, q])[1]).join(", ") + ".");
   const uebrig = g.stunden - g.zwingend;
-  if (!g.noetig.length && !g.standard && !g.vertretung)
-    saetze.push(`Für die Besetzung nicht zwingend — die ${h1(reihe.stunden)} h füllen Vertragsstunden auf oder gleichen das Stundenkonto aus.`);
+  if (!g.noetig.length && !g.standard && !g.vertretung && !g.aufgefuellt)
+    saetze.push(`Für sich allein nicht zwingend — in dieser Zeit könnten auch andere die Besetzung halten.`);
   else if (g.noetig.length && uebrig >= 1)
     saetze.push(`Nur mit dieser Schicht gedeckt sind ${h1(g.zwingend)} von ${h1(g.stunden)} h. In der übrigen Zeit könnten andere die Besetzung halten — sie füllt Vertragsstunden auf.`);
   return {grund: g, saetze};
@@ -4907,7 +5060,7 @@ function wochenEinteilung(plan){
   return plan.tage.map((t, ti) => {
     const e = tagesEinteilung(plan, ti);
     return {ti, key: t.key, label: t.label, datum: t.datum, feiertag: !!t.feiertag, summen: e ? e.summen : null,
-            arbeit: e ? e.summen.kasse + e.summen.ware + e.summen.bestell + e.summen.sonst : 0};
+            arbeit: e ? e.summen.kasse + e.summen.laden + e.summen.ware + e.summen.bestell + e.summen.sonst : 0};
   });
 }
 
@@ -5627,6 +5780,143 @@ function assistent(text, sl, kurz, eintrag){
     karten, fo.luecke ? ["Wer kann einspringen?"] : []);
 }
 
+// ==== kern/19-planentwurf.js ====
+/* Planentwurf: Ein neuer Plan ist erst ein Entwurf — gültig wird er mit „Plan freigeben“.
+
+   „Plan erstellen“ rechnet nur, was Besetzung, Aufgaben, Standardwochen und Gesetz
+   verlangen. Vertragsstunden, die danach noch fehlen, füllt der Planer nicht mehr von selbst
+   auf: Er schlägt vor, wo sie sinnvoll hinpassen, und begründet es mit dem, was im Plan
+   steht. Die Filialleitung übernimmt Vorschläge, trägt Zeiten von Hand ein oder lässt
+   Stunden offen (dann entstehen Minusstunden — sichtbar, nicht versteckt).
+
+   Abgelegt wird der Entwurf getrennt von den gültigen Plänen:
+     state.planEntwurf[woche] = {kurz, aenderungen, erstellt}
+   kurz ist der gerechnete Plan, aenderungen sind dieselben Bausteine wie in „Plan ändern“. */
+
+function planEntwurfAnlegen(plan){
+  const kurz = planKurz(plan), sl = wochenSchluessel(plan.mo);
+  state.planEntwurf = state.planEntwurf || {};
+  state.planEntwurf[sl] = {kurz, aenderungen: [], erstellt: kurz.erstellt};
+  return state.planEntwurf[sl];
+}
+const planEntwurfVon = sl => (state.planEntwurf || {})[sl] || null;
+
+/* Wem Vertragsstunden fehlen — und wo sie hinpassen.
+   → [{name, ist, soll, fehlt, konto, vorschlaege: [{ti, von, bis, gewinn, art, grund, text}]}]
+   Ein Vorschlag verlängert eine Schicht oder setzt eine an einem freien Tag. Bewertet wird
+   nur mit dem, was im Plan steht: läuft dort eine Aufgabe, die die Person kann; sind zu der
+   Zeit nur so viele im Laden wie mindestens nötig; ist es der Tag mit den wenigsten Stunden. */
+function auffuellVorschlaege(sl){
+  const pe = planEntwurfVon(sl);
+  if (!pe) return [];
+  const plan = entwurfAnwenden(pe.kurz, pe.aenderungen).plan;
+  const mo = montagDer(plan.mo), ms = state.mitarbeiter;
+  const start = ueberstundenZuBeginn(mo);
+  const aussen = state.allein ? 1 : MIN_BESETZUNG;
+  const tagStunden = plan.tage.map((t, ti) => t.feiertag ? Infinity : tagesStunden(plan, ti));
+  const wenigster = tagStunden.indexOf(Math.min(...tagStunden));
+  const raus = [];
+  ms.forEach((m, i) => {
+    const j = platzImPlan(plan, m.name);
+    const k = j < 0 ? null : kontoNach(plan, j);
+    if (!k) return;
+    const fehlt = viertel(k.soll - k.ist);
+    if (fehlt < 0.5) return;
+    const kann = q => !q || (m.qual || []).includes(q);
+    const kandidaten = [];
+    plan.tage.forEach((t, ti) => {
+      if (t.feiertag) return;
+      const r = tagesRaster(t);
+      const eigene = t.schichten.filter(s => s.mi === j);
+      const da = mm => t.schichten.filter(s => s.von <= mm && s.bis > mm).length;
+      // Was die zusätzliche Zeit bringt, je halbe Stunde
+      const werte = (von, bis, ausser) => {
+        let punkte = 0, aufgabe = {}, knapp = 0, n = 0;
+        for (let mm = von; mm < bis; mm += 30){
+          if (ausser && mm >= ausser.von && mm < ausser.bis) continue;       // die Zeit ist schon da
+          n++;
+          const drin = mm >= r.offenVon && mm < r.offenBis;
+          const hier = da(mm), noetig = personenBedarf(t.aufgaben || [], mm, drin, aussen);
+          // eine Aufgabe, bei der eine zweite Hand hilft — Bestellungen macht eine Person allein
+          const auf = (t.aufgaben || []).find(a => { const w = WAREN.find(x => x.id === a.id) || {};
+            return aufgabeLaeuft(a, mm) && w.gruppe !== "bestellung" && kann(w.braucht); });
+          if (hier > noetig) punkte -= 1.5 * (hier - noetig);                // dort sind schon mehr als nötig
+          if (auf){ punkte += 3; aufgabe[auf.name] = (aufgabe[auf.name] || 0) + 1; }
+          else if (drin && hier <= noetig){ punkte += 2; knapp++; }
+          else if (drin) punkte += 1;
+        }
+        return {punkte: n ? punkte / n : -9, aufgabe, knapp, n};
+      };
+      const melde = (von, bis, art, ausser) => {
+        const anw = (bis - von) / 60, arbeit = anw - pauseFuer(m, anw);
+        const gewinn = arbeit - (ausser ? ausser.arbeit : 0);
+        if (gewinn < 0.49 || gewinn > fehlt + 0.01) return;
+        const p = tagKopie(plan, ti);
+        if (!ausfallErlaubt(p, j, ti, von, bis, ausser ? p.tage[ti].schichten.find(s => s.mi === j) : undefined)) return;
+        const w = werte(von, bis, ausser);
+        kandidaten.push({ti, von, bis, art, gewinn, w, punkte: w.punkte + (ti === wenigster ? 0.5 : 0) + Math.min(gewinn, fehlt) / 20});
+      };
+      if (eigene.length === 1){
+        const s = eigene[0];
+        for (let d = 30; d <= 240; d += 30){
+          if (s.bis + d <= r.tagBis) melde(s.von, s.bis + d, "laenger", s);
+          if (s.von - d >= r.tagVon) melde(s.von - d, s.bis, "frueher", s);
+        }
+      } else if (!eigene.length && fehlt >= MINSCHICHT - 0.01){
+        for (let L = MINSCHICHT * 60; L <= REGELN.maxAnwesenheit * 60; L += 30)
+          for (let von = r.tagVon; von + L <= r.tagBis; von += 30) melde(von, von + L, "neu");
+      }
+    });
+    // Die besten drei — höchstens einer je Tag, damit Auswahl bleibt
+    const gewaehlt = [];
+    kandidaten.sort((a, b) => b.punkte - a.punkte || b.gewinn - a.gewinn).forEach(c => {
+      if (gewaehlt.length < 3 && !gewaehlt.some(x => x.ti === c.ti)) gewaehlt.push(c);
+    });
+    const vor = m.name.split(/\s+/)[0];
+    raus.push({name: m.name, ist: k.ist, soll: k.soll, fehlt, konto: start[i] || 0, vorschlaege: gewaehlt.map(c => {
+      const haupt = Object.keys(c.w.aufgabe).sort((a, b) => c.w.aufgabe[b] - c.w.aufgabe[a])[0];
+      const grund = haupt && c.w.aufgabe[haupt] * 2 >= c.w.n ? `zweite Hand bei „${haupt}“ — dort bleibt mehr Zeit für Sorgfalt`
+        : c.w.knapp * 2 >= c.w.n ? "in dieser Zeit sind nur so viele im Laden wie mindestens nötig — mehr Luft für Kasse und Kunden"
+        : c.ti === wenigster ? `${tagName(c.ti)} ist der Tag mit den wenigsten Stunden`
+        : haupt ? `teils zweite Hand bei „${haupt}“` : "ruhige Zeit — Raum für Liegengebliebenes";
+      const was = c.art === "neu" ? `${tagName(c.ti)} ${hhmm(c.von)}–${hhmm(c.bis)} zusätzlich`
+        : c.art === "laenger" ? `${tagName(c.ti)} länger: bis ${hhmm(c.bis)}` : `${tagName(c.ti)} früher: ab ${hhmm(c.von)}`;
+      return {ti: c.ti, von: c.von, bis: c.bis, art: c.art, gewinn: c.gewinn, grund, was,
+              text: `${vor} ${was} (+${h1(c.gewinn)} h)`};
+    })});
+  });
+  // Wer im Minus steht, zuerst — dort fehlen die Stunden am meisten
+  return raus.sort((a, b) => a.konto - b.konto || b.fehlt - a.fehlt);
+}
+
+// Einen Vorschlag in den Entwurf nehmen (ersetzt, was für die Person an dem Tag schon dazukam)
+function auffuellUebernehmen(sl, name, v){
+  const pe = planEntwurfVon(sl);
+  if (!pe) return;
+  pe.aenderungen = pe.aenderungen.filter(a => !(a.name === name && a.ti === v.ti && a.typ === "schicht"));
+  pe.aenderungen.push({id: aenderungsId(), aktiv: true, quelle: "auffuellen", typ: "schicht", name, ti: v.ti, von: v.von, bis: v.bis,
+    rolle: "Vertragsstunden", text: `${name} ${tagName(v.ti)} ${hhmm(v.von)}–${hhmm(v.bis)}`});
+}
+
+/* Freigabe: Der Entwurf wird der gültige Plan der Woche. Was im Entwurf als Ausfall
+   eingetragen wurde, landet wie in „Plan ändern“ in den Abwesenheiten. Der freigegebene
+   Plan ist die erste gültige Fassung — er trägt keine Spuren „nachträglich geändert“. */
+function planFreigeben(sl){
+  const pe = planEntwurfVon(sl);
+  if (!pe) return null;
+  const veraendert = pe.aenderungen.some(a => a.aktiv);
+  state.plaene[sl] = pe.kurz;
+  state.entwuerfe = state.entwuerfe || {};
+  state.entwuerfe[sl] = {basis: pe.kurz.erstellt, aenderungen: pe.aenderungen};
+  const neu = entwurfUebernehmen(sl);
+  delete neu.urfassung; delete neu.geaendert; delete neu.ausfaelle;
+  neu.geaendertVonHand = veraendert;
+  neu.erstellt = new Date().toISOString();
+  neu.freigegeben = neu.erstellt;
+  delete state.planEntwurf[sl];
+  return neu;
+}
+
 // ==== app/20-zustand.js ====
 /* Zustand der App und Einlesen alter Datenstände */
 
@@ -5662,7 +5952,7 @@ function neueAufgabe(w){
   // Jede Norma-Filiale hat alle Aufgaben; abschalten lässt sich eine nur, wenn ohne
   // sie geplant werden soll.
   const best = w.gruppe === "bestellung";
-  return {aktiv:true, tage:[], zeitArt: best ? "spanne" : "fest", zeit:"",
+  return {aktiv:true, tage:[], zeitArt: best ? "spanne" : "fest", zeit:"", fertig:"",
           fVon:"", fBis:"", dauer:"", personen: best ? "1" : "",
           jeTag:false, proTag:{}};
 }
@@ -5683,6 +5973,10 @@ function normalisiere(s){
   if (!s.listen) s.listen = {};
   if (!s.phasen) s.phasen = {};
   if (!s.ereignisse) s.ereignisse = [];
+  // Planentwürfe (seit 16.11.2026): was nie freigegeben wurde und zwei Wochen zurückliegt, entfällt
+  s.planEntwurf = s.planEntwurf || {};
+  { const grenze = wochenSchluessel(new Date(aktuellerMontag().getTime() - 14 * 864e5));
+    Object.keys(s.planEntwurf).forEach(sl => { if (sl < grenze) delete s.planEntwurf[sl]; }); }
   if (!s.land) s.land = "BW";        // bis 12.11.2026 gab es nur Baden-Württemberg
   // Vor dem 10.11.2026 gab es nur eine Stundenliste ohne Woche — sie wird zur
   // Liste der laufenden Woche, statt unsichtbar liegen zu bleiben
@@ -5710,6 +6004,7 @@ function normalisiere(s){
     // Kurz (13.11.2026) gab es „noch nicht festgelegt“ — jetzt ist jede Aufgabe aktiv,
     // bis sie jemand abschaltet
     if (a.offen){ delete a.offen; a.aktiv = true; }
+    if (a.fertig === undefined) a.fertig = "";       // „spätestens fertig bis“ (seit 16.11.2026)
     if (a.fVon === undefined) a.fVon = "";
     if (a.fBis === undefined) a.fBis = "";
     if (a.jeTag === undefined) a.jeTag = false;
@@ -6149,8 +6444,11 @@ function markierungen(){
   // Ab Donnerstag gehört der Plan der nächsten Woche gemacht
   const heute = new Date(), wt = (heute.getDay() + 6) % 7;
   const naechste = new Date(montagDer(null)); naechste.setDate(naechste.getDate() + 7);
-  if (!(state.plaene || {})[jetzt]) add("planen", "plan:" + jetzt, "anpassen", `Für KW ${kwVon(aktuellerMontag())} gibt es noch keinen Plan`);
-  else if (wt >= 3 && wt < 6 && !(state.plaene || {})[wochenSchluessel(naechste)])
+  // Ein Entwurf, der auf die Freigabe wartet, ist der nächste Schritt — nicht „kein Plan“
+  const entwuerfe = Object.keys(state.planEntwurf || {}).filter(sl => sl >= jetzt).sort();
+  entwuerfe.forEach(sl => add("planen", "entwurf:" + sl, "anpassen", `Der Entwurf für KW ${kwVon(montagAusSchluessel(sl))} wartet auf die Freigabe`));
+  if (!(state.plaene || {})[jetzt]){ if (!entwuerfe.includes(jetzt)) add("planen", "plan:" + jetzt, "anpassen", `Für KW ${kwVon(aktuellerMontag())} gibt es noch keinen Plan`); }
+  else if (wt >= 3 && wt < 6 && !(state.plaene || {})[wochenSchluessel(naechste)] && !entwuerfe.includes(wochenSchluessel(naechste)))
     add("planen", "plan:" + wochenSchluessel(naechste), "anpassen", `Für KW ${kwVon(naechste)} gibt es noch keinen Plan`);
   // Stundenliste: nur, wenn die Filiale überhaupt mit Listen arbeitet
   if (Object.keys(state.listen || {}).length && wt >= 3 && wt < 6 && !(state.listen || {})[wochenSchluessel(naechste)])
@@ -6220,6 +6518,7 @@ const REITER = [
 
 // Welcher Bereich ist gerade offen?
 function aktivesZiel(){
+  if (ansicht === "entwurf") return "planen";          // der Entwurf ist der zweite Schritt von „Plan erstellen“
   if (ansicht !== "bereich") return ansicht;
   if (schritt === PRUEFEN_SCHRITT) return "analyse";
   return (BEREICHE.find(b => b.schritt === schritt) || {}).id;
@@ -6239,7 +6538,8 @@ function geheZu(ziel, marke){
     // Fehlt der gezeigten Woche der Plan, ist sie gemeint — sonst die, die als Nächstes ansteht
     const offen = wocheDer(marke) || ((state.plaene || {})[wochenSchluessel(gezeigt)] ? wocheDer((markierungen().planen || [])[0]) : null);
     planWoche = isoVon(offen ? montagAusSchluessel(offen) : gezeigt);
-    ansicht = "planen";
+    // Wartet für die Woche ein Entwurf auf die Freigabe, geht es gleich dorthin
+    ansicht = marke && /^entwurf:/.test(marke.id) && planEntwurfVon(wochenSchluessel(montagDer(planWoche))) ? "entwurf" : "planen";
   } else if (ziel === "aendern"){
     // die Woche, um die es geht — sonst die gezeigte, sonst die nächste mit Plan
     const plaene = state.plaene || {}, jetzt = wochenSchluessel(aktuellerMontag());
@@ -6394,6 +6694,7 @@ function render(){
   if (ansicht === "anmeldung")        v.appendChild(anmeldung());
   else if (ansicht === "start")       v.appendChild(startseite());
   else if (ansicht === "planen")      v.appendChild(planenAnsicht());
+  else if (ansicht === "entwurf")     v.appendChild(planEntwurfAnsicht());
   else if (ansicht === "archiv")      v.appendChild(archivAnsicht());
   else if (ansicht === "sicherung")   v.appendChild(sicherungsAnsicht());
   else if (ansicht === "termine")     v.appendChild(termineAnsicht());
@@ -6752,8 +7053,10 @@ function warentage(){
     <div class="head"><span class="eyebrow">${stufe(2)}</span>
       <h1 style="margin-top:6px">Wochenaufgaben</h1>
       <p class="lede">Entscheidend ist die <b>Dauer</b> — die Uhrzeit kann fest sein, in einer
-      Spanne liegen oder offen bleiben. Was schwankt, bleibt leer und fließt nicht in die
-      Rechnung ein. Abschalten nur, wenn ohne die Aufgabe geplant werden soll. Ist eine
+      Spanne liegen oder offen bleiben. Eine feste Uhrzeit ist der <b>früheste Beginn</b>: Liegen
+      mehrere Aufgaben zur selben Zeit, legt der Planer sie nacheinander, damit eine Person sie
+      erledigen kann. Bis wann eine Aufgabe fertig sein muss, steht unter „spätestens fertig bis“.
+      Was schwankt, bleibt leer und fließt nicht in die Rechnung ein. Abschalten nur, wenn ohne die Aufgabe geplant werden soll. Ist eine
       Aufgabe nicht jeden Tag gleich, „an den Tagen unterschiedlich“ einschalten und jeden
       Tag einzeln einstellen.</p></div>
     <div id="tasks"></div>
@@ -6802,7 +7105,7 @@ function aufgabenKarte(w, p){
 
   // Ein Tag bekommt beim ersten Mal die allgemeinen Werte als Ausgangspunkt
   const tagAnlegen = k => {
-    if (!a.proTag[k]) a.proTag[k] = {zeitArt:a.zeitArt, zeit:a.zeit, fVon:a.fVon, fBis:a.fBis,
+    if (!a.proTag[k]) a.proTag[k] = {zeitArt:a.zeitArt, zeit:a.zeit, fertig:a.fertig || "", fVon:a.fVon, fBis:a.fBis,
                                       dauer:a.dauer, personen:a.personen};
   };
 
@@ -6834,9 +7137,12 @@ function aufgabenKarte(w, p){
     const zeiten = () => {
       zeitBox.innerHTML = "";
       if (z.zeitArt === "fest"){
-        const l = el(`<label class="f">Uhrzeit<input type="time" value="${esc(z.zeit)}"></label>`);
+        const l = el(`<label class="f">Uhrzeit (frühestens)<input type="time" value="${esc(z.zeit)}"></label>`);
         l.querySelector("input").oninput = e => { z.zeit = e.target.value; frisch(); };
-        zeitBox.appendChild(l);
+        // Ohne Angabe: vor der Öffnung bis zur Öffnung, sonst darf der Beginn bis zu zwei Stunden rutschen
+        const f = el(`<label class="f" title="Leer: vor der Ladenöffnung bis zur Öffnung, sonst darf die Aufgabe bis zu zwei Stunden später beginnen.">spätestens fertig bis<input type="time" value="${esc(z.fertig || "")}"></label>`);
+        f.querySelector("input").oninput = e => { z.fertig = e.target.value; frisch(); };
+        zeitBox.appendChild(l); zeitBox.appendChild(f);
       } else if (z.zeitArt === "spanne"){
         const l1 = el(`<label class="f">frühestens<input type="time" value="${esc(z.fVon)}"></label>`);
         const l2 = el(`<label class="f">${best ? "Frist (spätestens)" : "spätestens"}<input type="time" value="${esc(z.fBis)}"></label>`);
@@ -7559,29 +7865,34 @@ function pruefen(){
 }
 
 // ==== app/36-tagesanalyse.js ====
-/* Tagesanalyse in der Analyse: die Woche auf einen Blick, dann ein Tag im Einzelnen —
-   Besetzung im Zeitverlauf, je Person ein Balken nach Tätigkeit, darunter je Schicht,
-   warum es sie gibt. Gerechnet wird in kern/18-tagesanalyse.js. */
+/* Tagesanalyse in der Analyse: ein Tag des Plans, groß genug, um jede Aufgabe zu erkennen.
+
+   Zur Wahl stehen nur die zwei Pläne, mit denen gerade gearbeitet wird — der der laufenden
+   und der der nächsten Woche. Oben wählt man den Tag; gezeigt wird immer genau einer:
+     1. Aufgaben des Tages — je Aufgabe eine Zeile: wann sie liegt (und in welchem Fenster
+        sie liegen dürfte) und wer sie macht. Dazu die Kasse.
+     2. Wer wann was macht — je Person ein Balken, die Aufgaben stehen mit Namen darin.
+     3. Hinweise des Planers zu diesem Tag und, je Schicht, warum es sie gibt.
+   Gerechnet wird in kern/18-tagesanalyse.js. */
 
 let analyseWoche = null;   // Wochenschlüssel der betrachteten Woche
 let analyseTag = null;     // Tag (0 = Mo) der betrachteten Woche
 
-const taetigkeitName = id => id === "pause" ? "Pause" : (TAETIGKEITEN.find(x => x.id === id) || {name: id}).name;
-
 function tagesAnalyse(){
   const box = el(`<div class="tagesanalyse"></div>`);
   const plaene = state.plaene || {};
-  const wochen = Object.keys(plaene).sort();
-  if (!wochen.length){
-    box.appendChild(el(`<p class="empty">Noch kein Plan — die Tagesanalyse zeigt, woher die Stunden eines erstellten Plans kommen.</p>`));
+  const diese = wochenSchluessel(aktuellerMontag()), naechste = folgeSchluessel(diese);
+  const wahl = [[diese, "Diese Woche"], [naechste, "Nächste Woche"]].filter(([sl]) => plaene[sl]);
+  if (!wahl.length){
+    box.appendChild(el(`<p class="empty">Für diese und die nächste Woche gibt es noch keinen Plan — die Tagesanalyse zeigt,
+      welche Aufgabe wann von wem erledigt wird, sobald einer erstellt ist.</p>`));
     return box;
   }
-  const gezeigt = wochenSchluessel(zeigeWoche ? montagDer(zeigeWoche) : aktuellerMontag());
-  if (!analyseWoche || !plaene[analyseWoche]){ analyseWoche = plaene[gezeigt] ? gezeigt : wochen[wochen.length - 1]; analyseTag = null; }
+  if (!wahl.some(([sl]) => sl === analyseWoche)){ analyseWoche = wahl[0][0]; analyseTag = null; }
 
   const zeichnen = () => {
     box.innerHTML = "";
-    const plan = planLaden(plaene[analyseWoche]);
+    const kurz = plaene[analyseWoche], plan = planLaden(kurz);
     const woche = wochenEinteilung(plan);
     if (analyseTag === null || !woche[analyseTag] || woche[analyseTag].feiertag){
       // heute, wenn es die laufende Woche ist — sonst der erste offene Tag
@@ -7589,99 +7900,135 @@ function tagesAnalyse(){
       analyseTag = analyseWoche === wochenSchluessel(montagDer(null)) && woche[heute] && !woche[heute].feiertag
         ? heute : Math.max(0, woche.findIndex(w => !w.feiertag));
     }
+    const hinweis = m => `<div class="note ${m.art}"><span class="ic">${m.art === "bad" ? "×" : m.art === "ok" ? "✓" : "!"}</span><span>${esc(m.text)}</span></div>`;
+    // Hinweise des Planers: zum Tag, wenn sie mit ihm beginnen oder ihn nennen — sonst zur Woche
+    const tagVon = m => plan.tage.findIndex(t => m.text.startsWith(t.label + " ") || m.text.startsWith(t.label + ",") || m.text.startsWith(t.label + ":")
+      || m.text.includes(TAGNAMEN[t.key]));
+    // Über- und Minusstunden stehen nicht als alte Meldung da, sondern frisch aus dem Plan gerechnet
+    const meldungen = hinweiseOhneStunden(plan.meldungen || []);
+    const konten = state.mitarbeiter.map(m => ({name: m.name, k: kontoNach(kurz, platzImPlan(kurz, m.name))})).filter(x => x.k);
+    const abweichung = x => viertel(x.k.ist - x.k.soll);
 
-    // ---- Woche wählen, Legende ----
-    const kopf = el(`<div class="ta-kopf">
-      <label class="f wochenwahl">Woche<select>${wochen.map(sl => { const d = montagAusSchluessel(sl);
-        return `<option value="${sl}"${sl === analyseWoche ? " selected" : ""}>KW ${kwVon(d)} · ${deVon(d)}</option>`; }).join("")}</select></label>
-      <div class="ta-legende" aria-label="Farben der Tätigkeiten">${TAETIGKEITEN.map(t => `<span><i class="t-${t.id}"></i>${esc(t.name)}</span>`).join("")}
-        <span><i class="t-pause"></i>Pause</span></div></div>`);
-    kopf.querySelector("select").onchange = e => { analyseWoche = e.target.value; analyseTag = null; zeichnen(); };
+    // ---- Welcher Plan ----
+    const kopf = el(`<div class="ta-kopf"><div class="ta-wahl" role="group" aria-label="Plan wählen">${wahl.map(([sl, name]) =>
+      `<button class="ta-plan" type="button" data-sl="${sl}" aria-pressed="${sl === analyseWoche}"><b>${name}</b><span>KW ${kwVon(montagAusSchluessel(sl))}</span></button>`).join("")}</div>
+      <div class="ta-kennzahl"><span>Geplant <b>${h1(planSummen(plan).bezahlt)} h</b></span>${
+        kurz.berechnung && kurz.berechnung.mindest !== null && kurz.berechnung.mindest !== undefined
+          ? `<span>mindestens nötig <b>${h1(kurz.berechnung.mindest)} h</b></span>` : ""}</div></div>`);
+    kopf.querySelectorAll("[data-sl]").forEach(b => b.onclick = () => { analyseWoche = b.dataset.sl; analyseTag = null; zeichnen(); });
     box.appendChild(kopf);
+    const zurWoche = meldungen.filter(m => tagVon(m) < 0);
+    const unter = konten.filter(x => abweichung(x) <= -0.5), ueber = konten.filter(x => abweichung(x) >= 0.5);
+    const stundenZeile = (unter.length || ueber.length) ? `<div class="note info"><span class="ic">i</span><span><b>Vertragsstunden diese Woche:</b>
+      ${unter.length ? `darunter ${unter.map(x => `${esc(x.name.split(/\s+/)[0])} ${h1(-abweichung(x))} h`).join(", ")}` : ""}${unter.length && ueber.length ? " · " : ""}${
+        ueber.length ? `darüber ${ueber.map(x => `${esc(x.name.split(/\s+/)[0])} ${h1(abweichung(x))} h`).join(", ")}` : ""}.</span></div>` : "";
+    if (zurWoche.length || stundenZeile) box.appendChild(el(`<div class="ta-hinweise">${zurWoche.map(hinweis).join("")}${stundenZeile}</div>`));
 
-    // ---- Die Woche auf einen Blick: je Tag ein Balken aus den Stunden je Tätigkeit ----
+    // ---- Welcher Tag: sechs Reiter, je mit den Stunden des Tages ----
     const max = Math.max(1, ...woche.map(w => w.arbeit));
-    const liste = el(`<div class="ta-woche" role="group" aria-label="Tag wählen"></div>`);
+    const reiter = el(`<div class="ta-tage" role="tablist" aria-label="Tag wählen"></div>`);
     woche.forEach(w => {
       const d = w.datum, an = w.ti === analyseTag;
-      const z = el(`<button class="ta-tag" type="button" aria-pressed="${an}"${w.feiertag ? " disabled" : ""}>
-        <span class="ta-tagname"><b>${esc(w.label)}</b> ${d.getDate()}.${d.getMonth() + 1}.</span>
-        <span class="ta-stapel">${w.feiertag ? `<em>Feiertag</em>` : TAETIGKEITEN.filter(t => w.summen[t.id] > 0).map(t =>
+      const b = el(`<button class="ta-tag" type="button" role="tab" aria-selected="${an}"${w.feiertag ? " disabled" : ""}>
+        <b>${esc(w.label)}</b><span class="ta-datum">${d.getDate()}.${d.getMonth() + 1}.</span>
+        <span class="ta-stapel">${w.feiertag ? "" : TAETIGKEITEN.filter(t => w.summen[t.id] > 0).map(t =>
           `<i class="t-${t.id}" style="width:${(w.summen[t.id] / max * 100).toFixed(2)}%" title="${esc(t.name)}: ${h1(w.summen[t.id])} h"></i>`).join("")}</span>
-        <span class="ta-summe">${w.feiertag ? "" : h1(w.arbeit) + " h"}</span></button>`);
-      z.onclick = () => { analyseTag = w.ti; zeichnen(); };
-      liste.appendChild(z);
+        <span class="ta-summe">${w.feiertag ? "Feiertag" : h1(w.arbeit) + " h"}</span></button>`);
+      b.onclick = () => { analyseTag = w.ti; zeichnen(); };
+      reiter.appendChild(b);
     });
-    box.appendChild(liste);
+    box.appendChild(reiter);
 
     const e = tagesEinteilung(plan, analyseTag);
     if (!e){ box.appendChild(el(`<p class="empty">An diesem Tag ist die Filiale geschlossen.</p>`)); return; }
     const tag = plan.tage[analyseTag];
-    box.appendChild(el(`<h3 class="ta-titel">${esc(TAGNAMEN[tag.key])}, ${deVon(tag.datum)}
-      <span>${h1(woche[analyseTag].arbeit)} h Arbeit · ${new Set(e.reihen.map(r => r.name)).size} Personen</span></h3>`));
+    const vor = name => name.split(/\s+/)[0];
+    box.appendChild(el(`<div class="ta-tagkopf"><h3>${esc(TAGNAMEN[tag.key])}, ${deVon(tag.datum)}</h3>
+      <p>${h1(woche[analyseTag].arbeit)} h Arbeit · ${new Set(e.reihen.map(r => r.name)).size} Personen —
+        ${TAETIGKEITEN.filter(t => e.summen[t.id] > 0).map(t => `<span class="ta-teil"><i class="t-${t.id}"></i>${esc(t.name)} ${h1(e.summen[t.id])} h</span>`).join("")}
+        ${e.summen.pause > 0 ? `<span class="ta-teil"><i class="t-pause"></i>Pause ${h1(e.summen.pause)} h</span>` : ""}</p></div>`));
 
-    // ---- Summe je Tätigkeit ----
-    box.appendChild(el(`<div class="ta-summen">${TAETIGKEITEN.map(t => {
-      const sp = e.spitze[t.id];
-      return `<div class="ta-kachel"><span class="ta-kachelname"><i class="t-${t.id}"></i>${esc(t.name)}</span>
-        <b>${h1(e.summen[t.id])} h</b>
-        <span>${sp.n ? `bis zu ${sp.n} ${sp.n === 1 ? "Person" : "Personen"} gleichzeitig (${hhmm(sp.m)} Uhr)` : "an diesem Tag nicht geplant"}</span></div>`; }).join("")}</div>`));
-
-    // ---- Zeitleiste: oben die Besetzung, darunter je Person ein Balken ----
+    // ---- gemeinsame Zeitachse ----
     const dauer = e.bis - e.von;
     const x = m => ((m - e.von) / dauer * 100).toFixed(3) + "%";
     const w = (a, b) => ((b - a) / dauer * 100).toFixed(3) + "%";
-    const hoch = Math.max(1, ...e.zeitpunkte.map(z => Math.max(z.da, z.noetig)));
     const zu = (e.offenVon > e.von ? `<i class="ta-zu" style="left:0;width:${w(e.von, e.offenVon)}"></i>` : "")
              + (e.offenBis < e.bis ? `<i class="ta-zu" style="left:${x(e.offenBis)};width:${w(e.offenBis, e.bis)}"></i>` : "");
     const stunden = [];
     for (let m = Math.ceil(e.von / 60) * 60; m <= e.bis; m += 60) stunden.push(m);
     const raster = stunden.map(m => `<i class="ta-linie" style="left:${x(m)}"></i>`).join("");
-
-    const besetzung = `<div class="ta-reihe ta-besetzung"><span class="ta-name"><b>Im Laden</b><span>Linie = nötig</span></span>
-      <span class="ta-spur" role="img" aria-label="Besetzung im Tagesverlauf">${zu}${raster}<span class="ta-saeulen">${e.zeitpunkte.map(z =>
-        `<span class="ta-saeule" title="${hhmm(z.m)} Uhr · ${z.da} im Laden, mindestens nötig ${z.noetig}${
-          TAETIGKEITEN.concat([{id: "pause"}]).filter(t => z.je[t.id]).map(t => ` · ${taetigkeitName(t.id)} ${z.je[t.id]}`).join("")}">${
-          TAETIGKEITEN.concat([{id: "pause"}]).filter(t => z.je[t.id]).map(t =>
-            `<i class="t-${t.id}" style="height:${(z.je[t.id] / hoch * 100).toFixed(2)}%"></i>`).join("")}
-          <u style="bottom:${(z.noetig / hoch * 100).toFixed(2)}%"${z.da < z.noetig ? ' class="knapp"' : ""}></u></span>`).join("")}</span></span>
-      <span class="ta-zeit">bis zu ${Math.max(...e.zeitpunkte.map(z => z.da))}</span></div>`;
-
-    const reihen = e.reihen.map(r => {
-      const typ = !r.m ? "" : istAzubi(r.m) ? "Azubi" : r.m.typ.replace(/\s*\(.*\)$/, "");
-      return `<div class="ta-reihe"><span class="ta-name"><b>${esc(r.name.split(/\s+/)[0])}</b><span>${esc(typ)}</span></span>
-        <span class="ta-spur">${zu}${raster}${r.segmente.map(s =>
-          `<i class="ta-seg t-${s.art}" style="left:${x(s.von)};width:${w(s.von, s.bis)}" title="${esc(s.aufgabe || taetigkeitName(s.art))} · ${hhmm(s.von)}–${hhmm(s.bis)}"></i>`).join("")}</span>
-        <span class="ta-zeit">${hhmm(r.schicht.von)}–${hhmm(r.schicht.bis)}<span>${h1(r.stunden)} h</span></span></div>`; }).join("");
-
     const achse = `<div class="ta-reihe ta-achse"><span class="ta-name"></span><span class="ta-spur">${stunden.map(m =>
       `<span class="ta-uhr" style="left:${x(m)}">${m / 60}</span>`).join("")}</span><span class="ta-zeit"></span></div>`;
-    box.appendChild(el(`<div class="ta-leiste">${besetzung}${reihen}${achse}</div>`));
+    const balken = (klasse, von, bis, text, titel) =>
+      `<i class="ta-seg ${klasse}" style="left:${x(von)};width:${w(von, bis)}" title="${esc(titel)}"><span>${esc(text)}</span></i>`;
+
+    // ---- 1. Aufgaben des Tages ----
+    const kasseZeile = `<div class="ta-reihe"><span class="ta-name"><b>Kasse</b><span>während der Öffnung, 1 Person</span></span>
+      <span class="ta-spur">${zu}${raster}${e.kasse.map(k => balken("t-kasse", k.von, k.bis, vor(k.name), `Kasse · ${k.name} · ${hhmm(k.von)}–${hhmm(k.bis)}`)).join("")}</span>
+      <span class="ta-zeit">${hhmm(e.offenVon)}–${hhmm(e.offenBis)}</span></div>`;
+    const aufgabenZeilen = e.aufgaben.map(a => {
+      const fenster = a.spaet - a.frueh > a.bis - a.von;
+      const namen = a.wer.map(vor).join(", ") || (a.nebenher.length ? a.nebenher.map(n => vor(n.name)).join(", ") + " (nebenher)" : "niemand");
+      return `<div class="ta-reihe"><span class="ta-name"><b>${esc(a.name)}</b><span>${a.pers === 1 ? "1 Person" : a.pers + " Personen"}${
+          fenster ? ` · frühestens ${hhmm(a.frueh)}, fertig bis ${hhmm(a.spaet)}` : ""}</span></span>
+        <span class="ta-spur">${zu}${raster}${fenster ? `<i class="ta-fenster" style="left:${x(a.frueh)};width:${w(a.frueh, a.spaet)}" title="Fenster ${hhmm(a.frueh)}–${hhmm(a.spaet)}"></i>` : ""}${
+          balken("t-" + a.art + (a.fehlt.length ? " ta-fehlt" : ""), a.von, a.bis, namen, `${a.name} · ${hhmm(a.von)}–${hhmm(a.bis)} · ${namen}`)}</span>
+        <span class="ta-zeit">${hhmm(a.von)}–${hhmm(a.bis)}<span>${esc(namen)}</span></span></div>`; }).join("");
+    box.appendChild(el(`<section class="ta-block"><h3 class="ta-titel">Aufgaben des Tages
+      <span>Balken = geplante Zeit, gestrichelt = das Fenster, in dem die Aufgabe liegen darf</span></h3>
+      <div class="ta-leiste">${achse}${kasseZeile}${aufgabenZeilen || `<p class="hint">Für diesen Tag sind keine Wochenaufgaben eingetragen.</p>`}</div></section>`));
 
     // Was auffällt: Aufgaben, die neben einer anderen herlaufen — und solche, die niemand kann
-    const koennen = a => a.braucht ? `„${(QUAL.find(x => x[0] === a.braucht) || [, a.braucht])[1]}“` : "";
+    const koennen = a => a.braucht ? `„${(QUAL.find(q => q[0] === a.braucht) || [, a.braucht])[1]}“` : "";
     const nebenher = e.aufgaben.filter(a => a.nebenher.length);
     if (nebenher.length) box.appendChild(el(`<div class="note info"><span class="ic">i</span><span><b>Läuft nebenher:</b>
-      ${nebenher.map(a => `${esc(a.name)} (${a.nebenher.map(x => `${esc(x.name.split(/\s+/)[0])} ${x.spannen.map(spanneText).join(", ")}`).join("; ")})`).join(" · ")}.
-      Zu diesen Zeiten ist niemand mit dem nötigen Können frei — wer es kann, ist schon für eine andere Aufgabe eingeteilt.
-      Der Planer verlangt nur, dass jemand mit dem Können im Laden ist.</span></div>`));
+      ${nebenher.map(a => `${esc(a.name)} (${a.nebenher.map(n => `${esc(vor(n.name))} ${n.spannen.map(spanneText).join(", ")}`).join("; ")})`).join(" · ")}.
+      Zu diesen Zeiten ist niemand mit dem nötigen Können frei — wer es kann, ist schon für eine andere Aufgabe eingeteilt.</span></div>`));
     e.aufgaben.filter(a => a.fehlt.length).forEach(a => box.appendChild(el(`<div class="note warn"><span class="ic">!</span><span>
       <b>${esc(a.name)}, ${a.fehlt.map(spanneText).join(", ")}:</b> Niemand ${a.braucht ? `mit ${esc(koennen(a))} ` : ""}ist dafür im Laden
       — gebraucht ${a.pers === 1 ? "wird eine Person" : `werden ${a.pers} Personen`}.</span></div>`)));
 
-    // ---- Warum wer eingeplant ist ----
-    box.appendChild(el(`<h3 class="ta-titel">Warum wer eingeplant ist</h3>`));
+    // ---- 2. Wer wann was macht ----
+    const hoch = Math.max(1, ...e.zeitpunkte.map(z => Math.max(z.da, z.noetig)));
+    const arten = TAETIGKEITEN.concat([{id: "pause", name: "Pause"}]);
+    const besetzung = `<div class="ta-reihe ta-besetzung"><span class="ta-name"><b>Im Laden</b><span>Linie = mindestens nötig</span></span>
+      <span class="ta-spur" role="img" aria-label="Besetzung im Tagesverlauf">${zu}${raster}<span class="ta-saeulen">${e.zeitpunkte.map(z =>
+        `<span class="ta-saeule" title="${hhmm(z.m)} Uhr · ${z.da} im Laden, mindestens nötig ${z.noetig}${
+          arten.filter(t => z.je[t.id]).map(t => ` · ${t.name} ${z.je[t.id]}`).join("")}">${
+          arten.filter(t => z.je[t.id]).map(t => `<i class="t-${t.id}" style="height:${(z.je[t.id] / hoch * 100).toFixed(2)}%"></i>`).join("")}
+          <u style="bottom:${(z.noetig / hoch * 100).toFixed(2)}%"${z.da < z.noetig ? ' class="knapp"' : ""}></u></span>`).join("")}</span></span>
+      <span class="ta-zeit">bis zu ${Math.max(...e.zeitpunkte.map(z => z.da))}</span></div>`;
+    const personen = e.reihen.map(r => {
+      const typ = !r.m ? "" : istAzubi(r.m) ? "Azubi" : r.m.typ.replace(/\s*\(.*\)$/, "");
+      return `<div class="ta-reihe"><span class="ta-name"><b>${esc(vor(r.name))}</b><span>${esc(typ)}</span></span>
+        <span class="ta-spur">${zu}${raster}${r.segmente.map(s => balken("t-" + s.art, s.von, s.bis, s.kurz,
+          `${s.aufgabe || (s.art === "kasse" ? "Kasse" : s.art === "pause" ? "Pause" : "im Laden, ohne feste Aufgabe")} · ${hhmm(s.von)}–${hhmm(s.bis)}`)).join("")}</span>
+        <span class="ta-zeit">${hhmm(r.schicht.von)}–${hhmm(r.schicht.bis)}<span>${h1(r.stunden)} h</span></span></div>`; }).join("");
+    box.appendChild(el(`<section class="ta-block"><h3 class="ta-titel">Wer wann was macht
+      <span>grau = im Laden ohne feste Aufgabe, schraffiert = Pause</span></h3>
+      <div class="ta-leiste">${achse}${besetzung}${personen}</div></section>`));
+
+    // ---- 3. Hinweise des Planers zu diesem Tag ----
+    const zumTag = meldungen.filter(m => tagVon(m) === analyseTag);
+    const allgemein = zumTag.filter(m => !e.reihen.some(r => m.text.includes(r.name)));
+    if (allgemein.length) box.appendChild(el(`<section class="ta-block"><h3 class="ta-titel">Hinweise zu diesem Tag</h3>
+      <div class="ta-hinweise">${allgemein.map(hinweis).join("")}</div></section>`));
+
+    // ---- 4. Warum wer eingeplant ist ----
     const gruende = el(`<div class="ta-gruende"></div>`);
     e.reihen.forEach(r => {
       const b = schichtBegruendung(plan, analyseTag, r, e);
+      const eigene = zumTag.filter(m => m.text.includes(r.name));
+      const woche = konten.find(x => x.name === r.name);
       gruende.appendChild(el(`<div class="ta-grund"><div class="ta-grundkopf"><b>${esc(r.name)}</b>
-        <span>${hhmm(r.schicht.von)}–${hhmm(r.schicht.bis)} · ${h1(r.stunden)} h</span></div>
-        ${b.saetze.map(s => `<p>${esc(s)}</p>`).join("")}</div>`));
+        <span>${hhmm(r.schicht.von)}–${hhmm(r.schicht.bis)} · ${h1(r.stunden)} h${woche ? ` · Woche ${h1(woche.k.ist)} von ${h1(woche.k.soll)} h` : ""}</span></div>
+        ${b.saetze.map(s => `<p>${esc(s)}</p>`).join("")}${eigene.map(hinweis).join("")}</div>`));
     });
-    box.appendChild(gruende);
-    box.appendChild(el(`<p class="hint">Die Farben zeigen, wie der Planer die Besetzung rechnet: wer eine Aufgabe abdecken kann und dafür da ist.
-      „Kasse & Laden“ ist die Zeit ohne feste Aufgabe — Kasse, Kunden, Fläche. Wer im Laden tatsächlich was macht, entscheidest du.
-      „Ohne diese Schicht fehlte …“ ist dieselbe Prüfung wie beim Planen, nur ohne die Schicht.</p>`));
+    const block = el(`<section class="ta-block"><h3 class="ta-titel">Warum wer eingeplant ist</h3></section>`);
+    block.appendChild(gruende);
+    block.appendChild(el(`<p class="hint">„Ohne diese Schicht fehlte …“ ist dieselbe Prüfung wie beim Planen, nur ohne die Schicht.
+      Wer im Laden tatsächlich was macht, entscheidest du — die Zeitleisten zeigen, wie der Planer rechnet.</p>`));
+    box.appendChild(block);
   };
   zeichnen();
   return box;
@@ -7861,7 +8208,8 @@ function urfassungZellen(kurz){
   return raus;
 }
 
-// Nach „Übernehmen“ in „Plan ändern“: einmal oben sagen, dass der Plan jetzt gilt (Woche)
+// Nach „Übernehmen“ in „Plan ändern“ oder „Plan freigeben“: einmal oben sagen, dass der Plan
+// jetzt gilt — {sl, text}
 let startHinweis = null;
 
 /* ---- Was in der gezeigten Woche Besonderes ist — Auskunft, keine Aufgabe ----
@@ -8020,26 +8368,8 @@ function planKarte(mo, pdfIstHaupt){
   if (plan){
     const geaendert = urfassungZellen(gespeichert);
     inhalt.appendChild(planAnzeige(plan, {klickbar: true, zellen: geaendert}));
-    const s = planSummen(plan);
     if (Object.keys(geaendert).length) inhalt.appendChild(el(`<div class="legende"><span><i class="geaendert"></i> nach dem Erstellen geändert
       — darunter klein die ursprüngliche Zeit</span></div>`));
-    // Die Messlatte: wie viele Stunden die Woche mindestens bräuchte
-    const b = plan.berechnung;
-    if (b && b.mindest !== null && b.mindest !== undefined){
-      const mehr = s.bezahlt - b.mindest;
-      inhalt.appendChild(el(`<div class="messlatte"><span class="eyebrow">Messlatte</span>
-        <span>Geplant <b>${h1(s.bezahlt)} h</b> · mindestens nötig wären <b>${h1(b.mindest)} h</b> — für Gesetz, Besetzung, Aufgaben und
-        Standardwochen. ${mehr > 0.25 ? `Die ${h1(mehr)} h darüber füllen Vertragsstunden auf und gleichen
-        Konten aus.` : "Der Plan liegt genau darauf."}</span></div>`));
-    }
-    const hinweise = hinweiseOhneStunden(plan.meldungen);
-    if (hinweise.length){
-      const d = el(`<details class="aufklapp"><summary>${hinweise.length} Hinweise zum Plan</summary><div></div></details>`);
-      const box = d.querySelector("div");
-      hinweise.forEach(m => box.appendChild(
-        el(`<div class="note ${m.art}"><span class="ic">${m.art === "bad" ? "×" : m.art === "ok" ? "✓" : "!"}</span><span>${esc(m.text)}</span></div>`)));
-      inhalt.appendChild(d);
-    }
     // Drucken, in die Gruppe schicken, aushängen — in der App über „Teilen“
     const pdf = el(`<button class="btn small${pdfIstHaupt ? " haupt" : ""}" type="button">${inApp ? "PDF teilen oder drucken" : "PDF zum Aushängen"}</button>`);
     pdf.onclick = () => planPDF(planLaden(gespeichert));
@@ -8091,11 +8421,11 @@ function startseite(o){
   </div>`);
 
   if (startHinweis){
-    const n = el(`<div class="note ok"><span class="ic">✓</span><span>Der geänderte Plan ist jetzt der gültige.
-      Damit alle ihn haben: neu ausdrucken und in die Gruppe schicken.
+    const h = typeof startHinweis === "string" ? {sl: startHinweis} : startHinweis;
+    startHinweis = null;
+    const n = el(`<div class="note ok"><span class="ic">✓</span><span>${esc(h.text || "Der geänderte Plan ist jetzt der gültige. Damit alle ihn haben: neu ausdrucken und in die Gruppe schicken.")}
       <span class="knopfreihe"><button class="btn small" type="button">${inApp ? "PDF teilen oder drucken" : "PDF zum Aushängen"}</button></span></span></div>`);
-    const woche = startHinweis; startHinweis = null;
-    n.querySelector("button").onclick = () => planPDF(planLaden(state.plaene[woche]));
+    n.querySelector("button").onclick = () => planPDF(planLaden(state.plaene[h.sl]));
     p.appendChild(n);
   }
   const warnung = archivHinweis();
@@ -8137,8 +8467,10 @@ function planenAnsicht(){
       <span class="eyebrow">Arbeitsplan</span>
       <h1 style="margin-top:4px" id="kopf">KW ${kwVon(mo)} · ${deVon(mo)} – ${deVon(new Date(mo.getTime()+5*864e5))}</h1>
       <p class="lede">Erst die Woche wählen, dann eintragen, wer ausfällt oder nur zu
-      bestimmten Zeiten kann. Daraus und aus den hinterlegten Angaben entsteht der Plan.</p>
+      bestimmten Zeiten kann. Daraus entsteht ein <b>Entwurf</b> mit dem, was Besetzung und Aufgaben
+      brauchen. Vertragsstunden füllst du danach im Entwurf auf — gültig wird der Plan erst mit „Plan freigeben“.</p>
     </div>
+    <div id="entwurfDa"></div>
     <div class="grid g3" style="margin-bottom:16px">
       <label class="f">Kalenderwoche<select id="kw">${wahl.map(w =>
         `<option value="${w.iso}"${w.iso === planWoche ? " selected" : ""}>${w.text}</option>`).join("")}</select></label>
@@ -8159,7 +8491,7 @@ function planenAnsicht(){
     <div class="actions">
       <button class="btn ghost" id="zurueck">Zurück</button>
       <div class="spacer"></div>
-      <button class="btn haupt" id="erzeugen">Plan erzeugen</button>
+      <button class="btn haupt" id="erzeugen">Entwurf erstellen</button>
     </div>
   </div>`);
 
@@ -8337,16 +8669,16 @@ function planenAnsicht(){
       }
     }
     if (!state.mitarbeiter.length){ alert("Ohne Personal lässt sich kein Plan erzeugen."); return; }
-    const da = state.plaene[sl];
     if (ph.art === "sparen" && ph.sparArt === "stunden" && !(nz(ph.stunden) > 0)){
       alert("Bitte eintragen, wie viele Stunden in der Woche eingespart werden sollen."); return;
     }
     if (ph.art === "mehr" && !(nz(ph.mehr) > 0)){
       alert("Bitte eintragen, wie viele Stunden zusätzlich gebraucht werden."); return;
     }
-    if (da && !confirm(da.geaendertVonHand || da.notizen
-        ? `Für KW ${kwVon(mo)} gibt es schon einen Plan mit Änderungen von Hand. Neu erzeugen und die Änderungen verwerfen?`
-        : `Für KW ${kwVon(mo)} gibt es schon einen Plan. Neu erzeugen?`)) return;
+    // Ein gültiger Plan der Woche bleibt gültig, bis der neue Entwurf freigegeben ist. Nur ein
+    // schon begonnener Entwurf ginge verloren — danach wird gefragt.
+    const alt = planEntwurfVon(sl);
+    if (alt && alt.aenderungen.some(a => a.aktiv) && !confirm(`Für KW ${kwVon(mo)} gibt es schon einen Entwurf mit eigenen Änderungen. Neu rechnen und die Änderungen verwerfen?`)) return;
     // Rechnen dauert ein paar Sekunden — so lange zeigen, was passiert
     const schleier = el(`<div class="rechnet"><div class="rechnet-k"><div class="kreisel"></div>
       <b>Plan wird berechnet</b><span id="rechnetText">Planer rechnet …</span>
@@ -8355,13 +8687,19 @@ function planenAnsicht(){
     const atmen = () => new Promise(ok => setTimeout(ok, 40));
     await atmen();
     try {
-      planEntwurf = await erzeugePlanBest(isoVon(mo), ph, async t => { schleier.querySelector("#rechnetText").textContent = t; });
+      planEntwurf = await erzeugePlanBest(isoVon(mo), ph, async t => { schleier.querySelector("#rechnetText").textContent = t; }, true);
     } finally { schleier.remove(); }
-    planSpeichern(planEntwurf);
+    planEntwurfAnlegen(planEntwurf);
     await speichere();
-    zeigeWoche = planWoche;
-    ansicht = "start"; render();
+    ansicht = "entwurf"; render();
   };
+  // Liegt für die Woche schon ein Entwurf, führt der kürzeste Weg dorthin zurück
+  if (planEntwurfVon(sl)){
+    const n = el(`<div class="note info" style="margin-bottom:14px"><span class="ic">i</span><span>Für KW ${kwVon(mo)} liegt ein Entwurf, der noch nicht freigegeben ist.
+      <span class="knopfreihe"><button class="btn small" type="button">Entwurf öffnen</button></span></span></div>`);
+    n.querySelector("button").onclick = () => { ansicht = "entwurf"; render(); };
+    p.querySelector("#entwurfDa").appendChild(n);
+  }
   return p;
 }
 
@@ -8975,6 +9313,126 @@ async function testfassungVerlassen(){
   await appRuf("kanal", {setzen: "stabil"});
 }
 
+// ==== app/44-planentwurf.js ====
+/* Planentwurf: der zweite Schritt von „Plan erstellen“.
+
+   Oben, was noch nicht passt. Dann je Person, wie viele Vertragsstunden noch fehlen, mit
+   Vorschlägen, wo sie hinpassen. Darunter der Entwurf im Filialformular über die ganze
+   Breite — Zelle antippen ändert von Hand. Erst „Plan freigeben“ macht den Entwurf zum gültigen Plan; bis dahin gilt
+   für die Woche weiter, was vorher galt. */
+
+function planEntwurfAnsicht(){
+  const mo = montagDer(planWoche || isoVon(aktuellerMontag()));
+  const sl = wochenSchluessel(mo);
+  const pe = planEntwurfVon(sl);
+  if (!pe){ ansicht = "planen"; return planenAnsicht(); }
+  const pr = entwurfPruefen(sl, pe.kurz, pe);
+  const plan = planLaden(pr.plan);
+  const bis = new Date(mo.getTime() + 5 * 864e5);
+  const neuZeichnen = () => { const y = window.scrollY; sichern(); render(); window.scrollTo(0, y); };
+  const fehlend = auffuellVorschlaege(sl);
+  const offenStunden = fehlend.reduce((s, x) => s + x.fehlt, 0);
+  const gueltig = (state.plaene || {})[sl];
+
+  const p = el(`<div class="panel aendern planentwurf"></div>`);
+  const kopf = seitenKopf({eyebrow: "Plan erstellen · Entwurf", titel: `KW ${kwVon(mo)} · ${deVon(mo)} – ${deVon(bis)}`, zurueck: "planen",
+    lede: `Der Entwurf enthält nur, was Besetzung, Aufgaben und Standardwochen brauchen. Darunter steht, wem Vertragsstunden
+      fehlen und wo sie hinpassen — übernimm Vorschläge, ändere Zellen von Hand oder lass Stunden offen.
+      ${gueltig ? "Bis zur Freigabe gilt für diese Woche der bisherige Plan." : "Gültig wird der Plan erst mit „Plan freigeben“."}`});
+  p.appendChild(kopf);
+
+  const offenN = pr.offen.length;
+  const status = el(`<div class="aendern-status">
+    <span class="pille">${h1(planSummen(plan).bezahlt)} h geplant</span>
+    <span class="pille ${offenN ? "rot" : "gruen"}">${offenN ? `${offenN} noch zu tun` : "Besetzung passt"}</span>
+    <span class="pille">${offenStunden > 0.01 ? `${h1(offenStunden)} h Vertragsstunden offen` : "Vertragsstunden verteilt"}</span>
+    <div class="spacer"></div>
+    <button class="btn ghost small" id="peVerwerfen" type="button">Entwurf verwerfen</button>
+    <button class="btn haupt" id="peFreigeben" type="button">Plan freigeben</button></div>`);
+  p.appendChild(status);
+
+  // Reihenfolge: zu tun → Vertragsstunden → Entwurf. Der Plan braucht die ganze Breite.
+  const oben = el(`<div class="aendern-oben"></div>`), haupt = el(`<div class="aendern-oben"></div>`);
+  p.appendChild(oben); p.appendChild(haupt);
+
+  // ---- Noch zu tun ----
+  if (pr.offen.length){
+    const k = el(`<section class="karte rot"><h3>Noch zu tun</h3><div></div></section>`);
+    pr.offen.forEach(o => {
+      const z = el(`<div class="todo"><span>${esc(o.text)}</span></div>`);
+      if (o.art === "passtNicht"){
+        const b = el(`<button class="btn ghost small" type="button">Herausnehmen</button>`);
+        b.onclick = () => { pe.aenderungen = pe.aenderungen.filter(a => a.id !== o.id); neuZeichnen(); };
+        z.appendChild(b);
+      }
+      k.querySelector("div").appendChild(z);
+    });
+    oben.appendChild(k);
+  }
+
+  // ---- Der Entwurf ----
+  const planKarte = el(`<section class="karte entwurf"><div class="karte-kopf"><h3>Entwurf</h3>
+    <div class="legende"><span><i class="neu"></i> von dir dazugenommen oder geändert — die gerechnete Zeit klein darunter</span>
+    <span><i class="rot"></i> passt so nicht</span></div></div></section>`);
+  planKarte.appendChild(planAnzeige(plan, {notizImmer: true, zellen: pr.zellen, luecken: pr.luecken,
+    zelleKlick: (i, ti) => zelleBearbeiten(sl, pe, i, ti, pr.plan, neuZeichnen),
+    notizKlick: ti => notizBearbeiten(pe, ti, pr.plan, neuZeichnen)}));
+  haupt.appendChild(planKarte);
+  // Was der Planer zum gerechneten Plan anmerkt (Lücken, die niemand füllen kann, Stundenliste …)
+  const wichtig = (pe.kurz.meldungen || []).filter(m => m.art === "bad");
+  if (wichtig.length) haupt.appendChild(el(`<div class="ta-hinweise">${wichtig.map(m =>
+    `<div class="note bad"><span class="ic">×</span><span>${esc(m.text)}</span></div>`).join("")}</div>`));
+
+  // ---- Vertragsstunden ----
+  const vk = el(`<section class="karte"><h3>${symbol("uhr")} Vertragsstunden</h3><div class="pe-liste"></div></section>`);
+  const liste = vk.querySelector(".pe-liste");
+  if (!fehlend.length) liste.appendChild(el(`<p class="zt-leer">${symbol("haken")}<span>Alle haben ihre Vertragsstunden — oder mehr.</span></p>`));
+  fehlend.forEach(x => {
+    const box = el(`<div class="pe-person"><div class="pe-kopf"><b>${esc(x.name)}</b>
+      <span>${h1(x.ist)} von ${h1(x.soll)} h · <b>${h1(x.fehlt)} h offen</b></span></div>
+      ${Math.abs(x.konto) > 0.01 ? `<p class="hint">Stundenkonto zu Wochenbeginn: ${ueText(x.konto)} h${x.konto > 0 ? " — die offenen Stunden bauen es ab." : ""}</p>` : ""}
+      <div class="pe-vorschlaege"></div></div>`);
+    const vBox = box.querySelector(".pe-vorschlaege");
+    if (!x.vorschlaege.length) vBox.appendChild(el(`<p class="hint">Kein Vorschlag — an den freien Tagen stehen Ruhezeit, Höchstarbeitszeit,
+      Abwesenheit oder die Mindestschicht von ${MINSCHICHT} Stunden dagegen. Von Hand geht es über eine Zelle im Plan.</p>`));
+    x.vorschlaege.forEach(v => {
+      const b = el(`<button class="pe-vorschlag" type="button"><span class="pe-was"><b>${esc(v.was)}</b><span class="tag">+${h1(v.gewinn)} h</span></span>
+        <span class="pe-grund">${esc(v.grund)}</span><span class="pe-tun">Übernehmen</span></button>`);
+      b.onclick = () => { auffuellUebernehmen(sl, x.name, v); neuZeichnen(); };
+      vBox.appendChild(b);
+    });
+    liste.appendChild(box);
+  });
+  // Was schon dazugenommen wurde — einzeln wieder herausnehmbar
+  const dazu = pe.aenderungen.filter(a => a.aktiv && (a.quelle === "auffuellen" || a.quelle === "hand"));
+  if (dazu.length){
+    const d = el(`<div class="pe-dazu"><span class="eyebrow">Im Entwurf geändert</span></div>`);
+    dazu.forEach(a => {
+      const z = el(`<div class="pe-zeile"><span>${esc(a.text)}</span><button class="btn ghost small" type="button" title="wieder herausnehmen">×</button></div>`);
+      z.querySelector("button").onclick = () => { pe.aenderungen = pe.aenderungen.filter(y => y.id !== a.id); neuZeichnen(); };
+      d.appendChild(z);
+    });
+    vk.appendChild(d);
+  }
+  oben.appendChild(vk);
+
+  p.querySelector("#peVerwerfen").onclick = () => {
+    if (!confirm(`Den Entwurf für KW ${kwVon(mo)} verwerfen?${gueltig ? " Der bisherige Plan der Woche bleibt gültig." : ""}`)) return;
+    delete state.planEntwurf[sl]; sichern(); ansicht = "planen"; render();
+  };
+  p.querySelector("#peFreigeben").onclick = async () => {
+    const fragen = [];
+    if (pr.offen.length) fragen.push(`${pr.offen.length === 1 ? "Ein Punkt ist" : pr.offen.length + " Punkte sind"} noch offen.`);
+    if (gueltig) fragen.push("Der bisherige Plan dieser Woche wird ersetzt.");
+    if (fragen.length && !confirm(fragen.join(" ") + " Plan trotzdem freigeben?")) return;
+    planFreigeben(sl);
+    await speichere();
+    zeigeWoche = isoVon(mo); startHinweis = {sl, text: "Der Plan ist freigegeben und gilt jetzt. Nächster Schritt: ausdrucken, in die Gruppe schicken, aushängen."};
+    ansicht = "start"; render();
+  };
+  return p;
+}
+
 // ==== app/45-ereignisse.js ====
 /* Urlaub & Krankheit.
 
@@ -9414,7 +9872,7 @@ function zelleBearbeiten(sl, eintrag, i, ti, plan, fertig){
     <div class="dialog-ausfall"><span class="hint">Fällt aus:</span>
       ${["krank", "urlaub", "nicht"].map(g => `<button class="btn ghost small" data-grund="${g}" type="button">${GRUND_NAME[g]}</button>`).join("")}</div>
     <div class="dialog-knoepfe unten">
-      <button class="btn ghost small" data-zurueck type="button">wie im gültigen Plan</button>
+      <button class="btn ghost small" data-zurueck type="button">Änderung zurücknehmen</button>
       <div class="spacer"></div><button class="btn ghost small" data-abbrechen type="button">Abbrechen</button></div></div>`);
   const d = dialogZeigen(inhalt);
   // Was für diese Zelle schon von Hand gilt, wird ersetzt — nicht gestapelt
@@ -9455,15 +9913,15 @@ function notizBearbeiten(eintrag, ti, plan, fertig){
   inhalt.querySelector("[data-abbrechen]").onclick = () => d.remove();
 }
 
-// Der Assistent: Gespräch, Karten zum Antippen und — bei einer Rückfrage — Antwortknöpfe
+/* Der Assistent: Überschrift, Eingabefeld, darunter die Antwort auf die letzte Eingabe mit
+   ihren Lösungskarten. Was davor war, klappt als „Verlauf“ zusammen. Kein Begrüßungstext,
+   keine Sprechblasen — bei einer Rückfrage stehen Antwortknöpfe unter der Antwort. */
 function assistentKarte(sl, kurz, eintrag, fertig){
-  eintrag.chat = eintrag.chat || [{wer: "assistent", text: "Was soll sich am Plan ändern? Schreib es, wie du es sagen würdest.", knoepfe: ASSISTENT_START}];
-  const k = el(`<section class="karte assistent"><h3>${symbol("funke")} Assistent</h3>
-    <div class="chat"></div>
-    <form class="chat-eingabe"><input type="text" placeholder="z. B. Eva ist morgen krank" aria-label="Nachricht an den Assistenten">
-      <button class="btn" type="submit" title="senden">${symbol("senden")}</button></form>
-    <p class="hint">Rechnet nur auf diesem Gerät — es geht nichts ins Internet.</p></section>`);
-  const chat = k.querySelector(".chat");
+  eintrag.chat = eintrag.chat || [];
+  const k = el(`<section class="karte assistent"><h3>Assistent</h3>
+    <form class="chat-eingabe"><input type="text" placeholder="Was soll sich am Plan ändern?" aria-label="Was soll sich am Plan ändern?" autocomplete="off">
+      <button class="btn" type="submit" title="senden" aria-label="senden">${symbol("senden")}</button></form>
+    <div class="as-antwort"></div></section>`);
   const senden = text => {
     text = String(text || "").trim();
     if (!text) return;
@@ -9477,46 +9935,59 @@ function assistentKarte(sl, kurz, eintrag, fertig){
     const gezeigt = new Set(eintrag.chat.reduce((l, n) => l.concat(n.karten || []), []));
     eintrag.aenderungen = eintrag.aenderungen.filter(a => a.quelle !== "assistent" || a.aktiv || gezeigt.has(a.id));
     fertig();
-    setTimeout(() => {
-      const c = document.querySelector(".assistent .chat"); if (c) c.scrollTop = c.scrollHeight;
-      const f = document.querySelector(".assistent input"); if (f && matchMedia("(pointer:fine)").matches) f.focus({preventScroll: true});
-    }, 0);
+    setTimeout(() => { const f = document.querySelector(".assistent input"); if (f && matchMedia("(pointer:fine)").matches) f.focus({preventScroll: true}); }, 0);
   };
-  eintrag.chat.forEach((n, nr) => {
-    const b = el(`<div class="blase ${n.wer}"><p>${esc(n.text)}</p></div>`);
-    (n.karten || []).forEach(id => {
-      const a = eintrag.aenderungen.find(x => x.id === id);
-      if (!a) return;
-      const kn = el(`<button class="chatkarte${a.aktiv ? " an" : ""}" type="button" aria-pressed="${a.aktiv}">${esc(a.text)}
-        ${a.weg ? `<span class="chat-weg">${a.weg.zeilen.map(z => `${esc(z.name.split(" ")[0])}: ${z.vorher ? `<s>${esc(z.vorher)}</s> → ` : ""}${esc(z.nachher || "frei")}`).join(" · ")}</span>
-          ${a.weg.passt ? `<span class="chat-weg">${esc(a.weg.passt)}</span>` : ""}` : ""}
-        <span>${a.aktiv ? "✓ im Plan · antippen entfernt" : "antippen zeigt es im Plan"}</span></button>`);
-      kn.onclick = () => {
-        if (a.aktiv) aenderungAus(eintrag, a.id);
-        else {
-          a.aktiv = true;
-          // gehört die Lösung zu einem Ausfall aus demselben Gespräch, kommt der mit
-          if (a.fuer){ const f = eintrag.aenderungen.find(x => x.id === a.fuer); if (f) f.aktiv = true; }
-          // je Zelle bzw. je Ausfall nur eine Karte des Assistenten
-          eintrag.aenderungen.forEach(x => { if (x !== a && x.quelle === "assistent" && x.aktiv
-            && ((x.name && x.name === a.name && x.ti === a.ti && x.typ !== "abwesend" && a.typ !== "abwesend")
-             || (a.typ === "loesung" && x.typ === "loesung" && x.ti === a.ti && x.fuer === a.fuer))) x.aktiv = false; });
-        }
-        fertig();
-      };
-      b.appendChild(kn);
-    });
-    // Antwortknöpfe nur an der letzten Nachricht — ältere Fragen sind erledigt
-    if (nr === eintrag.chat.length - 1 && (n.knoepfe || []).length){
+  // Eine Lösungs- oder Änderungskarte: antippen zeigt sie im Plan, nochmal nimmt sie heraus
+  const karte = id => {
+    const a = eintrag.aenderungen.find(x => x.id === id);
+    if (!a) return null;
+    const kn = el(`<button class="chatkarte${a.aktiv ? " an" : ""}" type="button" aria-pressed="${a.aktiv}">${esc(a.text)}
+      ${a.weg ? `<span class="chat-weg">${a.weg.zeilen.map(z => `${esc(z.name.split(" ")[0])}: ${z.vorher ? `<s>${esc(z.vorher)}</s> → ` : ""}${esc(z.nachher || "frei")}`).join(" · ")}</span>
+        ${a.weg.passt ? `<span class="chat-weg">${esc(a.weg.passt)}</span>` : ""}` : ""}
+      <span>${a.aktiv ? "✓ im Plan · antippen entfernt" : "antippen zeigt es im Plan"}</span></button>`);
+    kn.onclick = () => {
+      if (a.aktiv) aenderungAus(eintrag, a.id);
+      else {
+        a.aktiv = true;
+        // gehört die Lösung zu einem Ausfall aus demselben Gespräch, kommt der mit
+        if (a.fuer){ const f = eintrag.aenderungen.find(x => x.id === a.fuer); if (f) f.aktiv = true; }
+        // je Zelle bzw. je Ausfall nur eine Karte des Assistenten
+        eintrag.aenderungen.forEach(x => { if (x !== a && x.quelle === "assistent" && x.aktiv
+          && ((x.name && x.name === a.name && x.ti === a.ti && x.typ !== "abwesend" && a.typ !== "abwesend")
+           || (a.typ === "loesung" && x.typ === "loesung" && x.ti === a.ti && x.fuer === a.fuer))) x.aktiv = false; });
+      }
+      fertig();
+    };
+    return kn;
+  };
+  // Das Gespräch als Paare aus Eingabe und Antwort (ein alter Begrüßungstext ohne Eingabe zählt nicht)
+  const paare = [];
+  eintrag.chat.forEach(n => {
+    if (n.wer === "du") paare.push({frage: n.text, antwort: null});
+    else if (paare.length && !paare[paare.length - 1].antwort) paare[paare.length - 1].antwort = n;
+  });
+  const block = (paar, letztes) => {
+    const b = el(`<div class="as-paar"><p class="as-frage">${esc(paar.frage)}</p><p class="as-text">${esc(paar.antwort ? paar.antwort.text : "")}</p></div>`);
+    ((paar.antwort && paar.antwort.karten) || []).forEach(id => { const kn = karte(id); if (kn) b.appendChild(kn); });
+    // Antwortknöpfe nur an der letzten Antwort — ältere Fragen sind erledigt
+    if (letztes && paar.antwort && (paar.antwort.knoepfe || []).length){
       const reihe = el(`<div class="chat-knoepfe"></div>`);
-      n.knoepfe.forEach(t => { const kn = el(`<button class="btn ghost small" type="button">${esc(t)}</button>`); kn.onclick = () => senden(t); reihe.appendChild(kn); });
+      paar.antwort.knoepfe.forEach(t => { const kn = el(`<button class="btn ghost small" type="button">${esc(t)}</button>`); kn.onclick = () => senden(t); reihe.appendChild(kn); });
       b.appendChild(reihe);
     }
-    chat.appendChild(b);
-  });
+    return b;
+  };
+  const antwort = k.querySelector(".as-antwort");
+  if (paare.length){
+    antwort.appendChild(block(paare[paare.length - 1], true));
+    if (paare.length > 1){
+      const d = el(`<details class="as-verlauf"><summary>Verlauf (${paare.length - 1})</summary></details>`);
+      paare.slice(0, -1).reverse().forEach(x => d.appendChild(block(x, false)));
+      antwort.appendChild(d);
+    }
+  }
   const feld = k.querySelector("input");
   k.querySelector("form").onsubmit = e => { e.preventDefault(); senden(feld.value); };
-  setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 0);
   return k;
 }
 

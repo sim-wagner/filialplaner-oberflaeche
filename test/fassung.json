@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-16-3-test",
+  "fassung": "2026-11-16-4-test",
   "datei": "filialplaner.html",
-  "pruefsumme": "288bf0062ceb7f081ac794678620f909d1dfffa64f1318a8b1d4e15d22d3b46d",
-  "hinweis": "PDF zum Aushängen: Bestellungen ausgeschrieben, je Frist ein Block"
+  "pruefsumme": "2b1e534115dd440db9371fe1e72156d799944f06753e9608568ae3030bb9d7a7",
+  "hinweis": "Planer legt Aufgaben nacheinander, Plan erst als Entwurf mit Freigabe, Tagesanalyse je Aufgabe, Assistent neu gestaltet"
 }
