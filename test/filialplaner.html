@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-16-4-test">
+<meta name="fassung" content="2026-11-16-5-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -1017,6 +1017,20 @@ table.kompakt th,table.kompakt td{overflow-wrap:break-word;hyphens:auto;-webkit-
 .as-verlauf .as-paar{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2)}
 .as-verlauf .as-paar:first-of-type{border-top:0;padding-top:0}
 .as-verlauf .as-text{color:var(--ink-2)}
+
+/* ---- Leistungswirksame Stunden, Aushilfen im Monat, Azubis im Entwurf (16.11.2026) ---- */
+table.plan tr.summe.wirksam td,table.plan tr.summe.wirksam th{border-top:1px solid var(--formlinie-2);font-weight:600;color:var(--ink-2)}
+tr.k-summe.k-wirksam th,tr.k-summe.k-wirksam td{font-weight:600;color:var(--ink-2)}
+tr.k-summe.k-wirksam th{font-family:var(--sans)}
+.pe-azubi{display:flex;align-items:center;gap:6px;margin-top:12px}
+.pe-azubi .sym{width:16px;height:16px;color:var(--good)}
+.pe-aushilfen{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.pe-person.knapp{border-color:var(--warn)}
+.pe-person .note{margin-top:8px;font-size:.8rem}
+.aus-stand{font-size:.86rem;color:var(--ink-2);margin-bottom:6px}
+.aushilfe.ohne-kopf{margin-top:6px}
+/* Aushilfen haben kein Konto: am Telefon bleibt die Spalte bei ihnen leer (der Monatsstand steht breit und in der Analyse) */
+@container (max-width:480px){ td.k-konto b.k-voll{display:none} }
 </style>
 
 <div class="markenband" aria-hidden="true"></div>
@@ -1709,6 +1723,8 @@ function baueWoche(montagISO, rnd, vorgabe){
   const rest = ms.map((m,i) => (soll[i] === null ? 0 : ziel[i]) - standardStunden(i));
   const tageGearbeitet = ms.map(() => 0);
   const letztesEnde = ms.map(() => null);
+  // Was Aushilfen in den anderen Wochen der berührten Monate schon haben (Minijob-Grenze)
+  const minijobBasis = ms.map(m => istAushilfe(m) ? monatsStunden(m.name, {mo, tage: [], namen: null}).stunden : null);
   const meldungen = [];
   const tage = [];
 
@@ -1777,9 +1793,19 @@ function baueWoche(montagISO, rnd, vorgabe){
       return null;
     };
 
+    // Aushilfen: Stunden des Monats aus den anderen Wochen, den schon gebauten Tagen und heute
+    const minijobOk = (i, mehr) => {
+      if (!istAushilfe(ms[i])) return true;
+      const monat = monatVon(d);
+      let summe = minijobBasis[i][monat] || 0;
+      tage.forEach(t => { if (t !== tag && monatVon(t.datum) === monat) t.schichten.forEach(s => { if (s.mi === i) summe += s.arbeit; }); });
+      belegt.forEach(b => { if (b.mi === i) summe += (b.bis - b.von)/60 - (b.pVon === null ? 0 : (b.pBis - b.pVon)/60); });
+      return summe + mehr <= minijobStunden(+monat.slice(0, 4)) + 0.01;
+    };
     const regelOk = (i, von, bis) => {
       const m = ms[i];
       if (!passtDazu(i, von, bis)) return false;
+      if (!minijobOk(i, (bis - von)/60 - pauseFuer(m, (bis - von)/60))) return false;
       if (!darfArbeiten(i, key, von, bis)) return false;
       const minder = minderjaehrig(m);
       if (minder && !jugendZeit(von, bis)) return false;
@@ -2343,6 +2369,7 @@ function ausgleichen(plan){
     if (tage >= maxTageFuer(minderj(i))) return false;
     const anw = (sch.bis - sch.von)/60;
     if (anw - pauseFuer(ms[i], anw) > MAXARBEIT + 0.01) return false;
+    if (!minijobPasst(plan, i, ti, sch.von, sch.bis)) return false;       // Aushilfen: Monatsgrenze
     return ruheOk(i, ti, sch.von, sch.bis);
   };
 
@@ -2572,6 +2599,7 @@ function schichtWerkzeug(plan){
     if (minderj(i) && !jugendZeit(von, bis)) return false;
     const anw = (bis - von)/60;
     if (anw - pauseFuer(ms[i], anw) > MAXARBEIT + 0.01) return false;
+    if (!minijobPasst(plan, i, ti, von, bis, plan.tage[ti].schichten.find(x => x.mi === i))) return false;
     const noetig = ruhezeitFuer(minderj(i)) * 60;
     const vor = ti > 0 ? plan.tage[ti-1].schichten.filter(x => x.mi === i) : [];
     const nach = ti < plan.tage.length-1 ? plan.tage[ti+1].schichten.filter(x => x.mi === i) : [];
@@ -2712,7 +2740,8 @@ function wochenVorgabe(mo, phase){
     const soll = sollWoche(m, i, mo);
     if (soll === null) return 0;
     const s = Math.max(-AUSGLEICH_MAX, Math.min(AUSGLEICH_MAX, start[i] || 0));
-    return Math.max(0, soll - s);
+    // Azubis kommen immer auf ihre Betriebsstunden — ein Plus auf dem Konto kürzt sie nicht
+    return istAzubi(m) ? Math.max(soll, soll - s) : Math.max(0, soll - s);
   });
   const vorgabe = {phase: ph, ziel, start, faktor: 1, zusatz: {}};
   const offeneTage = TAGE.map(([k], ti) => { const d = new Date(mo); d.setDate(mo.getDate() + ti); return istFeiertag(d) ? null : k; })
@@ -2772,6 +2801,12 @@ function planIndex(plan, m, i){
   return plan && plan.namen ? plan.namen.indexOf(m.name) : i;
 }
 
+/* Ein Stundenkonto hat, wer ein festes Gehalt bekommt. Aushilfen werden nach Stunden bezahlt:
+   Ihre Wochenstunden sind eine Orientierung, Minusstunden gibt es bei ihnen nicht — für sie
+   zählt der Monat (aushilfeMonat in kern/17-analyse.js). Ein früher gespeicherter Stand bleibt
+   in den Daten stehen, wird aber nicht mehr gezeigt und nicht mehr fortgeschrieben. */
+const hatKonto = m => hatVertrag(m) && m.typ !== "Aushilfe (Minijob)";
+
 function sollWoche(m, i, mo){
   if (!hatVertrag(m)) return null;
   const soll = stunden(m);
@@ -2790,7 +2825,7 @@ function sollWoche(m, i, mo){
 // Ist minus Soll in einer gespeicherten Woche
 function wochenAenderung(kurz, m, i){
   const j = planIndex(kurz, m, i);
-  if (j < 0 || !hatVertrag(m)) return 0;
+  if (j < 0 || !hatKonto(m)) return 0;
   return viertel(istStunden(kurz, j) - sollWoche(m, i, montagDer(kurz.mo instanceof Date ? isoVon(kurz.mo) : kurz.mo)));
 }
 
@@ -2799,7 +2834,7 @@ function ueberstundenZuBeginn(mo){
   const ziel = wochenSchluessel(mo);
   const wochen = Object.keys(state.plaene || {}).sort();
   return state.mitarbeiter.map((m, i) => {
-    if (!hatVertrag(m)) return null;
+    if (!hatKonto(m)) return null;
     let s = saldoVon(m);
     wochen.forEach(sl => {
       if (sl >= (m.saldoAb || ziel) && sl < ziel) s += wochenAenderung(state.plaene[sl], m, i);
@@ -2814,7 +2849,7 @@ function ueberstundenZuBeginn(mo){
 function bisInStandUebernehmen(sl){
   Object.keys(state.plaene || {}).filter(x => x <= sl).sort().forEach(x => {
     state.mitarbeiter.forEach((m, i) => {
-      if (!m.saldoAb || m.saldoAb > x) return;
+      if (!m.saldoAb || m.saldoAb > x || !hatKonto(m)) return;
       m.saldo = viertel(saldoVon(m) + wochenAenderung(state.plaene[x], m, i));
       m.saldoAb = folgeSchluessel(x);
     });
@@ -3459,6 +3494,23 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
     }
   });
 
+  // Aushilfen: je Kalendermonat nicht über die Minijob-Grenze. Was schon in anderen Wochen des
+  // Monats geplant ist, zählt mit. Ein Verstoß ist möglich (feste Standardwoche), kostet aber
+  // fast so viel wie eine Lücke.
+  ms.forEach((m, i) => {
+    if (!istAushilfe(m)) return;
+    const eigene = kand.map((k, n) => [k, n]).filter(([k]) => k.i === i);
+    const basis = monatsStunden(m.name, {mo, tage: [], namen: null}).stunden;
+    [...new Set(tage.map(t => monatVon(t.datum)))].forEach(monat => {
+      const hier = eigene.filter(([k]) => monatVon(tage[k.ti].datum) === monat);
+      if (!hier.length) return;
+      const frei = Math.max(0, minijobStunden(+monat.slice(0, 4)) - (basis[monat] || 0));
+      const s = `mj${i}_${monat.replace("-", "")}`;
+      nb.push({name: `minijob${i}_${monat.replace("-", "")}`, op: "<=", rechts: frei, terme: hier.map(([k, n]) => [k.arbeit, v(n)]).concat([[-1, s]])});
+      ziele.push([300, s]); grenzen.push(`${s} >= 0`);
+    });
+  });
+
   // Ziele je Person (nur im vollen Modell)
   if (modus === "plan"){
     const ph = vorgabe.phase;
@@ -3470,7 +3522,8 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
       const st = (vorgabe.start && vorgabe.start[i]) || 0;
       // Nur das Nötige: eine fehlende Vertragsstunde kostet weniger als eine geplante — es wird
       // also nichts aufgefüllt, aber was nötig ist, bekommt zuerst, wer unter seinem Vertrag liegt
-      const gewichtUnter = vorgabe.nurNoetig ? Math.min(0.8, 0.3 * (1 + Math.max(0, -st) / 8))
+      // (Azubis ausgenommen: Ihre Betriebsstunden sind Pflicht, sie werden immer aufgefüllt.)
+      const gewichtUnter = vorgabe.nurNoetig && !istAzubi(m) ? Math.min(0.8, 0.3 * (1 + Math.max(0, -st) / 8))
                          : (sparen ? 0.5 : OPT.unterZiel) * (1 + Math.max(0, -st) / 8);
       const gewichtUeber = OPT.ueberZiel * ueberGewicht(m) * (1 + Math.max(0, st) / 8);
       nb.push({name: `ziel${i}`, op: "=", rechts: ziel,
@@ -3662,7 +3715,8 @@ async function erzeugePlanBest(montagISO, phase, fortschritt, nurNoetig){
   // es dort —, sonst die Gütezahl (Ziele, Konten, Zahl der Schichten).
   let plan = planer, verfahren = "Planer";
   const besser = () => {
-    const lo = planMaengel(opt), lp = planMaengel(planer);
+    // Lücken zählen zuerst — gleich danach, ob eine Aushilfe über der Monatsgrenze läge
+    const lo = planMaengel(opt) + 5 * minijobVerstoesse(opt).length, lp = planMaengel(planer) + 5 * minijobVerstoesse(planer).length;
     if (lo !== lp) return lo < lp;
     if (ph.art === "sparen") return planSummen(opt).bezahlt <= planSummen(planer).bezahlt + 0.01;
     if (nurNoetig && Math.abs(planSummen(opt).bezahlt - planSummen(planer).bezahlt) > 0.01) return planSummen(opt).bezahlt < planSummen(planer).bezahlt;
@@ -3765,6 +3819,8 @@ function ausfallErlaubt(plan, j, ti, von, bis, ausser){
     const woche = plan.tage.reduce((s, t, k) => s + t.schichten.filter(x => x.mi === j && x !== ausser && k !== ti).reduce((a, x) => a + x.arbeit, 0), 0);
     if (woche + anw - pauseFuer(m, anw) > 40 + 0.01) return false;
   }
+  // Aushilfen: im Kalendermonat nie über die Minijob-Grenze
+  if (!minijobPasst(plan, j, ti, von, bis, ausser)) return false;
   return true;
 }
 
@@ -3791,7 +3847,7 @@ function schichtSetzen(plan, ti, s, von, bis){
 // Stunden und Konto einer Person nach einer Änderung
 function kontoNach(plan, j, grundAusfall){
   const {i, m} = planPerson(plan, j);
-  if (!m || !hatVertrag(m)) return null;
+  if (!m || !hatKonto(m)) return null;                 // Aushilfen haben kein Konto
   const mo = plan.mo instanceof Date ? plan.mo : montagDer(plan.mo);
   const start = ueberstundenZuBeginn(mo)[i] || 0;
   const ist = plan.tage.reduce((s, t) => s + t.schichten.filter(x => x.mi === j).reduce((a, x) => a + x.arbeit, 0), 0);
@@ -4421,6 +4477,9 @@ function entwurfPruefen(sl, kurz, eintrag){
   const vorher = new Set(handPruefung(planLaden(kurz)));
   const recht = handPruefung(planLaden(plan)).filter(x => !vorher.has(x) && !/nicht richtig besetzt/.test(x));
   recht.forEach(text => offen.push({art: "recht", text}));
+  // Aushilfen über der Minijob-Grenze des Monats — was durch die Änderungen neu dazukam
+  const schonDrueber = new Set(minijobVerstoesse(kurz).map(x => x.name + "|" + x.monat));
+  minijobVerstoesse(plan).filter(x => !schonDrueber.has(x.name + "|" + x.monat)).forEach(x => offen.push({art: "minijob", name: x.name, text: x.text}));
   eintrag.aenderungen.filter(a => passtNicht.has(a.id)).forEach(a =>
     offen.push({art: "passtNicht", id: a.id, text: `„${a.text}“ passt nicht mehr zum Plan — bitte abschalten oder neu wählen.`}));
   // Zellen, die anders sind als im gültigen Plan — mit der alten Zeit zum Vergleich
@@ -4736,6 +4795,72 @@ function aushilfenKonto(name){
   });
 }
 
+/* ---- Aushilfen: Orientierung in der Woche, Grenze im Monat (seit 16.11.2026) ----
+   Die eingetragenen Wochenstunden sind eine Orientierung. Pflicht ist nur: In keinem
+   Kalendermonat mehr Stunden, als die Minijob-Grenze beim Stundenlohn zulässt. Wochen über
+   einen Monatswechsel zählen tageweise zum jeweiligen Monat. */
+const monatVon = d => (d instanceof Date ? isoVon(d) : String(d)).slice(0, 7);
+const MONATSNAMEN = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const monatName = monat => MONATSNAMEN[+monat.slice(5, 7) - 1];
+// Eine Grenze wird nicht gerundet angezeigt: 43,25 h bleiben 43,25 h
+const hGenau = n => n.toLocaleString("de-DE", {minimumFractionDigits: 1, maximumFractionDigits: 2});
+
+// Stunden und geplante Tage je Monat für eine Person: alle gültigen Pläne — und statt der
+// gespeicherten Fassung seiner Woche der übergebene Plan (Entwurf, Probe, gerade im Bau)
+function monatsStunden(name, plan){
+  const stunden = {}, tage = {};
+  const zaehle = p => {
+    const j = p.namen ? p.namen.indexOf(name) : personIndex(name);
+    p.tage.forEach(t => {
+      const monat = monatVon(t.datum);
+      tage[monat] = (tage[monat] || 0) + 1;
+      if (j >= 0) t.schichten.forEach(s => { if (s.mi === j) stunden[monat] = (stunden[monat] || 0) + s.arbeit; });
+    });
+  };
+  const sl = plan ? wochenSchluessel(plan.mo instanceof Date ? plan.mo : montagDer(plan.mo)) : null;
+  Object.keys(state.plaene || {}).forEach(k => { if (k !== sl) zaehle(state.plaene[k]); });
+  if (plan) zaehle(plan);
+  return {stunden, tage};
+}
+
+/* Stand einer Aushilfe in einem Monat.
+   ziel: die eigenen Wochenstunden, auf den Monat hochgerechnet — höchstens die Minijob-Grenze.
+   erwartet: der Teil davon, der auf die schon geplanten Tage des Monats entfällt.
+   unter75: die geplanten Stunden liegen unter drei Vierteln davon — dann lohnt ein Hinweis. */
+function aushilfeMonat(name, monat, plan){
+  const m = state.mitarbeiter[personIndex(name)];
+  const grenze = minijobStunden(+monat.slice(0, 4)), arbeitstage = arbeitstageImMonat(monat);
+  const ziel = Math.min(grenze, (m ? stunden(m) : 0) * arbeitstage / 6);
+  const x = monatsStunden(name, plan);
+  const ist = viertel(x.stunden[monat] || 0), anteil = Math.min(1, (x.tage[monat] || 0) / arbeitstage);
+  const erwartet = ziel * anteil;
+  return {monat, monatsname: monatName(monat), ist, ziel, grenze, offen: Math.max(0, ziel - ist), erwartet, anteil,
+          unter75: erwartet > 0 && ist < 0.75 * erwartet - 0.001, ueber: ist > grenze + 0.01};
+}
+
+// Passt eine Schicht von–bis am Tag ti noch unter die Monatsgrenze? (`ausser`: die Schicht, die sie ersetzt)
+function minijobPasst(plan, j, ti, von, bis, ausser){
+  const {m, name} = planPerson(plan, j);
+  if (!m || !istAushilfe(m)) return true;
+  const tag = plan.tage[ti], monat = monatVon(tag.datum);
+  const anw = (bis - von) / 60, neu = anw - pauseFuer(m, anw);
+  const bisher = (monatsStunden(name, plan).stunden[monat] || 0) - (ausser && tag.schichten.includes(ausser) ? ausser.arbeit : 0);
+  return bisher + neu <= minijobStunden(+monat.slice(0, 4)) + 0.01;
+}
+
+// Wer in einem Plan über der Monatsgrenze liegt → [{name, monat, stunden, grenze, text}]
+function minijobVerstoesse(plan){
+  const raus = [];
+  state.mitarbeiter.filter(istAushilfe).forEach(m => {
+    [...new Set(plan.tage.map(t => monatVon(t.datum)))].forEach(monat => {
+      const a = aushilfeMonat(m.name, monat, plan);
+      if (a.ueber) raus.push({name: m.name, monat, stunden: a.ist, grenze: a.grenze,
+        text: `${m.name} käme im ${a.monatsname} auf ${h1(a.ist)} h — die Minijob-Grenze lässt ${hGenau(a.grenze)} h zu.`});
+    });
+  });
+  return raus;
+}
+
 // Der Mindestbedarf einer Woche: aus den letzten Plänen (Messlatte), sonst aus der Einrichtung
 function wochenBedarf(){
   const a = auswertung();
@@ -5017,7 +5142,8 @@ function schichtGrund(plan, ti, schicht){
     stunden: (schicht.bis - schicht.von) / 60,
     standard: (schicht.rollen || []).includes("Standard"),
     vertretung: (schicht.rollen || []).includes("Vertretung"),
-    aufgefuellt: (schicht.rollen || []).includes("Vertragsstunden")
+    aufgefuellt: (schicht.rollen || []).includes("Vertragsstunden"),
+    ausbildung: (schicht.rollen || []).includes("Ausbildung")
   };
 }
 
@@ -5029,6 +5155,7 @@ function schichtBegruendung(plan, ti, reihe, einteilung){
   if (g.standard) saetze.push(`Feste Standardwoche: Diese Zeit ist bei ${vorname} hinterlegt.`);
   if (g.vertretung) saetze.push("Springt ein — die Schicht kam durch eine Änderung am Plan dazu.");
   if (g.aufgefuellt) saetze.push("Vertragsstunden: Diese Zeit hast du im Entwurf dazugenommen.");
+  if (g.ausbildung) saetze.push("Ausbildung: Azubis kommen immer auf ihre Betriebsstunden — ein Teil dieser Zeit ist dafür da.");
   if (g.noetig.length) saetze.push("Ohne diese Schicht fehlte: " + g.noetig.map(n =>
     `${n.grund} (${n.spannen.map(spanneText).join(", ")})`).join("; ") + ".");
   const aufgaben = reihe.segmente.filter(s => s.aufgabe);
@@ -5048,7 +5175,7 @@ function schichtBegruendung(plan, ti, reihe, einteilung){
   if (koennen.size) saetze.push("Dafür nötig: " + [...koennen].map(q => q === "§" ? "Filialleitung (Schlüssel)"
     : (QUAL.find(x => x[0] === q) || [q, q])[1]).join(", ") + ".");
   const uebrig = g.stunden - g.zwingend;
-  if (!g.noetig.length && !g.standard && !g.vertretung && !g.aufgefuellt)
+  if (!g.noetig.length && !g.standard && !g.vertretung && !g.aufgefuellt && !g.ausbildung)
     saetze.push(`Für sich allein nicht zwingend — in dieser Zeit könnten auch andere die Besetzung halten.`);
   else if (g.noetig.length && uebrig >= 1)
     saetze.push(`Nur mit dieser Schicht gedeckt sind ${h1(g.zwingend)} von ${h1(g.stunden)} h. In der übrigen Zeit könnten andere die Besetzung halten — sie füllt Vertragsstunden auf.`);
@@ -5601,6 +5728,10 @@ function assistent(text, sl, kurz, eintrag){
     if (v.pronomen) mitKontextPerson();
     const zeile = name => {
       const m = state.mitarbeiter[personIndex(name)], x = kontoNach(plan, platzImPlan(plan, name));
+      if (!x && m && istAushilfe(m)){
+        const a = aushilfeMonat(name, planMonat(plan), plan);
+        return `${name} ist Aushilfe und hat kein Stundenkonto. Im ${a.monatsname} sind ${h1(a.ist)} h geplant — noch ${h1(a.offen)} h bis zur vollen Auszahlung, die Minijob-Grenze liegt bei ${hGenau(a.grenze)} h.`;
+      }
       if (!x) return `${name}: keine Vertragsstunden hinterlegt.`;
       return `${name} hat im Entwurf ${h1(x.ist)} h in dieser Woche (Soll ${h1(x.soll)} h). Konto danach: ${ueText(x.ende) || "0,0"} h`
         + (darfUeberstunden(m) ? "." : " — macht keine Überstunden.");
@@ -5795,85 +5926,183 @@ function assistent(text, sl, kurz, eintrag){
 
 function planEntwurfAnlegen(plan){
   const kurz = planKurz(plan), sl = wochenSchluessel(plan.mo);
+  // Azubis kommen immer auf ihre Betriebsstunden — das ist kein Vorschlag, sondern Teil des Entwurfs
+  if (azubisAuffuellen(kurz)) einteilungFestschreiben(kurz);
   state.planEntwurf = state.planEntwurf || {};
   state.planEntwurf[sl] = {kurz, aenderungen: [], erstellt: kurz.erstellt};
   return state.planEntwurf[sl];
 }
 const planEntwurfVon = sl => (state.planEntwurf || {})[sl] || null;
 
+/* Wo zusätzliche Stunden für eine Person hinpassen — höchstens `fehlt` Stunden, immer
+   rechtmäßig. Eine Möglichkeit verlängert eine Schicht oder setzt eine an einem freien Tag.
+   Bewertet wird nur mit dem, was im Plan steht: läuft dort eine Aufgabe, die die Person
+   kann; sind zu der Zeit nur so viele im Laden wie mindestens nötig; ist es der Tag mit den
+   wenigsten Stunden. → nach Wert sortiert: [{ti, von, bis, art, gewinn, w, punkte}] */
+function auffuellKandidaten(plan, m, fehlt){
+  const j = platzImPlan(plan, m.name);
+  if (j < 0) return [];
+  const aussen = state.allein ? 1 : MIN_BESETZUNG;
+  const tagStunden = plan.tage.map((t, ti) => t.feiertag ? Infinity : tagesStunden(plan, ti));
+  const wenigster = tagStunden.indexOf(Math.min(...tagStunden));
+  const kann = q => !q || (m.qual || []).includes(q);
+  const kandidaten = [];
+  plan.tage.forEach((t, ti) => {
+    if (t.feiertag) return;
+    const r = tagesRaster(t);
+    const eigene = t.schichten.filter(s => s.mi === j);
+    const da = mm => t.schichten.filter(s => s.von <= mm && s.bis > mm).length;
+    // Was die zusätzliche Zeit bringt, je halbe Stunde
+    const werte = (von, bis, ausser) => {
+      let punkte = 0, aufgabe = {}, knapp = 0, n = 0;
+      for (let mm = von; mm < bis; mm += 30){
+        if (ausser && mm >= ausser.von && mm < ausser.bis) continue;       // die Zeit ist schon da
+        n++;
+        const drin = mm >= r.offenVon && mm < r.offenBis;
+        const hier = da(mm), noetig = personenBedarf(t.aufgaben || [], mm, drin, aussen);
+        // eine Aufgabe, bei der eine zweite Hand hilft — Bestellungen macht eine Person allein
+        const auf = (t.aufgaben || []).find(a => { const w = WAREN.find(x => x.id === a.id) || {};
+          return aufgabeLaeuft(a, mm) && w.gruppe !== "bestellung" && kann(w.braucht); });
+        if (hier > noetig) punkte -= 1.5 * (hier - noetig);                // dort sind schon mehr als nötig
+        if (auf){ punkte += 3; aufgabe[auf.name] = (aufgabe[auf.name] || 0) + 1; }
+        else if (drin && hier <= noetig){ punkte += 2; knapp++; }
+        else if (drin) punkte += 1;
+      }
+      return {punkte: n ? punkte / n : -9, aufgabe, knapp, n};
+    };
+    const melde = (von, bis, art, ausser) => {
+      const anw = (bis - von) / 60, arbeit = anw - pauseFuer(m, anw);
+      const gewinn = arbeit - (ausser ? ausser.arbeit : 0);
+      if (gewinn < 0.49 || gewinn > fehlt + 0.01) return;
+      const p = tagKopie(plan, ti);
+      if (!ausfallErlaubt(p, j, ti, von, bis, ausser ? p.tage[ti].schichten.find(s => s.mi === j) : undefined)) return;
+      const w = werte(von, bis, ausser);
+      kandidaten.push({ti, von, bis, art, gewinn, w, wenigster: ti === wenigster,
+                       punkte: w.punkte + (ti === wenigster ? 0.5 : 0) + Math.min(gewinn, fehlt) / 20});
+    };
+    if (eigene.length === 1){
+      const s = eigene[0];
+      for (let d = 30; d <= 240; d += 30){
+        if (s.bis + d <= r.tagBis) melde(s.von, s.bis + d, "laenger", s);
+        if (s.von - d >= r.tagVon) melde(s.von - d, s.bis, "frueher", s);
+      }
+    } else if (!eigene.length && fehlt >= MINSCHICHT - 0.01){
+      for (let L = MINSCHICHT * 60; L <= REGELN.maxAnwesenheit * 60; L += 30)
+        for (let von = r.tagVon; von + L <= r.tagBis; von += 30) melde(von, von + L, "neu");
+    }
+  });
+  return kandidaten.sort((a, b) => b.punkte - a.punkte || b.gewinn - a.gewinn);
+}
+
+/* Azubis bis zu ihren Betriebsstunden einplanen — direkt im gerechneten Plan, nicht als
+   Vorschlag. Erst die Zeit, die am meisten bringt; so lange, bis nichts mehr fehlt oder
+   Gesetz, Berufsschule und Abwesenheiten nichts mehr zulassen. → true, wenn etwas dazukam */
+function azubisAuffuellen(kurz){
+  let geaendert = false;
+  state.mitarbeiter.filter(istAzubi).forEach(m => {
+    for (let runde = 0; runde < 24; runde++){
+      const j = platzImPlan(kurz, m.name);
+      const k = j < 0 ? null : kontoNach(kurz, j);
+      const fehlt = k ? viertel(k.soll - k.ist) : 0;
+      if (fehlt < 0.5) break;
+      // am liebsten die Möglichkeit, die am meisten der fehlenden Stunden bringt
+      const c = auffuellKandidaten(kurz, m, fehlt).sort((a, b) => b.gewinn - a.gewinn || b.punkte - a.punkte)[0];
+      if (!c){
+        // Passt nichts Zusätzliches (zu wenig für eine eigene Schicht, die übrigen Tage sind voll),
+        // hilft oft Umverteilen: ein Tag mehr, dafür ein anderer kürzer
+        if (azubiUmverteilen(kurz, m, j, fehlt)){ geaendert = true; continue; }
+        break;
+      }
+      const tag = kurz.tage[c.ti];
+      let s = tag.schichten.find(x => x.mi === j);
+      if (!s){ s = {mi: j, von: c.von, bis: c.bis, rollen: [], mehrarbeit: false}; tag.schichten.push(s); }
+      if (!(s.rollen || []).includes("Ausbildung")) s.rollen = (s.rollen || []).concat("Ausbildung");
+      schichtSetzen(kurz, c.ti, s, c.von, c.bis);
+      tag.schichten.sort((x, y) => x.von - y.von || x.mi - y.mi);
+      geaendert = true;
+    }
+  });
+  return geaendert;
+}
+
+/* Umverteilen: eine Möglichkeit nehmen, die mehr bringt als fehlt — und das Zuviel an einem
+   anderen Tag der Person wieder wegnehmen (Schicht später beginnen oder früher enden lassen).
+   Nur, wenn dort dadurch nichts fehlt und die Schicht lang genug bleibt. → true, wenn es geklappt hat */
+function azubiUmverteilen(kurz, m, j, fehlt){
+  const kandidaten = auffuellKandidaten(kurz, m, fehlt + MINSCHICHT).filter(c => c.gewinn > fehlt + 0.01);
+  for (const c of kandidaten){
+    const zuviel = c.gewinn - fehlt;
+    for (let t2 = 0; t2 < kurz.tage.length; t2++){
+      if (t2 === c.ti || kurz.tage[t2].feiertag) continue;
+      const s2 = kurz.tage[t2].schichten.find(x => x.mi === j);
+      if (!s2 || (s2.rollen || []).includes("Standard")) continue;
+      const vorher = tagesMaengel(kurz, t2);
+      for (let d = 30; d <= 300; d += 30) for (const [von, bis] of [[s2.von, s2.bis - d], [s2.von + d, s2.bis]]){
+        const anw = (bis - von) / 60;
+        if (anw < MINSCHICHT - 0.01) continue;
+        if (Math.abs(s2.arbeit - (anw - pauseFuer(m, anw)) - zuviel) > 0.01) continue;
+        const probe = tagKopie(kurz, t2);
+        schichtSetzen(probe, t2, probe.tage[t2].schichten.find(x => x.mi === j), von, bis);
+        if (tagesMaengel(probe, t2) > vorher) continue;
+        // beides übernehmen: der kürzere Tag …
+        schichtSetzen(kurz, t2, s2, von, bis);
+        // … und die zusätzliche Zeit
+        const tag = kurz.tage[c.ti];
+        let s = tag.schichten.find(x => x.mi === j);
+        if (!s){ s = {mi: j, von: c.von, bis: c.bis, rollen: [], mehrarbeit: false}; tag.schichten.push(s); }
+        if (!(s.rollen || []).includes("Ausbildung")) s.rollen = (s.rollen || []).concat("Ausbildung");
+        schichtSetzen(kurz, c.ti, s, c.von, c.bis);
+        tag.schichten.sort((x, y) => x.von - y.von || x.mi - y.mi);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Azubis, die trotzdem nicht auf ihre Stunden kommen → [{name, fehlt, text}] (mit dem Grund)
+function azubiFehlstunden(plan){
+  const sl = wochenSchluessel(plan.mo instanceof Date ? plan.mo : montagDer(plan.mo));
+  const abw = (state.abwesend || {})[sl] || {};
+  const raus = [];
+  state.mitarbeiter.forEach((m, i) => {
+    if (!istAzubi(m)) return;
+    const j = platzImPlan(plan, m.name), k = j < 0 ? null : kontoNach(plan, j);
+    const fehlt = k ? viertel(k.soll - k.ist) : 0;
+    if (fehlt < 0.5) return;
+    const schule = TAGE.filter(([key]) => (abw[i] || {})[key] === "schule").length;
+    const weg = TAGE.filter(([key]) => ["urlaub", "krank", "nicht"].includes((abw[i] || {})[key])).length;
+    const gruende = [];
+    if (schule) gruende.push(`${schule} ${schule === 1 ? "Tag" : "Tage"} Berufsschule`);
+    if (weg) gruende.push(`${weg} ${weg === 1 ? "Tag" : "Tage"} abwesend`);
+    gruende.push(minderjaehrig(m) ? "an den übrigen Tagen lässt der Jugendschutz nicht mehr zu (höchstens 8 h am Tag, 5 Tage, 6 bis 20 Uhr)"
+      : "an den übrigen Tagen lassen Ruhezeit, Höchstarbeitszeit und Mindestschicht nicht mehr zu");
+    raus.push({name: m.name, fehlt, text: `${m.name}: Bis zu den Betriebsstunden fehlen ${h1(fehlt)} h — ${gruende.join("; ")}.`});
+  });
+  return raus;
+}
+
+// Der Monat, in dem die Woche überwiegend liegt (Mittwoch)
+const planMonat = plan => monatVon(plan.tage[2] ? plan.tage[2].datum : plan.mo);
+
 /* Wem Vertragsstunden fehlen — und wo sie hinpassen.
-   → [{name, ist, soll, fehlt, konto, vorschlaege: [{ti, von, bis, gewinn, art, grund, text}]}]
-   Ein Vorschlag verlängert eine Schicht oder setzt eine an einem freien Tag. Bewertet wird
-   nur mit dem, was im Plan steht: läuft dort eine Aufgabe, die die Person kann; sind zu der
-   Zeit nur so viele im Laden wie mindestens nötig; ist es der Tag mit den wenigsten Stunden. */
+   → [{name, ist, soll, fehlt, konto, vorschlaege: [{ti, von, bis, gewinn, art, grund, was, text}]}]
+   Azubis stehen hier nicht: Ihre Stunden sind Pflicht und schon im Entwurf. Aushilfen stehen
+   nur da, wenn sie im Monat unter drei Vierteln ihrer Stunden liegen — als Hinweis (aushilfe),
+   nach den Festangestellten und nie über die Minijob-Grenze hinaus. */
 function auffuellVorschlaege(sl){
   const pe = planEntwurfVon(sl);
   if (!pe) return [];
   const plan = entwurfAnwenden(pe.kurz, pe.aenderungen).plan;
-  const mo = montagDer(plan.mo), ms = state.mitarbeiter;
-  const start = ueberstundenZuBeginn(mo);
-  const aussen = state.allein ? 1 : MIN_BESETZUNG;
+  const start = ueberstundenZuBeginn(montagDer(plan.mo));
   const tagStunden = plan.tage.map((t, ti) => t.feiertag ? Infinity : tagesStunden(plan, ti));
   const wenigster = tagStunden.indexOf(Math.min(...tagStunden));
-  const raus = [];
-  ms.forEach((m, i) => {
-    const j = platzImPlan(plan, m.name);
-    const k = j < 0 ? null : kontoNach(plan, j);
-    if (!k) return;
-    const fehlt = viertel(k.soll - k.ist);
-    if (fehlt < 0.5) return;
-    const kann = q => !q || (m.qual || []).includes(q);
-    const kandidaten = [];
-    plan.tage.forEach((t, ti) => {
-      if (t.feiertag) return;
-      const r = tagesRaster(t);
-      const eigene = t.schichten.filter(s => s.mi === j);
-      const da = mm => t.schichten.filter(s => s.von <= mm && s.bis > mm).length;
-      // Was die zusätzliche Zeit bringt, je halbe Stunde
-      const werte = (von, bis, ausser) => {
-        let punkte = 0, aufgabe = {}, knapp = 0, n = 0;
-        for (let mm = von; mm < bis; mm += 30){
-          if (ausser && mm >= ausser.von && mm < ausser.bis) continue;       // die Zeit ist schon da
-          n++;
-          const drin = mm >= r.offenVon && mm < r.offenBis;
-          const hier = da(mm), noetig = personenBedarf(t.aufgaben || [], mm, drin, aussen);
-          // eine Aufgabe, bei der eine zweite Hand hilft — Bestellungen macht eine Person allein
-          const auf = (t.aufgaben || []).find(a => { const w = WAREN.find(x => x.id === a.id) || {};
-            return aufgabeLaeuft(a, mm) && w.gruppe !== "bestellung" && kann(w.braucht); });
-          if (hier > noetig) punkte -= 1.5 * (hier - noetig);                // dort sind schon mehr als nötig
-          if (auf){ punkte += 3; aufgabe[auf.name] = (aufgabe[auf.name] || 0) + 1; }
-          else if (drin && hier <= noetig){ punkte += 2; knapp++; }
-          else if (drin) punkte += 1;
-        }
-        return {punkte: n ? punkte / n : -9, aufgabe, knapp, n};
-      };
-      const melde = (von, bis, art, ausser) => {
-        const anw = (bis - von) / 60, arbeit = anw - pauseFuer(m, anw);
-        const gewinn = arbeit - (ausser ? ausser.arbeit : 0);
-        if (gewinn < 0.49 || gewinn > fehlt + 0.01) return;
-        const p = tagKopie(plan, ti);
-        if (!ausfallErlaubt(p, j, ti, von, bis, ausser ? p.tage[ti].schichten.find(s => s.mi === j) : undefined)) return;
-        const w = werte(von, bis, ausser);
-        kandidaten.push({ti, von, bis, art, gewinn, w, punkte: w.punkte + (ti === wenigster ? 0.5 : 0) + Math.min(gewinn, fehlt) / 20});
-      };
-      if (eigene.length === 1){
-        const s = eigene[0];
-        for (let d = 30; d <= 240; d += 30){
-          if (s.bis + d <= r.tagBis) melde(s.von, s.bis + d, "laenger", s);
-          if (s.von - d >= r.tagVon) melde(s.von - d, s.bis, "frueher", s);
-        }
-      } else if (!eigene.length && fehlt >= MINSCHICHT - 0.01){
-        for (let L = MINSCHICHT * 60; L <= REGELN.maxAnwesenheit * 60; L += 30)
-          for (let von = r.tagVon; von + L <= r.tagBis; von += 30) melde(von, von + L, "neu");
-      }
-    });
-    // Die besten drei — höchstens einer je Tag, damit Auswahl bleibt
+  // Die besten drei — höchstens einer je Tag, damit Auswahl bleibt
+  const vorschlaege = (m, fehlt) => {
     const gewaehlt = [];
-    kandidaten.sort((a, b) => b.punkte - a.punkte || b.gewinn - a.gewinn).forEach(c => {
-      if (gewaehlt.length < 3 && !gewaehlt.some(x => x.ti === c.ti)) gewaehlt.push(c);
-    });
+    auffuellKandidaten(plan, m, fehlt).forEach(c => { if (gewaehlt.length < 3 && !gewaehlt.some(x => x.ti === c.ti)) gewaehlt.push(c); });
     const vor = m.name.split(/\s+/)[0];
-    raus.push({name: m.name, ist: k.ist, soll: k.soll, fehlt, konto: start[i] || 0, vorschlaege: gewaehlt.map(c => {
+    return gewaehlt.map(c => {
       const haupt = Object.keys(c.w.aufgabe).sort((a, b) => c.w.aufgabe[b] - c.w.aufgabe[a])[0];
       const grund = haupt && c.w.aufgabe[haupt] * 2 >= c.w.n ? `zweite Hand bei „${haupt}“ — dort bleibt mehr Zeit für Sorgfalt`
         : c.w.knapp * 2 >= c.w.n ? "in dieser Zeit sind nur so viele im Laden wie mindestens nötig — mehr Luft für Kasse und Kunden"
@@ -5883,10 +6112,37 @@ function auffuellVorschlaege(sl){
         : c.art === "laenger" ? `${tagName(c.ti)} länger: bis ${hhmm(c.bis)}` : `${tagName(c.ti)} früher: ab ${hhmm(c.von)}`;
       return {ti: c.ti, von: c.von, bis: c.bis, art: c.art, gewinn: c.gewinn, grund, was,
               text: `${vor} ${was} (+${h1(c.gewinn)} h)`};
-    })});
+    });
+  };
+  const fest = [], aushilfen = [];
+  state.mitarbeiter.forEach((m, i) => {
+    if (istAzubi(m)) return;
+    const j = platzImPlan(plan, m.name);
+    if (istAushilfe(m)){
+      const a = aushilfeMonat(m.name, planMonat(plan), plan);
+      if (!a.unter75) return;
+      // bis zur Orientierung für die schon geplanten Tage — nie über die Monatsgrenze
+      const fehlt = Math.floor(Math.min(a.erwartet - a.ist, a.grenze - a.ist) * 4) / 4;
+      if (fehlt < 0.5) return;
+      aushilfen.push({name: m.name, aushilfe: true, monat: a, ist: a.ist, soll: a.ziel, fehlt, konto: 0, vorschlaege: vorschlaege(m, fehlt)});
+      return;
+    }
+    const k = j < 0 ? null : kontoNach(plan, j);
+    if (!k) return;
+    const fehlt = viertel(k.soll - k.ist);
+    if (fehlt < 0.5) return;
+    fest.push({name: m.name, ist: k.ist, soll: k.soll, fehlt, konto: start[i] || 0, vorschlaege: vorschlaege(m, fehlt)});
   });
-  // Wer im Minus steht, zuerst — dort fehlen die Stunden am meisten
-  return raus.sort((a, b) => a.konto - b.konto || b.fehlt - a.fehlt);
+  // Wer im Minus steht, zuerst — dort fehlen die Stunden am meisten. Aushilfen danach.
+  return fest.sort((a, b) => a.konto - b.konto || b.fehlt - a.fehlt).concat(aushilfen.sort((a, b) => b.fehlt - a.fehlt));
+}
+
+// Alle Aushilfen mit ihrem Stand im Monat — für die Anzeige im Entwurf
+function aushilfenImEntwurf(sl){
+  const pe = planEntwurfVon(sl);
+  if (!pe) return [];
+  const plan = entwurfAnwenden(pe.kurz, pe.aenderungen).plan;
+  return state.mitarbeiter.filter(istAushilfe).map(m => Object.assign({name: m.name}, aushilfeMonat(m.name, planMonat(plan), plan)));
 }
 
 // Einen Vorschlag in den Entwurf nehmen (ersetzt, was für die Person an dem Tag schon dazukam)
@@ -7242,7 +7498,7 @@ function personalListe(){
           : aa === null ? ` <span class="tag fehlt">Alter fehlt</span>` : ""}
           <span class="hint">${esc(m.typ)}${istAzubi(m) ? ` · ${m.lehrjahr}. Lehrjahr` : ""}</span></div>
         <div class="person-zahlen"><span><b>${bek ? h1(stunden(m)) : "?"}</b> h</span>
-          <span class="${ue > 0.1 ? "ue-plus" : ue < -0.1 ? "ue-minus" : "hint"}">${bek ? (ueText(ue) || "0,0") + " h" : ""}</span></div>
+          <span class="${ue > 0.1 ? "ue-plus" : ue < -0.1 ? "ue-minus" : "hint"}">${!bek ? "" : istAushilfe(m) ? "Orientierung" : (ueText(ue) || "0,0") + " h"}</span></div>
         <div class="person-funktionen">${(m.qual || []).map(q => { const f = QUAL.find(x => x[0] === q); return f ? `<span class="tag">${f[1]}</span>` : ""; }).join("")}</div>
         <button class="punkte" type="button" aria-label="Aktionen für ${esc(m.name)}" title="Aktionen">⋯</button></div>`);
       const oeffnen = () => { bearbeite = i; render(); };
@@ -7326,11 +7582,12 @@ function personSeite(){
           Wird jemand 18, hier umstellen.</span></label>
       </div>
       <div class="grid g3" style="margin-top:12px">
-        <label class="f" id="wrapVertrag">Stunden laut Vertrag<input type="number" id="mVertrag" min="0" step="0.5" placeholder="leer lassen, wenn unklar" value="${esc(m.vertrag || "")}"></label>
+        <label class="f" id="wrapVertrag"><span id="vertragText">Stunden laut Vertrag</span><input type="number" id="mVertrag" min="0" step="0.5" placeholder="leer lassen, wenn unklar" value="${esc(m.vertrag || "")}">
+          <span class="hint" id="vertragHinweis" hidden>Orientierung, keine Pflicht. Fest ist nur die Minijob-Grenze im Monat — ein Stundenkonto gibt es für Aushilfen nicht.</span></label>
         <label class="f" id="wrapLj" hidden>Lehrjahr<select id="mLj">${[1,2,3].map(j =>
           `<option value="${j}"${m.lehrjahr === j ? " selected" : ""}>${j}. Lehrjahr</option>`).join("")}</select></label>
         <label class="f" id="wrapBetrieb" hidden>Stunden im Betrieb<input type="number" id="mBetrieb" min="0" step="0.5" placeholder="leer lassen, wenn unklar" value="${esc(m.betrieb || "")}"></label>
-        <label class="f">Überstunden zu Beginn KW ${kwVon(jetzt)}<input type="number" id="mSaldo" step="0.25" placeholder="0"
+        <label class="f" id="wrapSaldo">Überstunden zu Beginn KW ${kwVon(jetzt)}<input type="number" id="mSaldo" step="0.25" placeholder="0"
           value="${standJetzt === null || standJetzt === undefined ? esc(m.saldo ?? "") : standJetzt}">
           <span class="hint">+ Überstunden, − Minusstunden. Danach rechnet der Plan jede Woche selbst weiter.</span></label>
       </div>
@@ -7359,9 +7616,14 @@ function personSeite(){
     const typ = f.querySelector("#mTyp");
     const umschalten = () => {
       const az = typ.value === "Azubi";
+      const aus = typ.value === "Aushilfe (Minijob)";
       f.querySelector("#wrapVertrag").hidden = az;
       f.querySelector("#wrapLj").hidden = !az;
       f.querySelector("#wrapBetrieb").hidden = !az;
+      // Aushilfen: Wochenstunden als Orientierung, kein Stundenkonto
+      f.querySelector("#vertragText").textContent = aus ? "Stunden pro Woche (Orientierung)" : "Stunden laut Vertrag";
+      f.querySelector("#vertragHinweis").hidden = !aus;
+      f.querySelector("#wrapSaldo").hidden = aus;
     };
     typ.onchange = umschalten; umschalten();
 
@@ -7405,7 +7667,8 @@ function personSeite(){
     // Den Überstundenstand nur neu setzen, wenn er geändert wurde — sonst bleibt
     // die Rechnung über die Wochen hinweg unangetastet
     const eingabe = f.querySelector("#mSaldo").value;
-    const geaendert = neuM || (hat(eingabe) ? nz(eingabe) : 0) !== (standJetzt || 0);
+    // (bei Aushilfen gar nicht: Sie haben kein Konto, ein alter Stand bleibt unberührt liegen)
+    const geaendert = d.typ !== "Aushilfe (Minijob)" && (neuM || (hat(eingabe) ? nz(eingabe) : 0) !== (standJetzt || 0));
     if (geaendert){ d.saldo = hat(eingabe) ? viertel(nz(eingabe)) : 0; d.saldoAb = wochenSchluessel(jetzt); }
     if (neuM) state.mitarbeiter.push(d);
     else {
@@ -7802,7 +8065,7 @@ function pruefen(){
       <input type="number" step="0.01" min="0" id="aLohn" placeholder="${mindestlohn(x.jahr).toFixed(2)}" value="${esc((state.einstellungen || {}).aushilfeLohn || "")}">
       <span class="hint">leer = Mindestlohn ${euro(mindestlohn(x.jahr))}</span></label>
     <div class="tile"><span class="eyebrow">Minijob-Grenze ${x.jahr}</span><div class="v">${minijobGrenze(x.jahr)} €</div>
-      <div class="sub">= ${h1(minijobStunden(x.jahr))} h im Monat bei ${euro(aushilfeLohn(x.jahr))}</div></div>
+      <div class="sub">= ${hGenau(minijobStunden(x.jahr))} h im Monat bei ${euro(aushilfeLohn(x.jahr))}</div></div>
     <div class="tile"><span class="eyebrow">Minijob-Grenze ${x.jahr + 1}</span><div class="v">${minijobGrenze(x.jahr + 1)} €</div>
       <div class="sub">Mindestlohn dann ${euro(mindestlohn(x.jahr + 1))}</div></div></div>`);
   lohnFeld.querySelector("#aLohn").onchange = e => {
@@ -7814,19 +8077,28 @@ function pruefen(){
   const aushilfen = state.mitarbeiter.filter(istAushilfe);
   if (!aushilfen.length) aus.appendChild(el(`<p class="empty">Keine Aushilfen im Personal.</p>`));
   aushilfen.forEach(m => {
+    // Stand im laufenden Monat: Orientierung sind die eigenen Wochenstunden, Grenze der Minijob
+    const a = aushilfeMonat(m.name, monatVon(new Date()));
+    aus.appendChild(el(`<div class="aushilfe"><h3>${esc(m.name)}</h3>
+      <p class="aus-stand"><b>${esc(a.monatsname)}: ${h1(a.ist)} von ${h1(a.ziel)} h geplant</b> —
+        ${a.offen > 0.24 ? `noch ${h1(a.offen)} h bis zur vollen Auszahlung` : "volle Auszahlung erreicht"}${
+        a.anteil < 0.999 ? ` (geplant ist erst ${Math.round(a.anteil * 100)} % des Monats)` : ""}.</p>
+      ${a.unter75 ? `<div class="note warn"><span class="ic">!</span><span>Für die bisher geplanten Tage sind das weniger als drei Viertel der Stunden
+        (${h1(a.ist)} von ${h1(a.erwartet)} h). Kein Muss — beim nächsten Plan macht der Entwurf Vorschläge.</span></div>` : ""}
+      ${a.ueber ? `<div class="note bad"><span class="ic">×</span><span>Über der Minijob-Grenze von ${hGenau(a.grenze)} h — bitte in „Plan ändern“ kürzen.</span></div>` : ""}</div>`));
     const k = aushilfenKonto(m.name).slice(-4);
     if (!k.length){ aus.appendChild(el(`<p class="hint"><b>${esc(m.name)}</b>: noch in keinem Plan.</p>`)); return; }
     const monat = mo => new Date(mo + "-15T12:00:00").toLocaleDateString("de-DE", {month: "long", year: "numeric"});
     const folge = mo => { const d = new Date(mo + "-15T12:00:00"); d.setMonth(d.getMonth() + 1); return d.toLocaleDateString("de-DE", {month: "long"}); };
-    aus.appendChild(el(`<div class="aushilfe"><h3>${esc(m.name)}</h3><div class="tablewrap"><table><thead><tr><th>Gearbeitet im</th>
+    aus.appendChild(el(`<div class="aushilfe ohne-kopf"><div class="tablewrap"><table><thead><tr><th>Gearbeitet im</th>
       <th class="n">Stunden</th><th>Ausgezahlt im</th><th class="n">Stunden</th><th class="n">mitgenommen</th></tr></thead><tbody>${k.map(z =>
       `<tr><td>${monat(z.monat)}${z.vollstaendig ? "" : ` <span class="tag">nicht ganz geplant</span>`}</td><td class="n">${h1(z.gearbeitet)}</td>
         <td>${folge(z.monat)}</td><td class="n">${h1(z.ausgezahlt)}</td>
         <td class="n ${z.uebertrag > 0.01 ? "ue-plus" : ""}">${h1(z.uebertrag)}</td></tr>`).join("")}</tbody></table></div></div>`));
   });
-  aus.appendChild(el(`<p class="hint">Ausgezahlt wird im Folgemonat, was im Monat davor gearbeitet wurde — höchstens bis zur Minijob-Grenze.
-    Was darüber liegt, wird in die nächsten Monate mitgenommen und nie ausgezahlt. Gerechnet aus den Plänen; was nach dem Erstellen
-    von Hand geändert wurde, zählt mit.</p>`));
+  aus.appendChild(el(`<p class="hint">Aushilfen haben kein Stundenkonto: Ihre Wochenstunden sind eine Orientierung, fest ist nur die
+    Minijob-Grenze im Monat. Der Planer plant sie nicht darüber ein; wer von Hand darüber käme, steht in „Plan ändern“ rot.
+    Ausgezahlt wird im Folgemonat, was im Monat davor gearbeitet wurde. Gerechnet aus den Plänen — Änderungen von Hand zählen mit.</p>`));
 
   // ---- Aufbau des Mindestbedarfs (wie bisher) ----
   p.querySelector("#aufbau").appendChild(el(`<div class="tablewrap"><table><thead><tr><th>Posten</th><th>Rechnung</th><th class="n">Stunden</th></tr></thead>
@@ -8087,14 +8359,22 @@ function planGitter(plan, o){
       <td class="n std ${pz.ueStart === null ? "" : ueKlasse(pz.ueStart)}" rowspan="2">${ueText(pz.ueStart)}</td>
       ${oben.join("")}
       <td rowspan="2" class="n stunden"><b>${h1(pz.wo)}</b><br><span class="klein">${h1(pz.wopause)}</span></td>
-      <td rowspan="2" class="n std">${pz.ueEnde === null ? "" : `<b class="${ueKlasse(pz.ueEnde)}">${ueText(pz.ueEnde)}</b>
+      <td rowspan="2" class="n std"${pz.monat ? ` title="${monatsTitel(pz.monat)}"` : ""}>${pz.monat ? monatsZelle(pz.monat)
+        : pz.ueEnde === null ? "" : `<b class="${ueKlasse(pz.ueEnde)}">${ueText(pz.ueEnde)}</b>
         <br><span class="ue-aend ${ueKlasse(pz.ueAend)}">${Math.abs(pz.ueAend) < 0.01 ? "±0" : ueText(pz.ueAend)} Std.</span>`}</td></tr>
       <tr class="ma-unten">${unten.join("")}</tr>`;
   }).join("");
+  // Darunter, was davon zählt: ohne die leistungsneutralen Stunden der Azubis
   const summe = `<tr class="summe"><th class="zeilenkopf">Summe Stunden</th><td></td><td></td>${
-    r.summen.map(x => `<td colspan="2">${h1(x)}</td>`).join("")}<td class="n">${h1(r.summeWoche)}</td><td></td></tr>`;
+    r.summen.map(x => `<td colspan="2">${h1(x)}</td>`).join("")}<td class="n">${h1(r.summeWoche)}</td><td></td></tr>
+    <tr class="summe wirksam"><th class="zeilenkopf">Leistungswirksame Stunden</th><td></td><td></td>${
+    r.wirk.map(x => `<td colspan="2">${h1(x)}</td>`).join("")}<td class="n">${h1(r.wirkWoche)}</td><td></td></tr>`;
   return el(`<table class="plan gitter"><thead>${kopf}</thead><tbody>${liefer}${bestell}${aufg}${luecken}${leute}${summe}</tbody></table>`);
 }
+
+// Aushilfen haben kein Stundenkonto: In der Spalte steht bei ihnen der Stand im Monat
+const monatsZelle = a => `<b>${h1(a.ist)}</b> <span class="klein">von ${h1(a.ziel)}</span><br><span class="klein">im ${esc(a.monatsname)}</span>`;
+const monatsTitel = a => `Aushilfe: im ${a.monatsname} ${h1(a.ist)} h geplant — noch ${h1(a.offen)} h bis zur vollen Auszahlung. Die Minijob-Grenze liegt bei ${hGenau(a.grenze)} h.`;
 
 /* ---- Derselbe Plan kompakt — für schmale Bildschirme (iPhone) ---- */
 function planKompakt(plan, o){
@@ -8138,11 +8418,14 @@ function planKompakt(plan, o){
     const typ = istAzubi(m) ? `Azubi ${m.lehrjahr}. Jahr` : m.typ;
     return `<tr class="k-person"><th class="k-name">${name}<span class="k-typ">${esc(typ)}</span></th>${tage}
       <td class="k-std"><b>${h1(pz.wo)}</b>${pz.sollZahl !== null ? `<span>von ${h1(pz.sollZahl)}</span>` : ""}</td>
-      <td class="k-konto">${pz.ueEnde === null ? "" : `<b class="${ueKlasse(pz.ueEnde)}">${ueText(pz.ueEnde) || "0,0"}</b>
+      <td class="k-konto"${pz.monat ? ` title="${monatsTitel(pz.monat)}"` : ""}>${pz.monat ? `<b class="k-voll ue-null">${h1(pz.monat.ist)}</b><span>von ${h1(pz.monat.ziel)}</span>`
+        : pz.ueEnde === null ? "" : `<b class="${ueKlasse(pz.ueEnde)}">${ueText(pz.ueEnde) || "0,0"}</b>
         <span class="${ueKlasse(pz.ueAend)}">${Math.abs(pz.ueAend) < 0.01 ? "±0" : ueText(pz.ueAend)}</span>`}</td></tr>`;
   }).join("");
   const summe = `<tr class="k-summe"><th>Summe</th>${r.summen.map(x => `<td>${h1(x)}</td>`).join("")}
-    <td class="k-std"><b>${h1(r.summeWoche)}</b></td><td></td></tr>`;
+    <td class="k-std"><b>${h1(r.summeWoche)}</b></td><td></td></tr>
+    <tr class="k-summe k-wirksam"><th>${zweifach("Leistungswirksam", "Wirks.")}</th>${r.wirk.map(x => `<td>${h1(x)}</td>`).join("")}
+    <td class="k-std"><b>${h1(r.wirkWoche)}</b></td><td></td></tr>`;
   return el(`<table class="kompakt">
     <colgroup><col class="c-name">${plan.tage.map(() => `<col class="c-tag">`).join("")}<col class="c-std"><col class="c-konto"></colgroup>
     <thead>${kopf}</thead><tbody>${liefer}${bestell}${notiz}${luecken}${zeilen}${summe}</tbody></table>`);
@@ -9330,8 +9613,16 @@ function planEntwurfAnsicht(){
   const plan = planLaden(pr.plan);
   const bis = new Date(mo.getTime() + 5 * 864e5);
   const neuZeichnen = () => { const y = window.scrollY; sichern(); render(); window.scrollTo(0, y); };
-  const fehlend = auffuellVorschlaege(sl);
+  const vorschlaege = auffuellVorschlaege(sl);
+  const fehlend = vorschlaege.filter(x => !x.aushilfe);           // Festangestellte: Vertragsstunden
+  const aushilfen = aushilfenImEntwurf(sl);                         // Aushilfen: Stand im Monat
   const offenStunden = fehlend.reduce((s, x) => s + x.fehlt, 0);
+  // Was die Freigabe noch braucht: Lücken und Regeln aus dem Entwurf, Azubis unter ihren
+  // Betriebsstunden, Aushilfen über der Minijob-Grenze (auch wenn der gerechnete Plan sie schon hatte)
+  const zuTun = pr.offen.slice();
+  azubiFehlstunden(pr.plan).forEach(x => zuTun.push({art: "azubi", text: x.text}));
+  minijobVerstoesse(pr.plan).forEach(x => { if (!zuTun.some(o => o.text === x.text)) zuTun.push({art: "minijob", text: x.text}); });
+  const azubis = state.mitarbeiter.filter(istAzubi).length;
   const gueltig = (state.plaene || {})[sl];
 
   const p = el(`<div class="panel aendern planentwurf"></div>`);
@@ -9341,7 +9632,7 @@ function planEntwurfAnsicht(){
       ${gueltig ? "Bis zur Freigabe gilt für diese Woche der bisherige Plan." : "Gültig wird der Plan erst mit „Plan freigeben“."}`});
   p.appendChild(kopf);
 
-  const offenN = pr.offen.length;
+  const offenN = zuTun.length;
   const status = el(`<div class="aendern-status">
     <span class="pille">${h1(planSummen(plan).bezahlt)} h geplant</span>
     <span class="pille ${offenN ? "rot" : "gruen"}">${offenN ? `${offenN} noch zu tun` : "Besetzung passt"}</span>
@@ -9356,9 +9647,9 @@ function planEntwurfAnsicht(){
   p.appendChild(oben); p.appendChild(haupt);
 
   // ---- Noch zu tun ----
-  if (pr.offen.length){
+  if (zuTun.length){
     const k = el(`<section class="karte rot"><h3>Noch zu tun</h3><div></div></section>`);
-    pr.offen.forEach(o => {
+    zuTun.forEach(o => {
       const z = el(`<div class="todo"><span>${esc(o.text)}</span></div>`);
       if (o.art === "passtNicht"){
         const b = el(`<button class="btn ghost small" type="button">Herausnehmen</button>`);
@@ -9386,7 +9677,13 @@ function planEntwurfAnsicht(){
   // ---- Vertragsstunden ----
   const vk = el(`<section class="karte"><h3>${symbol("uhr")} Vertragsstunden</h3><div class="pe-liste"></div></section>`);
   const liste = vk.querySelector(".pe-liste");
-  if (!fehlend.length) liste.appendChild(el(`<p class="zt-leer">${symbol("haken")}<span>Alle haben ihre Vertragsstunden — oder mehr.</span></p>`));
+  if (!fehlend.length) liste.appendChild(el(`<p class="zt-leer">${symbol("haken")}<span>Alle Festangestellten haben ihre Vertragsstunden — oder mehr.</span></p>`));
+  const vorschlagKnoepfe = (vBox, x) => x.vorschlaege.forEach(v => {
+    const b = el(`<button class="pe-vorschlag" type="button"><span class="pe-was"><b>${esc(v.was)}</b><span class="tag">+${h1(v.gewinn)} h</span></span>
+      <span class="pe-grund">${esc(v.grund)}</span><span class="pe-tun">Übernehmen</span></button>`);
+    b.onclick = () => { auffuellUebernehmen(sl, x.name, v); neuZeichnen(); };
+    vBox.appendChild(b);
+  });
   fehlend.forEach(x => {
     const box = el(`<div class="pe-person"><div class="pe-kopf"><b>${esc(x.name)}</b>
       <span>${h1(x.ist)} von ${h1(x.soll)} h · <b>${h1(x.fehlt)} h offen</b></span></div>
@@ -9395,18 +9692,33 @@ function planEntwurfAnsicht(){
     const vBox = box.querySelector(".pe-vorschlaege");
     if (!x.vorschlaege.length) vBox.appendChild(el(`<p class="hint">Kein Vorschlag — an den freien Tagen stehen Ruhezeit, Höchstarbeitszeit,
       Abwesenheit oder die Mindestschicht von ${MINSCHICHT} Stunden dagegen. Von Hand geht es über eine Zelle im Plan.</p>`));
-    x.vorschlaege.forEach(v => {
-      const b = el(`<button class="pe-vorschlag" type="button"><span class="pe-was"><b>${esc(v.was)}</b><span class="tag">+${h1(v.gewinn)} h</span></span>
-        <span class="pe-grund">${esc(v.grund)}</span><span class="pe-tun">Übernehmen</span></button>`);
-      b.onclick = () => { auffuellUebernehmen(sl, x.name, v); neuZeichnen(); };
-      vBox.appendChild(b);
-    });
+    vorschlagKnoepfe(vBox, x);
     liste.appendChild(box);
   });
+  // Azubis: ihre Betriebsstunden sind Pflicht und schon eingeplant — fehlt etwas, steht es oben rot
+  if (azubis && !zuTun.some(o => o.art === "azubi")) vk.appendChild(el(`<p class="hint pe-azubi">${symbol("haken")}
+    ${azubis === 1 ? "Der Azubi ist" : "Die Azubis sind"} bis zu den Betriebsstunden eingeplant.</p>`));
+
+  // Aushilfen: Wochenstunden sind Orientierung, der Monat zählt. Hinweis erst unter drei Vierteln.
+  if (aushilfen.length){
+    const ak = el(`<div class="pe-aushilfen"><span class="eyebrow">Aushilfen — Stand im Monat</span><div class="pe-liste"></div></div>`);
+    aushilfen.forEach(a => {
+      const x = vorschlaege.find(v => v.aushilfe && v.name === a.name);
+      const box = el(`<div class="pe-person${a.unter75 ? " knapp" : ""}"><div class="pe-kopf"><b>${esc(a.name)}</b>
+        <span>${esc(a.monatsname)}: ${h1(a.ist)} von ${h1(a.ziel)} h</span></div>
+        <p class="hint">${a.offen > 0.24 ? `Noch ${h1(a.offen)} h bis zur vollen Auszahlung` : "Volle Auszahlung erreicht"} · Minijob-Grenze ${hGenau(a.grenze)} h im Monat.</p>
+        ${a.unter75 ? `<div class="note warn"><span class="ic">!</span><span>Für die bisher geplanten Tage liegt ${esc(a.name.split(/\s+/)[0])} unter drei Vierteln der Stunden
+          (${h1(a.ist)} von ${h1(a.erwartet)} h). Kein Muss — aber die Lücke sollte nicht zu groß werden.</span></div>` : ""}
+        <div class="pe-vorschlaege"></div></div>`);
+      if (x) vorschlagKnoepfe(box.querySelector(".pe-vorschlaege"), x);
+      ak.querySelector(".pe-liste").appendChild(box);
+    });
+    vk.appendChild(ak);
+  }
   // Was schon dazugenommen wurde — einzeln wieder herausnehmbar
   const dazu = pe.aenderungen.filter(a => a.aktiv && (a.quelle === "auffuellen" || a.quelle === "hand"));
   if (dazu.length){
-    const d = el(`<div class="pe-dazu"><span class="eyebrow">Im Entwurf geändert</span></div>`);
+    const d = el(`<div class="pe-dazu"><span class="eyebrow">Von dir im Entwurf geändert</span></div>`);
     dazu.forEach(a => {
       const z = el(`<div class="pe-zeile"><span>${esc(a.text)}</span><button class="btn ghost small" type="button" title="wieder herausnehmen">×</button></div>`);
       z.querySelector("button").onclick = () => { pe.aenderungen = pe.aenderungen.filter(y => y.id !== a.id); neuZeichnen(); };
@@ -9422,7 +9734,7 @@ function planEntwurfAnsicht(){
   };
   p.querySelector("#peFreigeben").onclick = async () => {
     const fragen = [];
-    if (pr.offen.length) fragen.push(`${pr.offen.length === 1 ? "Ein Punkt ist" : pr.offen.length + " Punkte sind"} noch offen.`);
+    if (zuTun.length) fragen.push(`${zuTun.length === 1 ? "Ein Punkt ist" : zuTun.length + " Punkte sind"} noch offen.`);
     if (gueltig) fragen.push("Der bisherige Plan dieser Woche wird ersetzt.");
     if (fragen.length && !confirm(fragen.join(" ") + " Plan trotzdem freigeben?")) return;
     planFreigeben(sl);
@@ -10063,11 +10375,15 @@ function planRaster(plan){
     const soll = hatVertrag(m) ? stunden(m) : null;
     const titel = m.name + "   " + (istAzubi(m) ? `Azubi ${m.lehrjahr}. Jahr` : m.typ);
     // Überstunden: Stand zu Beginn der Woche, Veränderung durch diese Woche, Stand danach
-    const ueStart = soll === null ? null : start[i];
-    const ueAend = soll === null || j < 0 ? null : wochenAenderung(plan, m, i);
-    const ueEnde = ueStart === null ? null : viertel(ueStart + (ueAend || 0));
+    // Aushilfen haben kein Konto: statt Überstunden steht bei ihnen der Stand im Monat
+    const konto = hatKonto(m);
+    const ueStart = !konto ? null : start[i];
+    const ueAend = !konto || j < 0 ? null : wochenAenderung(plan, m, i);
+    const ueEnde = ueStart === null || ueStart === undefined ? null : viertel(ueStart + (ueAend || 0));
+    const mitte = plan.tage[2] ? plan.tage[2].datum : plan.mo;         // der Monat, in dem die Woche überwiegend liegt
     return {titel, j, woche: soll === null ? "" : h1(soll), sollZahl: soll,
-            ueStart, ueAend, ueEnde, arbeit, pause, wo, wopause};
+            ueStart: ueStart === undefined ? null : ueStart, ueAend, ueEnde, arbeit, pause, wo, wopause,
+            monat: istAushilfe(m) ? aushilfeMonat(m.name, monatVon(mitte), plan) : null};
   });
 
   return {
@@ -10078,7 +10394,10 @@ function planRaster(plan){
     lieferungen, bestellung, bestellungVoll, mitBestellung, aufgabenZeile, leute,
     phase: plan.phase && plan.phase.art !== "normal" ? phasenText(plan.phase) : "",
     summen: s.proTag.map(x => x.bezahlt),
-    summeWoche: s.bezahlt
+    summeWoche: s.bezahlt,
+    // ohne die leistungsneutralen Stunden (Azubis im 1. Lehrjahr gar nicht, im 2. zur Hälfte)
+    wirk: s.proTag.map(x => x.wirk),
+    wirkWoche: s.wirk
   };
 }
 

@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-16-4-test",
+  "fassung": "2026-11-16-5-test",
   "datei": "filialplaner.html",
-  "pruefsumme": "2b1e534115dd440db9371fe1e72156d799944f06753e9608568ae3030bb9d7a7",
-  "hinweis": "Planer legt Aufgaben nacheinander, Plan erst als Entwurf mit Freigabe, Tagesanalyse je Aufgabe, Assistent neu gestaltet"
+  "pruefsumme": "f5f37499a4138f4add4f736134f23164a99d922f25985e8687edb017b80d0784",
+  "hinweis": "Azubis immer auf ihren Stunden, Aushilfen ohne Konto mit Monatsgrenze, Zeile „Leistungswirksame Stunden“"
 }
