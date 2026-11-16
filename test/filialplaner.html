@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-16-2-test">
+<meta name="fassung" content="2026-11-16-3-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -9773,6 +9773,24 @@ async function planExcel(plan){
 
 async function planPDF(plan){
   if (!plan || !window.jspdf){ alert("PDF-Bibliothek nicht geladen."); return; }
+  const doc = planPDFDokument(plan);
+  await anbieten(doc.output("blob"), `Arbeitsplan_N${state.nr}_KW${kwVon(plan.mo)}.pdf`);
+}
+
+/* Das PDF zum Aushängen — immer genau eine Seite.
+   Die Bestellungen stehen ausgeschrieben untereinander, je Frist ein Block. Reicht dafür
+   der Platz auf der Seite nicht (viele Leute, viele Bestellungen), rücken sie erst
+   nebeneinander, zuletzt in die Kurzform — lieber kürzer als eine zweite Seite. */
+function planPDFDokument(plan){
+  let doc = null;
+  for (const stufe of ["untereinander", "nebeneinander", "kurz"]){
+    doc = planPDFSeite(plan, stufe);
+    if (doc.getNumberOfPages() === 1 && doc.lastAutoTable.finalY <= 199) break;
+  }
+  return doc;
+}
+
+function planPDFSeite(plan, bestellStufe){
   const r = planRaster(plan);
   const {jsPDF} = window.jspdf;
   // Die eingebaute PDF-Schrift kennt das echte Minuszeichen nicht
@@ -9802,8 +9820,18 @@ async function planPDF(plan){
   const body = [];
   r.lieferungen.forEach(l => body.push([l.name, "", "", l.zeit,
     ...l.tage.map(x => ({content:x, colSpan:2, styles:{halign:"center"}})), "", ""]));
+  // Bestellungen: [Frist, Namen] je Tag. Die Zeilen werden selbst gezeichnet (Frist fett),
+  // der Text der Zelle dient nur dazu, dass die Tabelle die Höhe richtig rechnet.
+  const B_SCHRIFT = 6.8;
+  const bestellZeilen = tag => bestellStufe === "untereinander"
+    ? tag.reduce((l, [frist, namen]) => l.concat(frist ? [{text: frist, fett: true}] : [], namen.map(n => ({text: n}))), [])
+    : tag.map(([frist, namen]) => ({text: (frist ? frist + ": " : "") + namen.join(", ")}));
   if (r.mitBestellung) body.push(["Bestellung", "", "", "",
-    ...r.bestellung.map(x => ({content:x.join("\n"), colSpan:2, styles:{halign:"center", fontSize:6.2}})), "", ""]);
+    ...(bestellStufe === "kurz"
+      ? r.bestellung.map(x => ({content:x.join("\n"), colSpan:2, styles:{halign:"center", fontSize:6.2}}))
+      : r.bestellungVoll.map(tag => ({content: bestellZeilen(tag).map(z => z.text).join("\n"), colSpan:2,
+          bestell: bestellStufe === "untereinander" ? bestellZeilen(tag) : null,
+          styles:{halign:"center", valign:"top", fontSize:B_SCHRIFT}}))), "", ""]);
   body.push([{content:"Mitarbeiter", styles:{halign:"center"}}, "", "", "",
     ...r.aufgabenZeile.map(x => ({content:x, colSpan:2, styles:{halign:"center", fontStyle:"bold"}})), "", ""]);
 
@@ -9834,7 +9862,20 @@ async function planPDF(plan){
     styles:{fontSize:7, cellPadding:1.1, lineColor:[0,0,0], lineWidth:0.15, textColor:[0,0,0], valign:"middle"},
     headStyles:{fillColor:[255,255,255], textColor:[0,0,0], fontStyle:"bold", fontSize:7, lineWidth:0.2},
     columnStyles:spalten, margin:{left:10, right:10},
+    // Bestellzelle: den einfachen Text nicht zeichnen — didDrawCell setzt ihn mit fetter Frist
+    willDrawCell: d => { if (d.section === "body" && d.cell.raw && d.cell.raw.bestell) d.cell.text = []; },
     didDrawCell: d => {
+      const zeilen = d.section === "body" && d.cell.raw ? d.cell.raw.bestell : null;
+      if (zeilen){
+        const hoehe = B_SCHRIFT * 0.3528 * 1.15;
+        doc.setFontSize(B_SCHRIFT); doc.setTextColor(0);
+        zeilen.forEach((z, n) => {
+          doc.setFont("helvetica", z.fett ? "bold" : "normal");
+          doc.text(z.text, d.cell.x + d.cell.width/2, d.cell.y + 1.1 + B_SCHRIFT * 0.3528 + n * hoehe, {align:"center"});
+        });
+        doc.setFont("helvetica","normal");
+        return;
+      }
       const a = d.section === "body" && d.cell.raw ? d.cell.raw.aend : null;
       if (typeof a !== "number") return;
       doc.setFont("helvetica","bold"); doc.setFontSize(6.3);
@@ -9848,9 +9889,9 @@ async function planPDF(plan){
   // des Planers (Mehrstunden einzelner, Minijob-Grenze, Ausfälle) gehören nicht
   // hinein. Sie stehen in der App und in der Excel-Datei.
   doc.setFontSize(6.5); doc.setTextColor(120);
+  doc.setPage(1);
   doc.text(`Stand ${new Date().toLocaleDateString("de-DE")} · N ${state.nr}`, 10, 202);
-
-  await anbieten(doc.output("blob"), `Arbeitsplan_N${state.nr}_KW${r.kw}.pdf`);
+  return doc;
 }
 
 async function anbieten(blob, name){
