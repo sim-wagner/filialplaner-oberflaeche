@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-17-5-test",
+  "fassung": "2026-11-18-1-test",
   "datei": "filialplaner.html",
-  "pruefsumme": "bbfc4209e85694307711f9935dc47a3fb0c3b3f59e4f0bfc473432011e7231c9",
-  "hinweis": "Wie 2026-11-17-4-test, dazu klarere Vorschlagskarten im Assistenten (wer kommt, wer bleibt länger)"
+  "pruefsumme": "3bca8fb858cade2da2e82bd04150705ded0902ae199b5af7ddf8734284478d13",
+  "hinweis": "Zwischenstand: Fristen für Aufgaben, Aufgaben neu legen, PÄ und Kontoauszug als Funktionen, Pausen für wenige Kassenwechsel, Aufgaben bei einer Person, 50-%-Regel, Empfehlungen mit Möglichkeiten, Lösungen nur über den Assistenten"
 }
