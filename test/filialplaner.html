@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-17-4-test">
+<meta name="fassung" content="2026-11-17-5-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -6555,6 +6555,26 @@ function wegeOrdnen(wege){
 }
 
 // Das Nötigste eines Wegs für die Anzeige in einer Karte (ohne die Plantage)
+/* Ein Weg in einer Zeile, je Person ein kurzes Stück: „Yvonne kommt ab 12:00 · Lilly kommt 14:00–20:00“.
+   Bei mehr als drei Beteiligten bleibt der Satz des Planers. */
+function wegTitel(w){
+  const z = w.zeilen || [];
+  if (!z.length || z.length > 3) return w.titel;
+  const spanne = t => String(t || "").split(" + ").filter(Boolean).map(x => x.split("–").map(minuten));
+  return z.map(x => {
+    const n = x.name.split(" ")[0], a = spanne(x.vorher), b = spanne(x.nachher);
+    if (!a.length) return `${n} kommt ${x.nachher}`;
+    if (!b.length) return `${n} hat frei`;
+    if (a.length === 1 && b.length === 1){
+      const [[a0, a1]] = a, [[b0, b1]] = b;
+      if (b0 === a0 && b1 > a1) return `${n} bleibt bis ${hhmm(b1)}`;
+      if (b1 === a1 && b0 < a0) return `${n} kommt ab ${hhmm(b0)}`;
+      if (b1 === a1 && b0 > a0) return `${n} kommt erst ab ${hhmm(b0)}`;
+      if (b0 === a0 && b1 < a1) return `${n} geht schon um ${hhmm(b1)}`;
+    }
+    return `${n} ${x.nachher} statt ${x.vorher}`;
+  }).join(" · ");
+}
 // Was ein Weg bringt, in einer Zeile: „Lücke zu · +6,0 h“ oder „19:00–20:00 bleibt offen · +2,0 h“
 const wegKurz = w => ({zeilen: w.zeilen, voll: w.voll, offen: w.offen, luecke: w.luecke, mehr: w.mehr, konto: w.konto,
   passt: `${w.voll ? "Lücke zu" : spannenText(w.offen) + " bleibt offen"} · ${w.mehr > 0.01 ? `+${h1(w.mehr)} h`
@@ -6632,7 +6652,7 @@ function assistent(text, sl, kurz, eintrag){
     ? `${tagName(tage[0])} bis ${tagName(tage[tage.length - 1])}` : tage.map(tagName).join(", ");
   // Karten für die Wege einer Lücke (gleiche Rechnung wie bei den Lösungen)
   const wegKarten = (wege, fuer) => wege.map(w => karte({typ: "loesung", fuer: fuer || null, ti: w.ti, schritte: w.schritte,
-    titel: w.titel, art: w.art, weg: wegKurz(w)}, w.titel));
+    titel: w.titel, art: w.art, weg: wegKurz(w)}, wegTitel(w)));
   const lueckenWege = (ti, ausschluss) => {
     const extra = (ausschluss || []).map(name => ({aktiv: true, typ: "abwesend", name, ti, grund: "nicht"}));
     return mitEntwurfsAbwesenheiten(sl, {aenderungen: eintrag.aenderungen.concat(extra)}, () =>
@@ -11812,11 +11832,9 @@ function assistentKarte(sl, kurz, eintrag, fertig){
   const karte = id => {
     const a = eintrag.aenderungen.find(x => x.id === id);
     if (!a) return null;
-    // Kurz: der Satz, bei mehreren Beteiligten wer was anders macht, dann Ergebnis und Stunden
-    const zeilen = a.weg && a.weg.zeilen.length > 1 ? `<span class="chat-weg">${a.weg.zeilen.map(z =>
-      `${esc(z.name.split(" ")[0])}: ${z.vorher ? `<s>${esc(z.vorher)}</s> → ` : ""}${esc(z.nachher || "frei")}`).join(" · ")}</span>` : "";
+    // Kurz: wer was anders macht in einer Zeile (der Kartentext), darunter Ergebnis und Stunden
     const kn = el(`<button class="chatkarte${a.aktiv ? " an" : ""}" type="button" aria-pressed="${a.aktiv}">${esc(a.text)}
-      ${zeilen}${a.weg && a.weg.passt ? `<span class="chat-weg">${esc(a.weg.passt)}</span>` : ""}
+      ${a.weg && a.weg.passt ? `<span class="chat-weg">${esc(a.weg.passt)}</span>` : ""}
       <span>${a.aktiv ? "✓ im Plan · antippen entfernt" : "antippen zeigt es im Plan"}</span></button>`);
     kn.onclick = () => {
       if (a.aktiv) aenderungAus(eintrag, a.id);

@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-17-4-test",
+  "fassung": "2026-11-17-5-test",
   "datei": "filialplaner.html",
-  "pruefsumme": "2a74e5348f55613116f58f6763416a58255fafda993ff91b4d890914cf8f9d8c",
-  "hinweis": "Tagesansicht, Kasse je Viertelstunde, feste Kassenkraft, Assistent Schritt für Schritt, Azubis ohne Konto, PÄ und Kontoauszug, Empfehlungen mit Überstunden"
+  "pruefsumme": "bbfc4209e85694307711f9935dc47a3fb0c3b3f59e4f0bfc473432011e7231c9",
+  "hinweis": "Wie 2026-11-17-4-test, dazu klarere Vorschlagskarten im Assistenten (wer kommt, wer bleibt länger)"
 }
