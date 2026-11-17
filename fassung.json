@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-17-2",
+  "fassung": "2026-11-17-3",
   "datei": "filialplaner.html",
-  "pruefsumme": "39eb7aeae03fdb07c6175f8e95e907723cc0fd70b85b33424c643e61fd73e6e6",
-  "hinweis": "Verbesserungen: Vertragsstunden einklappbar, Farben rot/grün/blau, Leitung nicht an der Kasse, Aushilfen an der Minijob-Grenze, Dashboard, kürzere Texte"
+  "pruefsumme": "1eee973633960a4fce66dc102152016c4c18c1b31d28d334ee863ad5504eb4a8",
+  "hinweis": "Erklärungen hinter „i“, Personal in Rubriken, Analyse neu mit Tagesbesetzung je Person, ohne „Pflicht“"
 }
