@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-16-5-test">
+<meta name="fassung" content="2026-11-17-1-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -1031,6 +1031,143 @@ tr.k-summe.k-wirksam th{font-family:var(--sans)}
 .aushilfe.ohne-kopf{margin-top:6px}
 /* Aushilfen haben kein Konto: am Telefon bleibt die Spalte bei ihnen leer (der Monatsstand steht breit und in der Analyse) */
 @container (max-width:480px){ td.k-konto b.k-voll{display:none} }
+
+/* ==== Gesamtoptimierung (17.11.2026) ==================================================== */
+/* ---- Lange Schichten: eine Ausnahme, kein Fehler — Bernstein statt Rot ---- */
+.karte.lang{border-color:var(--warn);background:linear-gradient(var(--warn-soft),var(--warn-soft)) top/100% 4px no-repeat,var(--surface)}
+.karte.lang h3{color:var(--warn)}
+.karte.lang .hint{margin-top:8px}
+.tag.lang{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+/* ---- Plan ändern am Handy: erst der Assistent, dann die Lösungen, dann der Plan ---- */
+.aendern-plan{margin-bottom:14px}
+.aendern-oben:empty{display:none}
+@media(max-width:860px){
+  .panel.aendern:not(.planentwurf){display:flex;flex-direction:column}
+  .panel.aendern:not(.planentwurf) > .aendern-raster{order:1;margin-bottom:14px}
+  .panel.aendern:not(.planentwurf) > .aendern-plan{order:2;margin-bottom:0}
+  .panel.aendern:not(.planentwurf) .aendern-seite{order:-1}
+}
+/* ---- Zahlfelder: Text mit Dezimaltastatur, Rückmeldung darunter ---- */
+input.zahl-ein{font-family:var(--mono);font-variant-numeric:tabular-nums}
+input[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 3px var(--bad-soft)}
+.zahl-echo{display:block;margin-top:4px;font-size:.74rem;font-weight:600;color:var(--muted);font-family:var(--mono)}
+.zahl-echo.fehler{color:var(--bad);font-family:var(--sans)}
+.zahl-echo[hidden]{display:none}
+/* ---- Anmeldung: zwei Reiter; Wiederherstellungscode ---- */
+.an-reiter{display:inline-flex;border:1.5px solid var(--ton-200);border-radius:var(--r-s);overflow:hidden;margin-bottom:16px}
+.an-reiter button{appearance:none;border:0;background:var(--surface);color:var(--ink-2);font:inherit;font-weight:700;font-size:.88rem;padding:9px 18px;cursor:pointer;min-height:40px}
+.an-reiter button + button{border-left:1.5px solid var(--ton-200)}
+.an-reiter button[aria-selected="true"]{background:var(--voll);color:var(--auf-voll)}
+.an-reiter button:focus-visible{outline:2px solid var(--info);outline-offset:-2px}
+.wh-code{font-family:var(--mono);font-size:1.5rem;font-weight:700;letter-spacing:.06em;text-align:center;padding:16px 10px;margin:14px 0;
+  border:1.5px solid var(--ton-300, var(--line));border-radius:var(--r);background:var(--surface-2);user-select:all;-webkit-user-select:all;overflow-wrap:anywhere}
+.wh .note{font-size:.82rem}
+.wh-kachel{margin-top:18px;padding:14px 16px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.wh-kachel h3{margin:2px 0 4px}
+.wh-kachel .btn{margin-top:10px}
+@media(max-width:480px){.wh-code{font-size:1.15rem;letter-spacing:.02em}.an-reiter{display:flex}.an-reiter button{flex:1}}
+/* ---- Stundenkonto im Personal: Stand zum Lesen, Ändern nur über den Dialog ---- */
+.konto-feld{display:flex;flex-direction:column;gap:4px;font-size:.76rem;font-weight:700;color:var(--muted);letter-spacing:.01em}
+.konto-stand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.konto-stand b{font-size:1.05rem;color:var(--ink)}
+.konto-feld .hint{font-weight:500}
+.konto-gross{display:flex;align-items:baseline;gap:10px;margin:10px 0 6px}
+.konto-gross b{font-size:1.7rem;line-height:1}
+.konto-gross span{font-size:.82rem;color:var(--muted);font-weight:600}
+.konto-verlauf{margin-top:16px;padding-top:12px;border-top:1px solid var(--line-2)}
+.konto-zeile{display:grid;grid-template-columns:96px 1fr auto;gap:10px;font-size:.82rem;padding:5px 0;border-top:1px solid var(--line-2)}
+.konto-zeile:first-of-type{border-top:0}
+/* ---- Die eine Abwesenheitsliste: je Person, was eingetragen ist und woher es stammt ---- */
+.abw-liste{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:4px 14px;margin-bottom:10px}
+.abw-kopf{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0 4px}
+.abw-zahl{font-size:.76rem;color:var(--muted);font-weight:600}
+.abw-liste .zt-leer{padding:10px 0}
+.abw-zeile{display:grid;grid-template-columns:minmax(120px,220px) minmax(0,1fr) auto;gap:4px 12px;align-items:baseline;padding:9px 0;border-top:1px solid var(--line-2);font-size:.86rem}
+.abw-liste > .abw-zeile:first-child,.abw-kopf + .abw-zeile{border-top:0}
+.abw-was{color:var(--ink-2);font-variant-numeric:tabular-nums}
+.abw-herkunft{font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--ink-2);background:var(--surface-2);white-space:nowrap}
+.abw-herkunft.hand{color:var(--muted);background:transparent}
+.abw-zeile.abweichung{background:linear-gradient(var(--warn-soft),var(--warn-soft));margin:0 -14px;padding-left:14px;padding-right:14px}
+.abw-widerspruch{grid-column:1/-1;display:flex;gap:8px 12px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-size:.8rem;color:var(--warn);font-weight:600}
+.abw-widerspruch .knopfreihe{margin:0}
+@media(max-width:560px){.abw-zeile{grid-template-columns:minmax(0,1fr) auto}.abw-zeile b{grid-column:1/-1}}
+/* Herkunft an der Zelle der Eingabetabelle */
+td.abwzelle[data-herkunft]::after{content:attr(data-herkunft);display:block;margin-top:3px;font-size:.66rem;font-weight:700;color:var(--muted);letter-spacing:.01em}
+/* ---- Wochenaufgaben: eine Zeile je Aufgabe, Antippen öffnet die Einstellungen ---- */
+.task{padding:0;overflow:hidden}
+.task + .task{margin-top:6px}
+.task-h{margin:0;font-size:1rem}
+.task-kopf{display:grid;grid-template-columns:minmax(120px,240px) minmax(0,1fr) auto;gap:4px 14px;align-items:center;width:100%;
+  padding:11px 12px 11px 16px;background:none;border:0;font:inherit;text-align:left;color:inherit;cursor:pointer;min-height:48px}
+.task-kopf:hover{background:var(--ton-100)}
+.task-kopf:focus-visible{outline:2px solid var(--info);outline-offset:-2px}
+.task-name{font-weight:700;font-size:.95rem}
+.task-info{font-size:.82rem;font-weight:500;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.task-fehlt{color:var(--warn);font-weight:700}
+.task-leise{color:var(--muted)}
+.task.off .task-info{color:var(--muted)}
+.task-pfeil{display:flex;color:var(--muted);transition:transform .15s}
+.task-pfeil .sym{width:18px;height:18px}
+.task:not(.zu) .task-pfeil{transform:rotate(90deg)}
+.task .body{padding:4px 16px 14px;border-top:1px solid var(--line)}
+.task.zu .body{display:none}
+.task .body > .schalter{margin-top:10px}
+.task.fehlt{border-color:var(--warn)}
+.mehr-dazu{margin-top:8px;font-size:.86rem;color:var(--ink-2)}
+.mehr-dazu summary{cursor:pointer;font-weight:700;color:var(--link)}
+.mehr-dazu p{margin-top:6px;line-height:1.5;max-width:70ch}
+@media(max-width:640px){
+  .task-kopf{grid-template-columns:minmax(0,1fr) auto;padding-left:14px}
+  .task-info{grid-column:1;grid-row:2}
+  .task-pfeil{grid-column:2;grid-row:1 / span 2}
+}
+/* ---- Kompakter Plan: Beginn und Ende stehen immer untereinander. Nebeneinander passten sie
+   erst ab rund 910 px in eine Tagesspalte — so breit wird diese Ansicht nie (über 860 px steht das
+   Filialformular), die Zeiten liefen deshalb ineinander. ---- */
+table.kompakt .k-zeit{flex-direction:column;gap:0;line-height:1.25}
+table.kompakt .k-zeit b:first-child::after{content:none}
+/* Summen und Konto brechen nicht mitten in der Zahl um („240,“ / „0“) */
+td.k-std b,td.k-konto b,tr.k-summe td{white-space:nowrap;overflow-wrap:normal;hyphens:none;-webkit-hyphens:none}
+@container (max-width:480px){
+  table.kompakt col.c-name{width:16%} table.kompakt col.c-std{width:10.5%} table.kompakt col.c-konto{width:9.5%}
+}
+/* ---- Fußzeile ---- */
+.foot:empty{display:none}
+/* ---- Eingabetabelle der Abwesenheiten: alle sechs Tage passen auch in ein schmaleres Fenster ---- */
+.abwfeld{min-width:96px}
+.abwfeld select{padding:6px 6px;font-size:.84rem}
+.abwzeiten{flex-wrap:wrap}
+.abwzeiten input{flex:1 1 84px;min-width:0}
+table.abwtabelle td:first-child{min-width:104px}
+/* Rückmeldung unter einem Zahlfeld verschiebt die Nachbarfelder nicht */
+.task-fields{align-items:start}
+/* Kompakter Plan zwischen 481 und 860 px: „von 38,5“ bleibt in einer Zeile */
+td.k-std span,td.k-konto span{white-space:nowrap}
+@container (min-width:481px){
+  table.kompakt col.c-name{width:18%} table.kompakt col.c-std{width:8%} table.kompakt col.c-konto{width:8.5%}
+}
+.nur-schmal{display:none}
+@media(max-width:860px){ .nur-schmal{display:inline-flex} .aendern-plan{scroll-margin-top:calc(var(--oben, 0px) + var(--kopf, 56px) + 8px)} }
+/* Marke „Urlaub“: im hellen Bild war die Schrift mit 4,4 : 1 knapp unter dem Mindestkontrast */
+:root{--info-schrift:#245C9B}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--info-schrift:var(--info)}}
+:root[data-theme="dark"]{--info-schrift:var(--info)}
+.tag.urlaub{color:var(--info-schrift)}
+/* ---- Am Telefon groß genug zum Treffen: Zurück-Link, Aufklapper, Auswahl in der Abwesenheitstabelle ---- */
+@media (pointer:coarse){
+  .zurueck-link{min-height:40px;padding-right:12px}
+  .panel > .zurueck-link{margin:-14px 0 0}
+  details > summary{padding-top:9px;padding-bottom:9px}
+  .abwfeld select{min-height:40px}
+}
+/* Zahlen in Tabellen stehen rechtsbündig unter ihrer Spalte */
+td input.zahl-ein{text-align:right}
+/* Am Telefon sind alle Eingabefelder gleich hoch (ein leeres Zeitfeld ist auf dem iPhone sonst niedriger
+   und verschiebt die Beschriftung daneben) — und mit 44 px sicher zu treffen */
+.zeitfelder{align-items:flex-start}
+@media (pointer:coarse){
+  input[type=text],input[type=password],input[type=time],input[type=date],select{min-height:44px}
+}
 </style>
 
 <div class="markenband" aria-hidden="true"></div>
@@ -1051,7 +1188,7 @@ tr.k-summe.k-wirksam th{font-family:var(--sans)}
       <nav class="steps" id="steps" aria-label="Schritte"></nav>
       <div id="view"></div>
     </div>
-    <p class="foot" id="fuss">Baden-Württemberg · Testversion mit erfundenen Daten</p>
+    <p class="foot" id="fuss"></p>
     </div>
   </div>
 </div>
@@ -1086,9 +1223,14 @@ const REGELN = Object.freeze({
   // Schichten (Hausregel)
   mindestSchicht: 4,          // kürzere Einsätze lohnen den Weg nicht (§ 12 TzBfG verlangt mind. 3)
   wunschSchicht: 6,           // darauf wird eine neue Schicht möglichst ausgedehnt
-  maxAnwesenheit: 8.5,        // längste Schicht mit Pause
+  maxAnwesenheit: 8.5,        // übliche längste Schicht mit Pause — so plant der Planer von sich aus
+  // Lange Schicht: nur für Erwachsene und nur, wenn es sich nicht vermeiden lässt (sonst bliebe
+  // eine Besetzungslücke). 10 h Arbeit + 1 h Pause; die Woche der Person bleibt dann bei
+  // höchstens 48 h — so ist der Schnitt von 8 h je Werktag (§ 3 ArbZG) in jedem Fall gewahrt.
+  langAnwesenheit: 11,
+  langWoche: 48,
 
-  // Arbeitszeit (§ 3 ArbZG: 8 h, bis 10 h nur mit Ausgleich — hier nie)
+  // Arbeitszeit (§ 3 ArbZG: 8 h; bis 10 h nur mit Ausgleich — siehe „Lange Schicht“ oben)
   maxArbeitTag: 8,
   gesetzMaxTag: 10, gesetzMaxTagJugend: 8,   // darüber ist es auch mit Ausgleich verboten
   maxTage: 6,                 // Arbeitstage je Woche
@@ -1380,6 +1522,27 @@ const AUSGLEICH_MAX = REGELN.ausgleichMax;
 
 const viertel = n => Math.round(n * 4) / 4;
 
+/* Zahlen aus Eingabefeldern. Ein <input type="number"> nimmt „1,5“ je nach Gerät und Sprache
+   nicht an und liefert dann stumm einen leeren Wert — die Eingabe ginge verloren. Darum lesen
+   die Zahlfelder Text (zahlFeld in app/26-bausteine.js) und diese Funktion versteht ihn:
+   „1,5“, „1.5“, „13.000“, „13.000,50“, „−2“ → Zahl; leer → ""; nicht lesbar → null. */
+function zahlLesen(text){
+  let t = String(text == null ? "" : text).trim().replace(/\s/g, "").replace(/^\+/, "").replace(/[−–]/g, "-");
+  if (t === "") return "";
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");        // deutsch: Punkt trennt Tausender
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");
+  return /^-?(\d+\.?\d*|\.\d+)$/.test(t) && isFinite(+t) ? +t : null;
+}
+// Für die Anzeige im Feld: 1.5 → „1,5“ (gespeichert wird weiter mit Punkt)
+const zahlZeigen = v => v === "" || v === null || v === undefined ? "" : hat(v) ? String(nz(v)).replace(".", ",") : String(v);
+// Was eine Eingabe bedeutet, in Worten: „= 1,5 h (1 h 30 min)“, „= 13.000 €“
+function zahlEcho(z, einheit){
+  if (z === "" || z === null) return "";
+  const zahl = z.toLocaleString("de-DE", {maximumFractionDigits: 2});
+  const minuten = einheit === "h" && Math.abs(z % 1) > 0.001 && z > 0 ? ` (${Math.floor(z) ? Math.floor(z) + " h " : ""}${Math.round((z % 1) * 60)} min)` : "";
+  return `= ${zahl}${einheit ? " " + einheit : ""}${minuten}`;
+}
+
 // ==== kern/03-recht.js ====
 /* Arbeitsrecht: Pausen, Jugendschutz, Schichtgrenzen, Prüfung der Standardwoche */
 
@@ -1407,6 +1570,20 @@ function pauseGesetz(anwesend, minder){
 function pauseFuer(m, anwesend){
   return pauseGesetz(anwesend, minderjaehrig(m));
 }
+
+/* Wie lang eine Schicht sein darf — eine Stelle für Planer, Optimierer und Änderungen.
+   Üblich: höchstens 8,5 h im Haus und 8 h Arbeit.
+   Lang (lang = true): Erwachsene bis 10 h Arbeit, mit der Stunde Pause 11 h im Haus. Über 9 h
+   Arbeit verlangt § 4 ArbZG 45 min Pause — die Hausregel (60 min ab 8 h im Haus) liegt darüber.
+   Jugendliche nie über 8 h (§ 8 JArbSchG). Ob die Woche dabei unter 48 h bleibt, prüft, wer
+   die Woche kennt (ausfallErlaubt, handPruefung). */
+function schichtLaengeOk(m, anwesend, lang){
+  const arbeit = anwesend - pauseFuer(m, anwesend);
+  if (lang && !minderjaehrig(m)) return anwesend <= REGELN.langAnwesenheit + 0.01 && arbeit <= REGELN.gesetzMaxTag + 0.01;
+  return anwesend <= REGELN.maxAnwesenheit + 0.01 && arbeit <= REGELN.maxArbeitTag + 0.01;
+}
+// Lang ist ein Tag mit mehr als 8 h Arbeit
+const istLang = arbeit => arbeit > REGELN.maxArbeitTag + 0.01;
 
 function schicht(m, tag){
   const s = (m.standard || {})[tag];
@@ -1814,7 +1991,7 @@ function baueWoche(montagISO, rnd, vorgabe){
       const anw = (bis - von)/60;
       // Bei geteilten Schichten zählt der ganze Tag gegen die Tageshöchstzeit
       const heuteSchon = schonHeute.reduce((x,b) => x + (b.bis-b.von)/60 - (b.pBis === null ? 0 : (b.pBis-b.pVon)/60), 0);
-      if (heuteSchon + anw - pauseFuer(m, anw) > MAXARBEIT + 0.01) return false;
+      if (heuteSchon + anw - pauseFuer(m, anw) > MAXARBEIT + 0.01 || !schichtLaengeOk(m, anw)) return false;
       if (letztesEnde[i] !== null && (ti*24*60 + von - letztesEnde[i])/60 < ruhezeitFuer(minder) - 0.01) return false;
       return true;
     };
@@ -1876,7 +2053,7 @@ function baueWoche(montagISO, rnd, vorgabe){
       if (andere.some(x => !(von >= x.bis + 60 || bis + 60 <= x.von))) return false;
       const anw = (bis - von)/60;
       const sonst = andere.reduce((x,y) => x + arbeitVon(y), 0);
-      if (sonst + anw - pauseFuer(m, anw) > MAXARBEIT + 0.01) return false;
+      if (sonst + anw - pauseFuer(m, anw) > MAXARBEIT + 0.01 || !schichtLaengeOk(m, anw)) return false;
       if (vortagEnde[i] !== null && (ti*24*60 + von - vortagEnde[i])/60 < ruhezeitFuer(minder) - 0.01) return false;
       return true;
     };
@@ -2367,8 +2544,7 @@ function ausgleichen(plan){
     if (plan.tage[ti].schichten.some(x => x.mi === i)) return false;   // nicht doppelt am Tag
     const tage = plan.tage.filter((t,k) => t.schichten.some(x => x.mi === i)).length;
     if (tage >= maxTageFuer(minderj(i))) return false;
-    const anw = (sch.bis - sch.von)/60;
-    if (anw - pauseFuer(ms[i], anw) > MAXARBEIT + 0.01) return false;
+    if (!schichtLaengeOk(ms[i], (sch.bis - sch.von)/60)) return false;
     if (!minijobPasst(plan, i, ti, sch.von, sch.bis)) return false;       // Aushilfen: Monatsgrenze
     return ruheOk(i, ti, sch.von, sch.bis);
   };
@@ -2422,9 +2598,7 @@ function ausgleichen(plan){
         // wer geteilt arbeitet, hat am selben Tag noch eine Schicht — dann nicht tauschen
         if (t.schichten.filter(x => x.mi === a).length > 1 || t.schichten.filter(x => x.mi === b).length > 1) return;
         {
-          const anwB = (sch.bis - sch.von)/60, anwA = (zwei.bis - zwei.von)/60;
-          if (anwB - pauseFuer(ms[b], anwB) > MAXARBEIT + 0.01) return;
-          if (anwA - pauseFuer(ms[a], anwA) > MAXARBEIT + 0.01) return;
+          if (!schichtLaengeOk(ms[b], (sch.bis - sch.von)/60) || !schichtLaengeOk(ms[a], (zwei.bis - zwei.von)/60)) return;
         }
         if (!darf(b, TAGE[ti][0], sch.von, sch.bis) || !darf(a, TAGE[ti][0], zwei.von, zwei.bis)) return;
         if (minderj(b) && !jugendZeit(sch.von, sch.bis)) return;
@@ -2528,6 +2702,8 @@ function erzeugePlanRoh(montagISO, phase, summe, basisPlan, nurNoetig){
     auffuellen(beste, grenze, ph.art === "mehr" ? ph.tage : null);
     if (summe && summe.auf !== undefined && planSummen(beste).bezahlt > summe.auf + 0.5) sparenKuerzen(beste, summe.auf);
   }
+  azubisBegrenzen(beste);
+  lueckenMitLaengerenSchichten(beste);
   nachrechnen(beste);
   beste.phase = vorgabe.phase;
   return beste;
@@ -2560,7 +2736,7 @@ function phasenMeldung(plan, ph, normal){
     ? `Sparwoche (${phasenText(ph)}): ${vergleich}.`
       + (verfehlt ? ` Mehr ließ sich nicht einsparen, ohne dass Kasse, Führung, Aufgaben oder die Mindestbesetzung von zwei Personen reißen.` : "")
     : `Woche mit Mehrbedarf (${phasenText(ph)}): ${vergleich}.`
-      + (verfehlt ? ` Genauer ging es nicht — Schichten sind mindestens vier Stunden lang, und niemand darf über acht Stunden am Tag.` : ""))});
+      + (verfehlt ? ` Genauer ging es nicht — Schichten sind mindestens vier Stunden lang, und über acht Stunden am Tag plant der Planer nur, wenn sonst eine Lücke bliebe.` : ""))});
 }
 
 /* Schichten eines fertigen Plans nachträglich länger oder kürzer machen — mit
@@ -2588,7 +2764,7 @@ function schichtWerkzeug(plan){
     }
     sch.pause = pz; sch.arbeit = anw - pz;
   };
-  // Darf i am Tag ti von–bis arbeiten? Abwesenheit, Jugendschutz, Ruhezeit, 8 Stunden
+  // Darf i am Tag ti von–bis arbeiten? Abwesenheit, Jugendschutz, Ruhezeit, übliche Schichtlänge
   const erlaubt = (i, ti, von, bis) => {
     const e = (abw[i] || {})[TAGE[ti][0]];
     if (e){
@@ -2597,8 +2773,7 @@ function schichtWerkzeug(plan){
       if (a !== null && b !== null && b > a && !(e.a === "nur" ? (von >= a && bis <= b) : (bis <= a || von >= b))) return false;
     }
     if (minderj(i) && !jugendZeit(von, bis)) return false;
-    const anw = (bis - von)/60;
-    if (anw - pauseFuer(ms[i], anw) > MAXARBEIT + 0.01) return false;
+    if (!schichtLaengeOk(ms[i], (bis - von)/60)) return false;
     if (!minijobPasst(plan, i, ti, von, bis, plan.tage[ti].schichten.find(x => x.mi === i))) return false;
     const noetig = ruhezeitFuer(minderj(i)) * 60;
     const vor = ti > 0 ? plan.tage[ti-1].schichten.filter(x => x.mi === i) : [];
@@ -2692,6 +2867,42 @@ function sparenKuerzen(plan, zielSumme){
   }
 }
 
+/* Azubis kommen auf ihre Betriebsstunden — nicht darüber: Liegt einer über seinem Ziel, wird
+   seine Schicht in halben Stunden gekürzt, solange dadurch keine Lücke entsteht und sie
+   mindestens vier Stunden lang bleibt. (Der Optimierer trifft die Stunden von selbst genau;
+   das hier gilt dem einfachen Planer.) */
+function azubisBegrenzen(plan){
+  const w = schichtWerkzeug(plan);
+  state.mitarbeiter.forEach((m, i) => {
+    if (!istAzubi(m)) return;
+    const ziel = aufHalbe(plan.ziel[i] || 0);
+    for (let schutz = 0; schutz < 60 && istStunden(plan, i) > ziel + 0.01; schutz++){
+      let bester = null;
+      plan.tage.forEach((t, ti) => {
+        if (t.feiertag) return;
+        const vorher = tagesMaengel(plan, ti);
+        t.schichten.forEach(sch => {
+          if (sch.mi !== i || !w.beweglich(t, sch) || sch.bis - sch.von - 30 < MINSCHICHT * 60) return;
+          for (const seite of ["ende", "anfang"]){
+            const alt = {von: sch.von, bis: sch.bis, pauseVon: sch.pauseVon, pauseBis: sch.pauseBis, pause: sch.pause, arbeit: sch.arbeit};
+            if (seite === "ende") sch.bis -= 30; else sch.von += 30;
+            w.pauseAnpassen(sch);
+            const weniger = alt.arbeit - sch.arbeit;
+            const geht = tagesMaengel(plan, ti) <= vorher && weniger > 0.01 && istStunden(plan, i) >= ziel - 0.01;
+            Object.assign(sch, alt);
+            // die längste Schicht zuerst — so bleiben die Tage gleichmäßig
+            if (geht && (!bester || alt.arbeit > bester.arbeit)) bester = {sch, seite, arbeit: alt.arbeit};
+          }
+        });
+      });
+      if (!bester) break;
+      if (bester.seite === "ende") bester.sch.bis -= 30; else bester.sch.von += 30;
+      w.pauseAnpassen(bester.sch);
+      bester.sch.gekuerzt = true;
+    }
+  });
+}
+
 /* ---- Art der Woche (testweise) ------------------------------------------
    normal  — alles wie hinterlegt
    sparen  — Stunden auf das Nötige: entweder alle Aufgaben um einen Prozentsatz
@@ -2730,6 +2941,9 @@ function phasenText(ph){
   return "Standardwoche";
 }
 
+// Auf die nächste halbe Stunde aufrunden (22,4 → 22,5; 22,5 bleibt)
+const aufHalbe = h => Math.ceil(h * 2 - 0.001) / 2;
+
 function wochenVorgabe(mo, phase){
   const ph = phaseNormal(phase);
   const ms = state.mitarbeiter;
@@ -2740,8 +2954,10 @@ function wochenVorgabe(mo, phase){
     const soll = sollWoche(m, i, mo);
     if (soll === null) return 0;
     const s = Math.max(-AUSGLEICH_MAX, Math.min(AUSGLEICH_MAX, start[i] || 0));
-    // Azubis kommen immer auf ihre Betriebsstunden — ein Plus auf dem Konto kürzt sie nicht
-    return istAzubi(m) ? Math.max(soll, soll - s) : Math.max(0, soll - s);
+    // Azubis kommen immer auf ihre Betriebsstunden — ein Plus auf dem Konto kürzt sie nicht.
+    // Schichten liegen im Halbstundenraster: Ein krummes Soll (Feiertagswoche: 28 h − 5,6 h)
+    // wird auf die nächste halbe Stunde aufgerundet, damit niemand darunter bleibt.
+    return istAzubi(m) ? aufHalbe(Math.max(soll, soll - s)) : Math.max(0, soll - s);
   });
   const vorgabe = {phase: ph, ziel, start, faktor: 1, zusatz: {}};
   const offeneTage = TAGE.map(([k], ti) => { const d = new Date(mo); d.setDate(mo.getDate() + ti); return istFeiertag(d) ? null : k; })
@@ -2861,6 +3077,32 @@ function bisInStandUebernehmen(sl){
 const ueText = n => n === null || n === undefined ? ""
   : (n > 0.01 ? "+" : n < -0.01 ? "−" : "") + h1(Math.abs(n));
 
+/* Konto korrigieren — der eine Weg, einen Stand von Hand zu setzen (etwa nach einer Auszahlung
+   oder wenn die Lohnabrechnung etwas anderes sagt). Der neue Stand gilt zu Beginn der Woche mo:
+   Was davor war, steckt dann darin; ab dann rechnet der Plan wieder jede Woche Ist minus Soll.
+   Jede Korrektur bleibt im Verlauf der Person stehen — Datum, Woche, vorher, nachher. Einen
+   Grund gibt es dort mit Absicht nicht: In den Verlauf gehört nichts Persönliches. */
+function kontoKorrigieren(i, neu, mo){
+  const m = state.mitarbeiter[i];
+  if (!m || !hatKonto(m) || !isFinite(neu)) return null;
+  mo = mo || aktuellerMontag();
+  const alt = ueberstundenZuBeginn(mo)[i] || 0, wert = viertel(neu);
+  if (Math.abs(wert - alt) < 0.01) return null;                 // nichts geändert: kein neuer Stichtag
+  m.saldo = wert; m.saldoAb = wochenSchluessel(mo);
+  m.kontoVerlauf = (m.kontoVerlauf || []).concat({am: isoVon(new Date()), ab: m.saldoAb, alt, neu: wert}).slice(-12);
+  return m.kontoVerlauf[m.kontoVerlauf.length - 1];
+}
+// Wie der Stand zu Beginn der Woche mo zustande kommt: Stand am Stichtag, dann je Woche mit
+// Plan Ist minus Soll → {start, ab, wochen: [{sl, aenderung}], stand, korrekturen (neueste zuerst)}
+function kontoHerkunft(i, mo){
+  const m = state.mitarbeiter[i];
+  mo = mo || aktuellerMontag();
+  const ziel = wochenSchluessel(mo), ab = m.saldoAb || ziel;
+  const wochen = Object.keys(state.plaene || {}).sort().filter(sl => sl >= ab && sl < ziel)
+    .map(sl => ({sl, aenderung: wochenAenderung(state.plaene[sl], m, i)}));
+  return {start: saldoVon(m), ab, wochen, stand: ueberstundenZuBeginn(mo)[i] || 0, korrekturen: (m.kontoVerlauf || []).slice().reverse()};
+}
+
 // ==== kern/09-plaene.js ====
 /* Pläne speichern, laden, nach Änderung von Hand prüfen */
 
@@ -2891,6 +3133,18 @@ function planSpeichern(plan){
   const kurz = planKurz(plan);
   state.plaene[wochenSchluessel(plan.mo)] = kurz;
   return kurz;
+}
+
+// Die nächste Woche ohne gültigen Plan — ab der, die heute oben steht. Dorthin führt
+// „Plan erstellen“, wenn die gezeigte Woche schon geplant ist: Geplant wird fast immer
+// die kommende Woche, nicht die laufende ein zweites Mal.
+function naechsteWocheOhnePlan(){
+  const d = aktuellerMontag();
+  for (let n = 0; n < 7; n++){
+    if (!(state.plaene || {})[wochenSchluessel(d)]) return d;
+    d.setDate(d.getDate() + 7);
+  }
+  return aktuellerMontag();
 }
 
 function planLaden(kurz){
@@ -2932,10 +3186,15 @@ function handPruefung(plan){
       if (!m) return;
       const minder = minderjaehrig(m);
       const anw = (s.bis - s.von)/60;
-      if (s.arbeit > (minder ? REGELN.gesetzMaxTagJugend : REGELN.gesetzMaxTag) + 0.01)
-        raus.push(`${t.label}: ${m.name} arbeitet ${h1(s.arbeit)} h — mehr als das Gesetz zulässt.`);
-      else if (s.arbeit > 8.01)
-        raus.push(`${t.label}: ${m.name} arbeitet ${h1(s.arbeit)} h — über 8 h nur mit Ausgleich.`);
+      // Der ganze Tag zählt (geteilte Schichten zusammen) — gemeldet wird er einmal
+      const erste = t.schichten.find(x => x.mi === s.mi) === s;
+      const heute = t.schichten.filter(x => x.mi === s.mi).reduce((a, x) => a + x.arbeit, 0);
+      const woche = plan.tage.reduce((a, tg) => a + tg.schichten.filter(x => x.mi === s.mi).reduce((b, x) => b + x.arbeit, 0), 0);
+      if (!erste){ /* schon gemeldet */ }
+      else if (heute > (minder ? REGELN.gesetzMaxTagJugend : REGELN.gesetzMaxTag) + 0.01)
+        raus.push(`${t.label}: ${m.name} arbeitet ${h1(heute)} h — mehr als das Gesetz zulässt (${minder ? "unter 18 höchstens 8 h, § 8 JArbSchG" : "höchstens 10 h, § 3 ArbZG"}).`);
+      else if (istLang(heute) && woche > REGELN.langWoche + 0.01)
+        raus.push(`${t.label}: ${m.name} arbeitet ${h1(heute)} h — über 8 h am Tag nur, wenn die Woche bei höchstens ${REGELN.langWoche} h bleibt (hier ${h1(woche)} h).`);
       if (s.pause + 0.01 < pauseFuer(m, anw))
         raus.push(`${t.label}: ${m.name} hat ${h1(s.pause*60/60)} h Pause, nötig sind ${h1(pauseFuer(m, anw))} h.`);
       if (minder && s.bis > JUGEND_BIS)
@@ -3164,13 +3423,14 @@ function termineUebernehmen(zeilen, quelle){
     const w = state.abwesend[z.sl][z.i] = state.abwesend[z.sl][z.i] || {};
     rueck.push({sl:z.sl, i:z.i, name:state.mitarbeiter[z.i].name, tag:z.tag, vorher: w[z.tag] === undefined ? null : w[z.tag]});
     if (z.neu === null) delete w[z.tag]; else w[z.tag] = z.neu;
-    if (z.online){
-      // merken, was die Abgabe hineingeschrieben hat — beim nächsten Abholen zählt das
-      state.onlineStand = state.onlineStand || {};
-      const o = ((state.onlineStand[z.sl] = state.onlineStand[z.sl] || {})[z.i] = state.onlineStand[z.sl][z.i] || {});
-      if (z.neu === null) delete o[z.tag]; else o[z.tag] = z.neu;
-    }
+    // merken, was die Abgabe (online) oder die Terminliste (Datei, Text) hineingeschrieben hat —
+    // beim nächsten Abholen zählt das, und die Abwesenheitsliste zeigt daran die Herkunft
+    const feld = z.online ? "onlineStand" : "listenStand";
+    state[feld] = state[feld] || {};
+    const o = ((state[feld][z.sl] = state[feld][z.sl] || {})[z.i] = state[feld][z.sl][z.i] || {});
+    if (z.neu === null) delete o[z.tag]; else o[z.tag] = z.neu;
   });
+  ereignisseNachfuehren();
   const wochen = [...new Set(zeilen.map(z => z.sl))].sort();
   state.terminImport = {am: new Date().toISOString(), quelle, anzahl: zeilen.length, wochen, rueck};
   return wochen;
@@ -3189,6 +3449,7 @@ function terminImportZuruecknehmen(){
   });
   const n = imp.rueck.length;
   delete state.terminImport;
+  ereignisseNachfuehren();
   return n;
 }
 
@@ -3246,7 +3507,7 @@ function archivAufraeumen(){
   });
   Object.keys(state.phasen || {}).forEach(sl => { if (zuAlt(sl)){ delete state.phasen[sl]; geaendert++; } });
   geaendert += ereignisseAufraeumen();
-  ["onlineStand", "onlineImport"].forEach(f => Object.keys(state[f] || {}).forEach(sl => {
+  ["onlineStand", "onlineImport", "listenStand"].forEach(f => Object.keys(state[f] || {}).forEach(sl => {
     if (zuAlt(sl)){ delete state[f][sl]; geaendert++; } }));
   if (geaendert) speichere();
   return loeschen.length;
@@ -3261,6 +3522,8 @@ function archivAufraeumen(){
    · Für jede Person und jeden Tag werden alle erlaubten Schichten erzeugt (Beginn im
      Halbstundenraster, 4 bis 8,5 h lang, mit gesetzlicher Pause). Abwesenheit,
      Jugendschutz und Tageshöchstzeit sind schon beim Erzeugen ausgeschlossen.
+     Längere Schichten (bis 10 h Arbeit) kommen erst danach und nur dort dazu, wo sonst
+     eine Lücke bliebe — siehe lueckenMitLaengerenSchichten.
    · Je Schicht eine Ja/Nein-Variable. Je Person höchstens eine Schicht am Tag,
      höchstens 6 (Jugendliche 5) Tage, Ruhezeit zwischen den Tagen, Jugendliche ≤ 40 h.
    · Jede halbe Stunde: Schichtführung mit Schlüssel, Kasse während der Öffnung, jede
@@ -3647,6 +3910,9 @@ async function optimiereRoh(montagISO, phase, summe, basisPlan, nurNoetig){
   plan.tage.forEach(t => t.schichten.sort((x, y) => x.von - y.von || x.mi - y.mi));
   pausenLegen(plan);
   rollenLegen(plan);
+  // Bleibt eine Lücke, darf eine Schicht ausnahmsweise wachsen (kern/13-ausfall.js)
+  const gewachsen = lueckenMitLaengerenSchichten(plan);
+  if (gewachsen) erg.schlupf = erg.schlupf.filter(s => tagesMaengelAm(plan, s.ti, s.m) > 0);
   plan.tage.forEach(t => t.schichten.forEach(s => delete s.fest));
   // Lücken, die niemand füllen kann, wie der Planer melden — zusammenhängend je Art
   const segmente = {};
@@ -3795,13 +4061,15 @@ function maengelGruende(plan, ti, m){
 }
 
 // Darf Person j (Plan) am Tag ti von–bis arbeiten? Ohne die Schicht `ausser`.
-function ausfallErlaubt(plan, j, ti, von, bis, ausser){
+// lang: auch eine lange Schicht ist recht (Erwachsene bis 10 h Arbeit) — nur dort setzen,
+// wo es ohne nicht geht (siehe schichtLaengeOk).
+function ausfallErlaubt(plan, j, ti, von, bis, ausser, lang){
   const {i, m} = planPerson(plan, j);
   if (!m) return false;
   const minder = minderjaehrig(m);
   if (minder && !jugendZeit(von, bis)) return false;
   const anw = (bis - von)/60;
-  if (anw - pauseFuer(m, anw) > MAXARBEIT + 0.01 || anw > REGELN.maxAnwesenheit + 0.01) return false;
+  if (!schichtLaengeOk(m, anw, lang)) return false;
   const e = (((state.abwesend || {})[wochenSchluessel(plan.mo instanceof Date ? plan.mo : montagDer(plan.mo))] || {})[i] || {})[TAGE[ti][0]];
   if (e){
     if (typeof e === "string") return false;
@@ -3815,9 +4083,12 @@ function ausfallErlaubt(plan, j, ti, von, bis, ausser){
   if (nach.some(x => 24*60 - bis + x.von < ruhe - 0.5)) return false;
   const tage = new Set(plan.tage.map((t, k) => t.schichten.some(x => x.mi === j && x !== ausser) || k === ti ? k : -1).filter(k => k >= 0));
   if (tage.size > maxTageFuer(minder)) return false;
-  if (minder){
+  const arbeit = anw - pauseFuer(m, anw);
+  if (minder || istLang(arbeit)){
     const woche = plan.tage.reduce((s, t, k) => s + t.schichten.filter(x => x.mi === j && x !== ausser && k !== ti).reduce((a, x) => a + x.arbeit, 0), 0);
-    if (woche + anw - pauseFuer(m, anw) > 40 + 0.01) return false;
+    if (minder && woche + arbeit > 40 + 0.01) return false;
+    // über 8 h am Tag nur, wenn die Woche bei höchstens 48 h bleibt (§ 3 ArbZG)
+    if (istLang(arbeit) && woche + arbeit > REGELN.langWoche + 0.01) return false;
   }
   // Aushilfen: im Kalendermonat nie über die Minijob-Grenze
   if (!minijobPasst(plan, j, ti, von, bis, ausser)) return false;
@@ -3896,7 +4167,7 @@ const tagesStunden = (plan, ti) => plan.tage[ti].schichten.reduce((s, x) => s + 
 /* Alle Wege, die Lücken eines Tages zu schließen. weg: die Zeit, die frei geworden ist
    (für „ganz übernehmen“). tiefe 0 erlaubt zusätzlich: jemand, der da ist, übernimmt die
    frei gewordene Schicht, und seine eigene wird ihrerseits gefüllt. */
-function luekenSchliessen(basis, ti, weg, tiefe, ziel){
+function luekenSchliessen(basis, ti, weg, tiefe, ziel, lang){
   // ziel: so viele Mängel hatte der Tag schon vor dem Ausfall — besser als vorher muss
   // eine Lösung nicht sein (eine knapp besetzte Filiale hat vielleicht schon Lücken)
   ziel = ziel || {maengel: 0, punkte: []};
@@ -3908,7 +4179,7 @@ function luekenSchliessen(basis, ti, weg, tiefe, ziel){
   const probe = (aenderungen, teile) => {
     const plan = kopie(basis); plan.mo = basis.mo;
     aenderungen.forEach(a => {
-      if (a.art === "neu" && !ausfallErlaubt(plan, planPlatz(plan, a.i), ti, a.von, a.bis)) throw "nein";
+      if (a.art === "neu" && !ausfallErlaubt(plan, planPlatz(plan, a.i), ti, a.von, a.bis, undefined, lang)) throw "nein";
     });
     aenderungenAnwenden(plan, ti, aenderungen);
     if (tagesMaengel(plan, ti) <= ziel.maengel) raus.push({aenderungen, teile});
@@ -3925,7 +4196,7 @@ function luekenSchliessen(basis, ti, weg, tiefe, ziel){
   // 2) jemand, der frei hat, kommt nur für die Lücke — so kurz wie möglich
   frei.forEach(i => {
     const vorher = raus.length;
-    for (let laenge = Math.max(MINSCHICHT*60, g1 - g0); laenge <= REGELN.maxAnwesenheit*60 && raus.length === vorher; laenge += 30)
+    for (let laenge = Math.max(MINSCHICHT*60, g1 - g0); laenge <= (lang ? REGELN.langAnwesenheit : REGELN.maxAnwesenheit)*60 && raus.length === vorher; laenge += 30)
       for (let von = Math.max(r.tagVon, g1 - laenge); von <= g0 && von + laenge <= r.tagBis && raus.length === vorher; von += 30){
         if (weg && von === weg.von && von + laenge === weg.bis) continue;
         versuch([{art: "neu", i, von, bis: von + laenge}], [`${state.mitarbeiter[i].name} kommt ${hhmm(von)}–${hhmm(von + laenge)}`]);
@@ -3934,7 +4205,7 @@ function luekenSchliessen(basis, ti, weg, tiefe, ziel){
   // 3) eine Schicht wächst über die Lücke
   tag.schichten.forEach(s0 => {
     const von = Math.min(s0.von, g0), bis = Math.max(s0.bis, g1);
-    if ((von === s0.von && bis === s0.bis) || !ausfallErlaubt(basis, s0.mi, ti, von, bis, s0)) return;
+    if ((von === s0.von && bis === s0.bis) || !ausfallErlaubt(basis, s0.mi, ti, von, bis, s0, lang)) return;
     const p = planPerson(basis, s0.mi);
     const teile = [];
     if (von < s0.von) teile.push(`kommt ab ${hhmm(von)}`);
@@ -3949,7 +4220,7 @@ function luekenSchliessen(basis, ti, weg, tiefe, ziel){
     for (let p = g0; p <= g1; p += 30){
       const aBis = Math.max(a.bis, p), bVon = Math.min(b.von, p);
       if (aBis === a.bis && bVon === b.von) continue;
-      if (!ausfallErlaubt(basis, a.mi, ti, a.von, aBis, a) || !ausfallErlaubt(basis, b.mi, ti, bVon, b.bis, b)) continue;
+      if (!ausfallErlaubt(basis, a.mi, ti, a.von, aBis, a, lang) || !ausfallErlaubt(basis, b.mi, ti, bVon, b.bis, b, lang)) continue;
       const pa = planPerson(basis, a.mi), pb = planPerson(basis, b.mi);
       const vorher = raus.length;
       versuch([{art: "aendern", i: pa.i, alt: [a.von, a.bis], von: a.von, bis: aBis},
@@ -3966,7 +4237,7 @@ function luekenSchliessen(basis, ti, weg, tiefe, ziel){
     const tausch = {art: "aendern", i: p.i, alt: [s0.von, s0.bis], von: weg.von, bis: weg.bis};
     const plan = kopie(basis); plan.mo = basis.mo;
     aenderungenAnwenden(plan, ti, [tausch]);
-    luekenSchliessen(plan, ti, {von: s0.von, bis: s0.bis}, 1, ziel).slice(0, 4).forEach(w => raus.push({
+    luekenSchliessen(plan, ti, {von: s0.von, bis: s0.bis}, 1, ziel, lang).slice(0, 4).forEach(w => raus.push({
       aenderungen: [tausch].concat(w.aenderungen),
       teile: [`${p.name} übernimmt ${hhmm(weg.von)}–${hhmm(weg.bis)} statt ${hhmm(s0.von)}–${hhmm(s0.bis)}`].concat(w.teile)}));
   });
@@ -3993,7 +4264,9 @@ function ausfallVorschlaege(gespeichert, j0, ti, grund){
   state.abwesend[sl][i0] = Object.assign({}, state.abwesend[sl][i0], {[TAGE[ti][0]]: grund});
   let vorschlaege = [];
   try {
-    const wege = luekenSchliessen(basis, ti, {von: weg.von, bis: weg.bis}, 0, ziel);
+    // Lange Schichten (über 8 h Arbeit) nur, wenn sich die Lücke sonst gar nicht schließen lässt
+    let wege = luekenSchliessen(basis, ti, {von: weg.von, bis: weg.bis}, 0, ziel);
+    if (!wege.length) wege = luekenSchliessen(basis, ti, {von: weg.von, bis: weg.bis}, 0, ziel, true);
     const vorher = tagesStunden(basis, ti);
     vorschlaege = wege.map(w => {
       const plan = kopie(basis); plan.mo = basis.mo;
@@ -4014,8 +4287,10 @@ function ausfallVorschlaege(gespeichert, j0, ti, grund){
         return vorher && vorher.pauseVon !== s.pauseVon;
       }).map(s => `${planPerson(plan, s.mi).name} Pause ${hhmm(s.pauseVon)}`);
       if (pausen.length) punkte += pausen.length * 0.5;
+      const lange = plan.tage[ti].schichten.filter(s => istLang(s.arbeit)).map(s => `${planPerson(plan, s.mi).name} ${h1(s.arbeit)} h`);
       return w.aenderungen.length
-        ? {titel: w.teile.join(", "), details: details + (pausen.length ? ` · Pause verschoben: ${pausen.join(", ")}` : ""),
+        ? {titel: w.teile.join(", "), details: details + (pausen.length ? ` · Pause verschoben: ${pausen.join(", ")}` : "")
+             + (lange.length ? ` · Lange Schicht: ${lange.join(", ")} Arbeit — anders ließ sich die Lücke nicht schließen` : ""),
            mehr, aenderungen: w.aenderungen, punkte}
         : {titel: "Ohne Ersatz", details: ziel.maengel ? "Durch den Ausfall entsteht keine neue Lücke."
                                                       : "Die Besetzung reicht auch so — es fehlt keine halbe Stunde.",
@@ -4050,9 +4325,11 @@ function ausfallAnwenden(gespeichert, j0, ti, grund, vorschlag){
   if (i0 >= 0) state.abwesend[sl][i0] = Object.assign({}, state.abwesend[sl][i0], {[TAGE[ti][0]]: grund});
   // Krankheit und Urlaub erscheinen auch unter „Urlaub & Krankheit“
   const datum = isoVon(new Date(mo.getTime() + ti * 864e5));
-  if ((grund === "krank" || grund === "urlaub") && name)
+  if ((grund === "krank" || grund === "urlaub") && name){
     (state.ereignisse = state.ereignisse || []).push({id: "e" + Date.now().toString(36) + ti, name, art: grund,
       von: datum, bis: datum, angelegt: new Date().toISOString(), ausfall: true});
+    ereignisseNachfuehren();              // schließt an den Vortag an: ein Eintrag
+  }
   gespeichert.geaendertVonHand = true;
   // Nachvollziehbar bleiben: was wann umgeplant wurde — ohne den Grund (Gesundheitsdaten)
   (gespeichert.ausfaelle = gespeichert.ausfaelle || []).push({am: new Date().toISOString(), wer: name,
@@ -4133,6 +4410,82 @@ async function ausfallUmplanen(gespeichert, j0, ti, grund, abTag){
   finally { state.abwesend[sl] = abwVorher; }
 }
 
+/* ---- Lange Schichten --------------------------------------------------------
+   Üblich sind höchstens 8,5 h im Haus. Bleibt nach dem Planen trotzdem eine Besetzungslücke,
+   darf eine Schicht wachsen: zuerst innerhalb des Üblichen, und nur wenn das nicht reicht,
+   darüber hinaus — Erwachsene bis 10 h Arbeit, die Woche bei höchstens 48 h (§ 3 ArbZG).
+   Standardwochen, geteilte Tage und Jugendliche bleiben, wie sie sind.
+   → Zahl der Schichten, die gewachsen sind */
+function lueckenMitLaengerenSchichten(plan){
+  let geaendert = 0;
+  plan.tage.forEach((t, ti) => {
+    if (t.feiertag) return;
+    const r = tagesRaster(t);
+    for (let runde = 0; runde < 6; runde++){
+      const vorher = tagesMaengel(plan, ti);
+      if (!vorher) break;
+      let beste = null;
+      for (const lang of [false, true]){
+        t.schichten.forEach(s => {
+          if ((s.rollen || []).includes("Standard") || s.fest) return;
+          if (t.schichten.filter(x => x.mi === s.mi).length > 1) return;
+          const alt = {von: s.von, bis: s.bis, pause: s.pause, arbeit: s.arbeit, pauseVon: s.pauseVon, pauseBis: s.pauseBis};
+          const probiere = (von, bis) => {
+            if (von < r.tagVon || bis > r.tagBis || !ausfallErlaubt(plan, s.mi, ti, von, bis, s, lang)) return false;
+            schichtSetzen(plan, ti, s, von, bis);
+            const z = tagesMaengel(plan, ti);
+            Object.assign(s, alt);
+            // am meisten schließen; bei gleichem Ergebnis die kürzere Schicht
+            if (z < vorher && (!beste || z < beste.z || (z === beste.z && bis - von < beste.bis - beste.von))) beste = {s, von, bis, z};
+            return true;
+          };
+          for (let d = 30; d <= 420 && probiere(s.von, s.bis + d); d += 30);
+          for (let d = 30; d <= 420 && probiere(s.von - d, s.bis); d += 30);
+        });
+        if (beste) break;                      // im Üblichen gefunden: keine lange Schicht nötig
+      }
+      if (!beste) break;
+      schichtSetzen(plan, ti, beste.s, beste.von, beste.bis);
+      beste.s.verlaengert = true;
+      pausenNachbessern(plan, ti);
+      geaendert++;
+    }
+  });
+  return geaendert;
+}
+
+/* Die langen Schichten eines Plans (mehr als 8 h Arbeit), jede mit dem Grund, soweit er aus
+   dem Plan folgt: Was bliebe unbesetzt, wenn die Schicht nur die übliche Länge hätte?
+   → [{name, ti, von, bis, arbeit, noetig, text}] */
+function langeSchichten(plan){
+  const raus = [];
+  plan.tage.forEach((t, ti) => {
+    if (t.feiertag) return;
+    t.schichten.forEach(s => {
+      if (!istLang(s.arbeit)) return;
+      const {m, name} = planPerson(plan, s.mi);
+      if (!m) return;
+      const ueblich = REGELN.maxAnwesenheit * 60, schon = new Set(fehlzeiten(plan, ti));
+      let wenigstes = null;
+      [[s.von, s.von + ueblich], [s.bis - ueblich, s.bis]].forEach(([von, bis]) => {
+        const p = tagKopie(plan, ti);
+        if (!plan.namen) delete p.namen;            // frisch gerechnete Pläne führen Personen über ihren Platz
+        schichtSetzen(p, ti, p.tage[ti].schichten.find(x => x.mi === s.mi && x.von === s.von && x.bis === s.bis), von, bis);
+        const punkte = fehlzeiten(p, ti).filter(mm => !schon.has(mm));
+        if (!wenigstes || punkte.length < wenigstes.punkte.length) wenigstes = {punkte, plan: p};
+      });
+      const noetig = wenigstes.punkte.length > 0;
+      raus.push({name, ti, von: s.von, bis: s.bis, arbeit: s.arbeit, noetig,
+        text: `${name}, ${tagName(ti)} ${hhmm(s.von)}–${hhmm(s.bis)}: ${h1(s.arbeit)} h Arbeit. ` + (noetig
+          ? `Mit der üblichen Länge wäre ${spannenText(wenigstes.punkte)} nicht richtig besetzt (${fehltText(wenigstes.plan, ti, wenigstes.punkte)}).`
+          : `Nach dem Plan ginge es auch kürzer — die Besetzung reicht mit der üblichen Länge.`)});
+    });
+  });
+  return raus;
+}
+// Der Satz, der zu jeder langen Schicht gehört
+const LANG_HINWEIS = "Über 8 Stunden am Tag sind nur als Ausnahme erlaubt (§ 3 ArbZG) — die App achtet darauf, dass die Woche der Person bei höchstens 48 Stunden bleibt. Für Schwangere und Stillende gelten höchstens 8,5 Stunden (§ 4 MuSchG); das weiß die App nicht.";
+
 // ==== kern/14-ereignisse.js ====
 /* Besondere Ereignisse: Urlaub und Krankheit.
 
@@ -4171,6 +4524,8 @@ function ereignisEintragen(e){
     const w = state.abwesend[t.sl] = state.abwesend[t.sl] || {};
     w[i] = Object.assign({}, w[i], {[t.tag]: e.art});
   });
+  // schließt der Zeitraum an einen bestehenden an oder überdeckt er ihn, wird daraus ein Eintrag
+  ereignisseNachfuehren();
   return neu;
 }
 
@@ -4184,6 +4539,7 @@ function ereignisLoeschen(id){
     if (w && w[t.tag] === e.art) delete w[t.tag];
   });
   state.ereignisse = state.ereignisse.filter(x => x.id !== id);
+  ereignisseNachfuehren();
 }
 
 // Wo stehen für die Person schon Schichten an den Tagen des Ereignisses?
@@ -4227,6 +4583,131 @@ function ereignisseAufraeumen(){
 // Hinweise zum Plan ohne Über- und Minusstunden — die stehen im Plan selbst
 const STUNDEN_HINWEIS = /h verplant, Ziel|über ihren Vertragsstunden|über die Vertragsstunden hinaus/;
 const hinweiseOhneStunden = meldungen => (meldungen || []).filter(m => !STUNDEN_HINWEIS.test(m.text));
+
+/* ---- Eine Abwesenheitsliste je Woche ------------------------------------------------
+   Alles, was der Planer über Abwesenheiten weiß, steht an einer Stelle:
+   state.abwesend[sl][i][tag]. Drei Wege führen dorthin — die Tabelle in „Plan erstellen“,
+   „Urlaub & Krankheit“ und „Zeiten der Mitarbeiter“ (Abgaben, Terminliste). Damit sich die
+   Stellen nicht widersprechen, gilt:
+     · Urlaub und Krankheit stehen immer auch unter „Urlaub & Krankheit“ — egal, wo sie
+       eingetragen wurden. ereignisseNachfuehren() baut diese Liste aus den Tagen neu auf
+       (zusammenhängende Arbeitstage = ein Eintrag). Die Tage sind die Wahrheit, denn Planer
+       und Stundenkonto lesen sie.
+     · Woher ein Eintrag stammt, wird nicht doppelt geführt, sondern abgeleitet (abwHerkunft):
+       „Urlaub & Krankheit“, „Abgabe“ oder „Terminliste“ (steht so da, wie es dort
+       hineingeschrieben wurde) oder „von Hand“.
+     · Ein Widerspruch bleibt nur, wo eine Abgabe von Hand überschrieben wurde — die Liste
+       markiert ihn, und er lässt sich mit einem Tipp auflösen (abwAbweichung). */
+
+const istEreignisArt = w => w === "urlaub" || w === "krank";
+// Der nächste Arbeitstag nach dem Tag iso (Mo–Sa, ohne Feiertage)
+function naechsterArbeitstag(iso){
+  const d = new Date(iso + "T12:00:00");
+  do d.setDate(d.getDate() + 1); while (d.getDay() === 0 || istFeiertag(d));
+  return isoVon(d);
+}
+
+/* „Urlaub & Krankheit“ aus den Tagen neu aufbauen: je Person und Art werden zusammenhängende
+   Arbeitstage zu einem Eintrag. Ein bestehender Eintrag, der sich mit dem Zeitraum überschneidet,
+   behält seine Kennung. → true, wenn sich die Liste geändert hat */
+function ereignisseNachfuehren(){
+  const alt = state.ereignisse || [];
+  const tage = new Map();                       // Name → Art → [Tage]
+  Object.keys(state.abwesend || {}).forEach(sl => {
+    const mo = montagAusSchluessel(sl);
+    Object.entries(state.abwesend[sl] || {}).forEach(([i, woche]) => {
+      const m = state.mitarbeiter[+i];
+      if (!m) return;
+      TAGE.forEach(([k], ti) => {
+        const w = (woche || {})[k];
+        if (!istEreignisArt(w)) return;
+        const d = new Date(mo); d.setDate(mo.getDate() + ti);
+        if (istFeiertag(d)) return;
+        if (!tage.has(m.name)) tage.set(m.name, {urlaub: [], krank: []});
+        tage.get(m.name)[w].push(isoVon(d));
+      });
+    });
+  });
+  const frei = alt.slice(), neu = [];
+  tage.forEach((arten, name) => EREIGNIS_ARTEN.forEach(([art]) => {
+    const liste = [...new Set(arten[art])].sort();
+    let von = null, bis = null;
+    const fertig = () => {
+      if (von === null) return;
+      // die Kennung bleibt bei dem Eintrag, der diesen Zeitraum bisher (teilweise) abdeckte
+      const n = frei.findIndex(e => e.name === name && e.art === art && e.von <= bis && e.bis >= von);
+      const vorher = n >= 0 ? frei.splice(n, 1)[0] : null;
+      neu.push(Object.assign({id: vorher ? vorher.id : "e" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        angelegt: vorher ? vorher.angelegt : new Date().toISOString()}, vorher && vorher.ausfall ? {ausfall: true} : {}, {name, art, von, bis}));
+    };
+    liste.forEach(tag => {
+      if (von !== null && naechsterArbeitstag(bis) === tag){ bis = tag; return; }
+      fertig(); von = bis = tag;
+    });
+    fertig();
+  }));
+  neu.sort((a, b) => a.von < b.von ? -1 : a.von > b.von ? 1 : a.name < b.name ? -1 : 1);
+  const bild = l => JSON.stringify(l.map(e => [e.name, e.art, e.von, e.bis]).sort());
+  const geaendert = bild(alt) !== bild(neu);
+  state.ereignisse = neu;
+  return geaendert;
+}
+
+const ABW_HERKUNFT = {ereignis: "Urlaub & Krankheit", abgabe: "Abgabe", liste: "Terminliste", hand: "von Hand"};
+const abwText = w => !w ? "verfügbar" : typeof w === "string" ? terminArtText(w) : terminArtText(w.a, w.von, w.bis);
+const abwGleich = (a, b) => a !== undefined && a !== null && JSON.stringify(a) === JSON.stringify(b);
+
+// Woher der Eintrag eines Tages stammt: ereignis | abgabe | liste | hand (null ohne Eintrag)
+function abwHerkunft(sl, i, tag){
+  const w = (((state.abwesend || {})[sl] || {})[i] || {})[tag];
+  if (!w) return null;
+  if (istEreignisArt(w)) return "ereignis";
+  if (abwGleich((((state.onlineStand || {})[sl] || {})[i] || {})[tag], w)) return "abgabe";
+  if (abwGleich((((state.listenStand || {})[sl] || {})[i] || {})[tag], w)) return "liste";
+  return "hand";
+}
+// Hat eine Abgabe für den Tag etwas anderes gesagt, als jetzt dasteht? → {abgabe, text} oder null
+function abwAbweichung(sl, i, tag){
+  const o = (((state.onlineStand || {})[sl] || {})[i] || {})[tag];
+  if (o === undefined || o === null) return null;
+  const w = (((state.abwesend || {})[sl] || {})[i] || {})[tag];
+  if (abwGleich(o, w)) return null;
+  // Beides heißt „den ganzen Tag nicht da“ (etwa „kann nicht“ abgegeben, dann als Urlaub eingetragen):
+  // für den Plan dasselbe, also kein Widerspruch
+  if (typeof o === "string" && typeof w === "string") return null;
+  return {abgabe: o, text: `Abgabe: „${abwText(o)}“ — eingetragen ist „${abwText(w)}“`};
+}
+// Einen Widerspruch auflösen: die Abgabe gilt wieder (abgabe = true) oder der Eintrag bleibt
+function abwAbweichungLoesen(sl, i, tag, abgabe){
+  const o = (((state.onlineStand || {})[sl] || {})[i] || {})[tag];
+  if (o === undefined) return;
+  if (abgabe){
+    state.abwesend[sl] = state.abwesend[sl] || {};
+    (state.abwesend[sl][i] = state.abwesend[sl][i] || {})[tag] = JSON.parse(JSON.stringify(o));
+  } else delete state.onlineStand[sl][i][tag];
+  ereignisseNachfuehren();
+}
+
+/* Die Liste der Woche: je Person zusammengefasst, was eingetragen ist, woher es stammt und
+   wo eine Abgabe überschrieben wurde.
+   → [{i, name, tage: [ti], text, herkunft, abweichung: {abgabe, text} | null}] */
+function abwesenheitsListe(sl){
+  const abw = (state.abwesend || {})[sl] || {}, mo = montagAusSchluessel(sl), raus = [];
+  state.mitarbeiter.forEach((m, i) => {
+    let offen = null;
+    TAGE.forEach(([k], ti) => {
+      const d = new Date(mo); d.setDate(mo.getDate() + ti);
+      const w = istFeiertag(d) ? null : (abw[i] || {})[k], ab = istFeiertag(d) ? null : abwAbweichung(sl, i, k);
+      if (!w && !ab){ offen = null; return; }
+      const text = abwText(w), herkunft = w ? abwHerkunft(sl, i, k) : "hand";
+      // aufeinanderfolgende Tage mit demselben Eintrag aus derselben Quelle gehören zusammen
+      if (offen && !ab && !offen.abweichung && offen.text === text && offen.herkunft === herkunft && offen.tage[offen.tage.length - 1] === ti - 1){ offen.tage.push(ti); return; }
+      offen = {i, name: m.name, tage: [ti], tag: k, text, herkunft, abweichung: ab};
+      raus.push(offen);
+    });
+  });
+  return raus;
+}
 
 // ==== kern/15-bereitschaft.js ====
 /* Bereitschaft: Kann für eine Woche ein Plan entstehen, der nicht auf falschen
@@ -4545,7 +5026,7 @@ function tagKopie(plan, ti){
 }
 
 // Wenn sich die Lücke nicht ganz schließen lässt: die Wege, die am meisten davon schließen
-function teilLoesungen(mit, ti, zielPunkte){
+function teilLoesungen(mit, ti, zielPunkte, lang){
   const tag = mit.tage[ti], r = tagesRaster(tag);
   const rest = p => fehlzeiten(p, ti).filter(m => !zielPunkte.includes(m)).length;
   const offen0 = fehlzeiten(mit, ti).filter(m => !zielPunkte.includes(m));
@@ -4563,10 +5044,10 @@ function teilLoesungen(mit, ti, zielPunkte){
   state.mitarbeiter.forEach((m, i) => {
     if (schichtenVon(mit, m.name, ti).length) return;
     const merke = {};
-    for (let L = MINSCHICHT * 60; L <= REGELN.maxAnwesenheit * 60; L += 60)
+    for (let L = MINSCHICHT * 60; L <= (lang ? REGELN.langAnwesenheit : REGELN.maxAnwesenheit) * 60; L += 60)
       for (let von = Math.max(r.tagVon, g0 - L + 30); von < g1 && von + L <= r.tagBis; von += 30){
         const p = tagKopie(mit, ti);
-        if (!ausfallErlaubt(p, planPlatz(p, i), ti, von, von + L)) continue;
+        if (!ausfallErlaubt(p, planPlatz(p, i), ti, von, von + L, undefined, lang)) continue;
         probe([{art: "neu", i, von, bis: von + L}], L, merke);
       }
     if (merke.best) raus.push(merke.best);
@@ -4578,7 +5059,7 @@ function teilLoesungen(mit, ti, zielPunkte){
     const merke = {};
     for (let von = s0.von; von >= Math.max(r.tagVon, s0.von - 240); von -= 30)
       for (let bis = s0.bis; bis <= Math.min(r.tagBis, s0.bis + 240); bis += 30){
-        if ((von === s0.von && bis === s0.bis) || !ausfallErlaubt(mit, s0.mi, ti, von, bis, s0)) continue;
+        if ((von === s0.von && bis === s0.bis) || !ausfallErlaubt(mit, s0.mi, ti, von, bis, s0, lang)) continue;
         probe([{art: "aendern", i: p0.i, alt: [s0.von, s0.bis], von, bis}], bis - von, merke);
       }
     if (merke.best) raus.push(merke.best);
@@ -4604,25 +5085,35 @@ function wegAufbereiten(mit, ti, aenderungen, zielPunkte, ausser){
     if (k.ende < 0) punkte += k.ende * 0.5;
     return {name: z.name, ist: k.ist, ende: k.ende};
   }).filter(Boolean);
+  // Wer durch diesen Weg an dem Tag über 8 h arbeitet (lange Schicht) — nur als letzter Ausweg
+  const lang = nachher.tage[ti].schichten.filter(s => istLang(s.arbeit) && !mit.tage[ti].schichten.some(x => x.mi === s.mi && istLang(x.arbeit)))
+    .map(s => ({name: planPerson(nachher, s.mi).name, arbeit: s.arbeit}));
+  punkte += lang.length * 12;
   const titel = zeilen.length === 1 ? zeilen[0].satz
     : zeilen.length === 2 ? `${zeilen[0].name.split(" ")[0]} und ${zeilen[1].name.split(" ")[0]} ${
         zeilen.every(z => /länger|früher/.test(z.satz)) ? "teilen sich die Lücke" : "ändern ihre Zeiten"}`
     : `${zeilen.length} Personen verschieben ihre Zeiten`;
   return {schritte: aenderungen.map(x => Object.assign({}, x, {name: (state.mitarbeiter[x.i] || {}).name})),
-          titel, zeilen, luecke, offen, voll: !offen.length, mehr, konto, punkte, ti,
+          titel, zeilen, luecke, offen, voll: !offen.length, mehr, konto, punkte, ti, lang,
           tagVorher: mit.tage[ti], tagNachher: nachher.tage[ti], namen: nachher.namen};
 }
 
 // Alle Wege für die Lücken eines Tages: erst die ganzen, dann die besten teilweisen
 function wegeFuerTag(mit, ti, weg, ziel, ausser){
-  const ganz = luekenSchliessen(mit, ti, weg, 0, ziel).filter(w => w.aenderungen.length)
-    .map(w => wegAufbereiten(mit, ti, w.aenderungen, ziel.punkte, ausser));
+  let wege = luekenSchliessen(mit, ti, weg, 0, ziel).filter(w => w.aenderungen.length);
+  // Lange Schichten (über 8 h Arbeit) erst, wenn sich die Lücke sonst gar nicht ganz schließen lässt
+  if (!wege.length) wege = luekenSchliessen(mit, ti, weg, 0, ziel, true).filter(w => w.aenderungen.length);
+  const ganz = wege.map(w => wegAufbereiten(mit, ti, w.aenderungen, ziel.punkte, ausser));
   const gesehen = new Set(), raus = [];
   ganz.sort((a, b) => a.punkte - b.punkte).forEach(w => { if (!gesehen.has(w.titel) && raus.length < 3){ gesehen.add(w.titel); raus.push(w); } });
-  if (raus.length < 2) teilLoesungen(mit, ti, ziel.punkte).forEach(w => {
+  const teilweise = lang => teilLoesungen(mit, ti, ziel.punkte, lang).forEach(w => {
     const v = wegAufbereiten(mit, ti, w.aenderungen, ziel.punkte, ausser);
+    // ein langer Teilweg nur, wenn er mehr schließt als alles bisher Gefundene
+    if (lang && raus.some(x => x.offen.length <= v.offen.length)) return;
     if (!gesehen.has(v.titel) && raus.length < 4){ gesehen.add(v.titel); raus.push(v); }
   });
+  if (raus.length < 2) teilweise(false);
+  if (!raus.some(w => w.voll)) teilweise(true);
   wegeOrdnen(raus);
   raus.forEach((w, n) => w.warum = wegErklaerung(w, n, raus));
   return raus;
@@ -4632,6 +5123,7 @@ function wegErklaerung(w, platz, alle){
   const teile = [];
   teile.push(w.voll ? `Schließt die Lücke ${spannenText(w.luecke)} ganz.`
     : `Schließt die Lücke nur teilweise: ${spannenText(w.offen)} bleibt offen. Ein vollständiger Weg am selben Tag hält Gesetz oder Ruhezeiten nicht ein.`);
+  if ((w.lang || []).length) teile.push(`Lange Schicht: ${w.lang.map(x => `${x.name} arbeitet an dem Tag ${h1(x.arbeit)} Stunden`).join(", ")} — mit üblich langen Schichten ließ sich die Lücke nicht ganz schließen. ${LANG_HINWEIS}`);
   teile.push("Geprüft: Ruhezeit zwischen zwei Schichten, Höchstarbeitszeit, Pausen, Jugendschutz, höchstens sechs Arbeitstage und alle eingetragenen Abwesenheiten.");
   teile.push(w.mehr > 0.01 ? `Kostet ${h1(w.mehr)} Stunden mehr an diesem Tag.` : w.mehr < -0.01 ? `Spart ${h1(-w.mehr)} Stunden.` : "Kostet keine zusätzlichen Stunden.");
   if (alle.length > 1) teile.push(w.gelernt ? `Steht oben, weil du in dieser Filiale meist so löst: ${LOESUNGSARTEN[w.art]}.`
@@ -4698,6 +5190,7 @@ function entwurfUebernehmen(sl){
         angelegt: new Date().toISOString(), ausfall: true});
     });
   });
+  ereignisseNachfuehren();
   // Ursprüngliche Zeiten der geänderten Zellen festhalten (die erste Fassung zählt)
   const urfassung = Object.assign({}, kurz.urfassung || {});
   state.mitarbeiter.forEach(m => plan.tage.forEach((t, ti) => {
@@ -6003,7 +6496,7 @@ function azubisAuffuellen(kurz){
     for (let runde = 0; runde < 24; runde++){
       const j = platzImPlan(kurz, m.name);
       const k = j < 0 ? null : kontoNach(kurz, j);
-      const fehlt = k ? viertel(k.soll - k.ist) : 0;
+      const fehlt = k ? aufHalbe(k.soll - k.ist) : 0;
       if (fehlt < 0.5) break;
       // am liebsten die Möglichkeit, die am meisten der fehlenden Stunden bringt
       const c = auffuellKandidaten(kurz, m, fehlt).sort((a, b) => b.gewinn - a.gewinn || b.punkte - a.punkte)[0];
@@ -6068,7 +6561,7 @@ function azubiFehlstunden(plan){
   state.mitarbeiter.forEach((m, i) => {
     if (!istAzubi(m)) return;
     const j = platzImPlan(plan, m.name), k = j < 0 ? null : kontoNach(plan, j);
-    const fehlt = k ? viertel(k.soll - k.ist) : 0;
+    const fehlt = k ? aufHalbe(k.soll - k.ist) : 0;
     if (fehlt < 0.5) return;
     const schule = TAGE.filter(([key]) => (abw[i] || {})[key] === "schule").length;
     const weg = TAGE.filter(([key]) => ["urlaub", "krank", "nicht"].includes((abw[i] || {})[key])).length;
@@ -6658,6 +7151,60 @@ function zahlHtml(liste){
   return `<span class="zahl${nurNeu ? " neu" : ""}" aria-label="${n} ${nurNeu ? "neu" : "offen"}">${n > 9 ? "9+" : n}</span>`;
 }
 
+/* ---- Zahlfelder ----------------------------------------------------------------
+   Textfeld mit Dezimaltastatur statt <input type="number"> (siehe zahlLesen in kern/02-hilfen.js).
+   attrs: was bisher am Feld stand (id, data-…, placeholder). einheit: für die Rückmeldung unter
+   dem Feld („= 1,5 h“). o: {min, max, ganz, echo:false, klasse}.
+   Ausgelesen wird mit zahlWert(feld) — der Text mit Punkt („1.5“), "" wenn leer oder unlesbar. */
+function zahlFeld(attrs, wert, einheit, o){
+  o = o || {};
+  return `<input type="text" inputmode="${o.ganz ? "numeric" : "decimal"}" autocomplete="off" autocapitalize="off" spellcheck="false"
+    class="zahl-ein${o.klasse ? " " + o.klasse : ""}" data-zahl="${esc(einheit || "")}"${o.min !== undefined ? ` data-min="${o.min}"` : ""}${
+    o.max !== undefined ? ` data-max="${o.max}"` : ""}${o.ganz ? " data-ganz" : ""}${o.echo === false ? " data-ohne-echo" : ""} ${attrs} value="${esc(zahlZeigen(wert))}">`;
+}
+// Was an einem Zahlfeld nicht stimmt — "" wenn alles passt
+function zahlFehler(feld){
+  const z = zahlLesen(feld.value), d = feld.dataset;
+  if (z === null) return "Bitte eine Zahl eingeben, z. B. 1,5";
+  if (z === "") return "";
+  if (d.ganz !== undefined && Math.abs(z % 1) > 0.001) return "Bitte eine ganze Zahl";
+  if (d.min !== undefined && z < +d.min) return `Mindestens ${zahlZeigen(d.min)}`;
+  if (d.max !== undefined && z > +d.max) return `Höchstens ${zahlZeigen(d.max)}`;
+  return "";
+}
+const zahlWert = feld => { const z = zahlLesen(feld.value); return z === null || z === "" || zahlFehler(feld) ? "" : String(z); };
+// Rückmeldung am Feld: rot bei Unlesbarem, sonst klein darunter, was verstanden wurde
+function zahlRueckmeldung(feld){
+  const fehler = zahlFehler(feld), z = zahlLesen(feld.value);
+  feld.setAttribute("aria-invalid", fehler ? "true" : "false");
+  feld.title = fehler;
+  if (feld.dataset.ohneEcho !== undefined) return;
+  const halter = feld.closest("label.f");
+  if (!halter) return;
+  let echo = halter.querySelector(".zahl-echo");
+  if (!echo){ echo = document.createElement("span"); echo.className = "zahl-echo"; echo.setAttribute("aria-live", "polite"); feld.after(echo); }
+  // nur zeigen, wenn es etwas sagt: ein Fehler, ein Komma, eine Einheit mit Minuten
+  const text = fehler || (/[.,]/.test(feld.value) && z !== "" ? zahlEcho(z, feld.dataset.zahl) : "");
+  echo.textContent = text; echo.classList.toggle("fehler", !!fehler); echo.hidden = !text;
+}
+if (typeof document.addEventListener === "function"){
+  document.addEventListener("input", e => { if (e.target && e.target.matches && e.target.matches("input[data-zahl]")) zahlRueckmeldung(e.target); }, true);
+  // Beim Verlassen steht im Feld, was verstanden wurde — einheitlich mit Komma
+  document.addEventListener("focusout", e => {
+    const f = e.target;
+    if (!f || !f.matches || !f.matches("input[data-zahl]")) return;
+    const z = zahlLesen(f.value);
+    if (z !== null && z !== "" && !zahlFehler(f)) f.value = zahlZeigen(z);
+    zahlRueckmeldung(f);
+  }, true);
+}
+// Vor dem Speichern eines Formulars: alle Zahlfelder prüfen — false, wenn eines nicht lesbar ist
+function zahlenOk(wurzel){
+  let ok = true;
+  wurzel.querySelectorAll("input[data-zahl]").forEach(f => { zahlRueckmeldung(f); if (zahlFehler(f)) ok = false; });
+  return ok;
+}
+
 // ==== app/27-markierungen.js ====
 /* Rote Zahlen an den Knöpfen: Wo ist etwas einzustellen, wo hat sich etwas geändert?
 
@@ -6691,6 +7238,9 @@ function markierungen(){
   });
   // Neuerungen nur in Filialen, die schon vorher eingerichtet waren
   if (state.mitarbeiter.length) NEUIGKEITEN.forEach(n => add(n.ziel, n.id, "neu", n.text));
+
+  // Ohne Wiederherstellungscode gibt es keinen Weg zurück, wenn das Kennwort vergessen ist
+  if (state.eingerichtet && state.pw && !state.wh) add("sicherung", "wh", "anpassen", "Wiederherstellungscode fürs Kennwort anlegen");
 
   // Pläne: Wer steht im Plan, obwohl er inzwischen fehlt? (laufende und kommende Wochen)
   const jetzt = wochenSchluessel(aktuellerMontag());
@@ -6791,9 +7341,10 @@ function geheZu(ziel, marke){
   const wocheDer = m => { const t = /(\d{4}-KW\d{2})/.exec((m && m.id) || ""); return t ? t[1] : null; };
 
   if (ziel === "planen"){
-    // Fehlt der gezeigten Woche der Plan, ist sie gemeint — sonst die, die als Nächstes ansteht
-    const offen = wocheDer(marke) || ((state.plaene || {})[wochenSchluessel(gezeigt)] ? wocheDer((markierungen().planen || [])[0]) : null);
-    planWoche = isoVon(offen ? montagAusSchluessel(offen) : gezeigt);
+    // Fehlt der gezeigten Woche der Plan, ist sie gemeint — sonst die nächste, die noch keinen hat
+    const offen = wocheDer(marke);
+    planWoche = isoVon(offen ? montagAusSchluessel(offen)
+      : (state.plaene || {})[wochenSchluessel(gezeigt)] ? naechsteWocheOhnePlan() : gezeigt);
     // Wartet für die Woche ein Entwurf auf die Freigabe, geht es gleich dorthin
     ansicht = marke && /^entwurf:/.test(marke.id) && planEntwurfVon(wochenSchluessel(montagDer(planWoche))) ? "entwurf" : "planen";
   } else if (ziel === "aendern"){
@@ -6933,6 +7484,7 @@ function kopfLeiste(){
   const ab = document.getElementById("abmelden");
   if (ab) ab.hidden = (ansicht === "anmeldung");
   navZeichnen();
+  if (typeof fussZeichnen === "function") fussZeichnen();
 }
 
 function render(){
@@ -7049,60 +7601,79 @@ function oeffneBereich(id, zurueck){
 
 /* --------- Anmeldung --------- */
 function anmeldung(){
-  const p = el(`<div class="panel">
+  // Drei Wege, klar getrennt: anmelden · neue Filiale anlegen · Kennwort vergessen
+  const p = el(`<div class="panel anmeldung">
     <div class="head">
       <h1>Filialplaner</h1>
-      <p class="lede">Mit Filialnummer und Kennwort anmelden — oder einen neuen
-      Filialbereich anlegen.</p></div>
+      <p class="lede" id="anLede"></p></div>
+    <div class="an-reiter" role="tablist" aria-label="Anmelden oder neue Filiale">
+      <button type="button" role="tab" data-modus="anmelden">Anmelden</button>
+      <button type="button" role="tab" data-modus="neu">Neue Filiale</button></div>
     <div class="grid g3">
       <label class="f">Filialnummer<input type="text" id="nr" inputmode="numeric" placeholder="Nummer der Filiale" class="num"></label>
-      <label class="f">Kennwort<input type="password" id="pw" placeholder="mindestens 4 Zeichen"></label>
+      <label class="f" id="wrapCode" hidden>Wiederherstellungscode<input type="text" id="code" autocomplete="off" autocapitalize="characters"
+        spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" class="num"></label>
+      <label class="f"><span id="pwText">Kennwort</span><input type="password" id="pw" placeholder="mindestens 4 Zeichen"></label>
       <label class="f" id="wrapPw2" hidden>Kennwort wiederholen<input type="password" id="pw2"></label>
     </div>
     <p class="err" id="err">${esc(fehler)}</p>
     <div class="actions">
-      <button class="btn haupt" id="anmelden">Anmelden</button>
-      <button class="btn ghost" id="neu">Neuen Bereich anlegen</button>
+      <button class="btn haupt" id="los" type="button">Anmelden</button>
+      <button class="btn ghost small" id="vergessen" type="button">Kennwort vergessen?</button>
       <div class="spacer"></div>
-      <button class="btn ghost small" id="verwalten">Gespeicherte Filialen</button>
+      <button class="btn ghost small" id="verwalten" type="button">Gespeicherte Filialen</button>
     </div>
     <div id="liste"></div>
   </div>`);
 
   let modus = "anmelden";
-  const nrF = p.querySelector("#nr"), pwF = p.querySelector("#pw"), pw2F = p.querySelector("#pw2");
+  const nrF = p.querySelector("#nr"), pwF = p.querySelector("#pw"), pw2F = p.querySelector("#pw2"), codeF = p.querySelector("#code");
   const fehlerZeigen = txt => { fehler = txt; p.querySelector("#err").textContent = txt; };
-
+  const TEXTE = {
+    anmelden:  {lede: "Mit Filialnummer und Kennwort anmelden.", knopf: "Anmelden", pw: "Kennwort"},
+    neu:       {lede: "Einen neuen Filialbereich anlegen — mit eigener Nummer und eigenem Kennwort.", knopf: "Filiale anlegen", pw: "Kennwort"},
+    vergessen: {lede: "Mit dem Wiederherstellungscode der Filiale ein neues Kennwort setzen. Der Code wurde beim Anlegen gezeigt oder unter „Sicherung“ erstellt.",
+                knopf: "Neues Kennwort setzen", pw: "Neues Kennwort"}
+  };
   const umschalten = (neuerModus) => {
     modus = neuerModus;
-    p.querySelector("#wrapPw2").hidden = (modus !== "neu");
-    p.querySelector("#anmelden").className = modus === "anmelden" ? "btn haupt" : "btn ghost";
-    p.querySelector("#neu").className      = modus === "neu"      ? "btn haupt" : "btn ghost";
+    p.querySelector("#anLede").textContent = TEXTE[modus].lede;
+    p.querySelector("#los").textContent = TEXTE[modus].knopf;
+    p.querySelector("#pwText").textContent = TEXTE[modus].pw;
+    p.querySelector("#wrapPw2").hidden = (modus === "anmelden");
+    p.querySelector("#wrapCode").hidden = (modus !== "vergessen");
+    p.querySelector("#vergessen").textContent = modus === "vergessen" ? "Zurück zur Anmeldung" : "Kennwort vergessen?";
+    p.querySelector("#vergessen").hidden = (modus === "neu");
+    p.querySelectorAll(".an-reiter button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.modus === modus)));
     fehlerZeigen("");
   };
+  p.querySelectorAll(".an-reiter button").forEach(b => b.onclick = () => umschalten(b.dataset.modus));
+  p.querySelector("#vergessen").onclick = () => umschalten(modus === "vergessen" ? "anmelden" : "vergessen");
 
   const oeffnen = (daten) => {
     state = Object.assign(leer(), daten);
     archivAufraeumen();
+    // „Urlaub & Krankheit“ folgt den eingetragenen Tagen (eine Liste, kein Nebeneinander)
+    if (ereignisseNachfuehren()) sichern();
     merkeZugang(state.nr, state.ort, state.pw);
     if (state.eingerichtet){ ansicht = "start"; }
     else { ansicht = "einrichtung"; schritt = 0; maxSchritt = 0; }
     fehler = ""; render();
   };
 
-  p.querySelector("#anmelden").onclick = async () => {
-    if (modus !== "anmelden"){ umschalten("anmelden"); return; }
+  const anmelden = async () => {
     const nr = nrF.value.replace(/\D/g, ""), pw = pwF.value;
     if (!nr) return fehlerZeigen("Bitte eine Filialnummer eintragen.");
     if (!pw) return fehlerZeigen("Bitte das Kennwort eintragen.");
     const vorhanden = await ladeFiliale(nr);
-    if (!vorhanden) return fehlerZeigen(`Für N ${nr} gibt es noch keinen Bereich. Lege ihn mit „Neuen Bereich anlegen“ an.`);
-    if (vorhanden.pw !== await hash(nr + ":" + pw)) return fehlerZeigen("Das Kennwort stimmt nicht.");
+    if (!vorhanden) return fehlerZeigen(`Für N ${nr} gibt es noch keinen Bereich. Lege ihn unter „Neue Filiale“ an.`);
+    if (vorhanden.pw !== await hash(nr + ":" + pw)) return fehlerZeigen(vorhanden.wh
+      ? "Das Kennwort stimmt nicht. Vergessen? Mit dem Wiederherstellungscode lässt sich ein neues setzen."
+      : "Das Kennwort stimmt nicht.");
     oeffnen(vorhanden);
   };
 
-  p.querySelector("#neu").onclick = async () => {
-    if (modus !== "neu"){ umschalten("neu"); return; }
+  const anlegen = async () => {
     const nr = nrF.value.replace(/\D/g, ""), pw = pwF.value, pw2 = pw2F.value;
     if (!nr) return fehlerZeigen("Bitte eine Filialnummer eintragen.");
     if (pw.length < 4) return fehlerZeigen("Das Kennwort braucht mindestens 4 Zeichen.");
@@ -7111,9 +7682,28 @@ function anmeldung(){
     if (vorhanden) return fehlerZeigen(`N ${nr} ist bereits angelegt. Melde dich mit dem Kennwort an oder lösche den Bereich unter „Gespeicherte Filialen“.`);
     const frisch = leer();
     frisch.nr = nr; frisch.pw = await hash(nr + ":" + pw);
-    state = frisch; await speichere();
-    oeffnen(frisch);
+    state = frisch;
+    // Der Weg zurück, falls das Kennwort einmal fehlt — wird nur jetzt gezeigt
+    const code = await whAnlegen();
+    await whZeigen(code, "neu");
+    oeffnen(state);
   };
+
+  const zuruecksetzen = async () => {
+    const nr = nrF.value.replace(/\D/g, ""), pw = pwF.value, pw2 = pw2F.value;
+    if (!nr) return fehlerZeigen("Bitte eine Filialnummer eintragen.");
+    if (!codeF.value.trim()) return fehlerZeigen("Bitte den Wiederherstellungscode eintragen.");
+    if (pw.length < 4) return fehlerZeigen("Das neue Kennwort braucht mindestens 4 Zeichen.");
+    if (pw !== pw2) return fehlerZeigen("Die beiden Kennwörter stimmen nicht überein.");
+    const erg = await whEinloesen(nr, codeF.value, pw);
+    if (erg.fehler) return fehlerZeigen(erg.fehler);
+    // Der alte Code ist verbraucht — der neue wird wieder nur jetzt gezeigt
+    await whZeigen(erg.code, "ersetzt");
+    oeffnen(state);
+  };
+
+  p.querySelector("#los").onclick = () => modus === "neu" ? anlegen() : modus === "vergessen" ? zuruecksetzen() : anmelden();
+  [nrF, pwF, pw2F, codeF].forEach(feld => feld.onkeydown = e => { if (e.key === "Enter") p.querySelector("#los").click(); });
 
   // Verwaltung: nur auf Wunsch, und ohne Öffnen-Abkürzung
   const box = p.querySelector("#liste");
@@ -7308,20 +7898,21 @@ function warentage(){
   const p = el(`<div class="panel">
     <div class="head"><span class="eyebrow">${stufe(2)}</span>
       <h1 style="margin-top:6px">Wochenaufgaben</h1>
-      <p class="lede">Entscheidend ist die <b>Dauer</b> — die Uhrzeit kann fest sein, in einer
-      Spanne liegen oder offen bleiben. Eine feste Uhrzeit ist der <b>früheste Beginn</b>: Liegen
-      mehrere Aufgaben zur selben Zeit, legt der Planer sie nacheinander, damit eine Person sie
-      erledigen kann. Bis wann eine Aufgabe fertig sein muss, steht unter „spätestens fertig bis“.
-      Was schwankt, bleibt leer und fließt nicht in die Rechnung ein. Abschalten nur, wenn ohne die Aufgabe geplant werden soll. Ist eine
-      Aufgabe nicht jeden Tag gleich, „an den Tagen unterschiedlich“ einschalten und jeden
-      Tag einzeln einstellen.</p></div>
-    <div id="tasks"></div>
+      <p class="lede">Je Aufgabe: an welchen Tagen, wann und wie lange. Eine Zeile antippen öffnet
+      die Einstellungen. Entscheidend ist die <b>Dauer</b>.</p>
+      <details class="mehr-dazu"><summary>Wie der Planer die Angaben liest</summary>
+        <p>Die Uhrzeit kann fest sein, in einer Spanne liegen oder offen bleiben. Eine feste Uhrzeit ist der
+        <b>früheste Beginn</b>: Liegen mehrere Aufgaben zur selben Zeit, legt der Planer sie nacheinander, damit eine
+        Person sie erledigen kann. Bis wann eine Aufgabe fertig sein muss, steht unter „spätestens fertig bis“.
+        Was schwankt, bleibt leer und fließt nicht in die Rechnung ein. Abschalten nur, wenn ohne die Aufgabe geplant
+        werden soll. Ist eine Aufgabe nicht jeden Tag gleich, „an den Tagen unterschiedlich“ einschalten und jeden
+        Tag einzeln einstellen.</p></details></div>
+    <div id="tasks" class="task-liste"></div>
     <h2 style="margin:28px 0 4px">Bestellungen</h2>
-    <p class="lede" style="margin-bottom:12px">Für jede Bestellung die Tage und die Frist
-      eintragen („Zeitspanne“, spätestens = Frist). Die Fristen stehen im Arbeitsplan in der Zeile
-      „Bestellung“. Mit einer Dauer wird die Bestellung auch eingeplant — bei jemandem mit der
-      Funktion „Bestellen“.</p>
-    <div id="bestellungen"></div>
+    <p class="lede" style="margin-bottom:12px">Je Bestellung die Tage und die Frist („Zeitspanne“, spätestens = Frist).
+      Die Fristen stehen im Arbeitsplan in der Zeile „Bestellung“. Mit einer Dauer wird die Bestellung
+      auch eingeplant — bei jemandem mit der Funktion „Bestellen“.</p>
+    <div id="bestellungen" class="task-liste"></div>
     <div class="tile" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
       <span class="eyebrow">Personenstunden pro Woche, soweit angegeben</span>
       <b class="num" id="sumP" style="font-size:1.2rem"></b></div>
@@ -7340,21 +7931,55 @@ function tagesKurzinfo(z){
   return "frei";
 }
 
+/* Was in der Zeile einer Aufgabe steht: Tage, Zeit, Dauer, Personen — und was noch fehlt.
+   → {text, fehlt (bremst den Plan), leise (nur ein Hinweis)} */
+function aufgabenZeile(w, a){
+  if (!a.aktiv) return {text: "abgeschaltet", fehlt: "", leise: ""};
+  const best = w.gruppe === "bestellung";
+  const idx = TAGE.map(([k], ti) => a.tage.includes(k) ? ti : -1).filter(ti => ti >= 0);
+  if (!idx.length) return best ? {text: "keine Tage gewählt", fehlt: "", leise: ""} : {text: "", fehlt: "Tage fehlen", leise: ""};
+  const teile = [idx.length === TAGE.length ? "täglich" : tageText(idx)];
+  const tage = a.tage.map(k => aufgabeAm(a, k));
+  const bild = z => JSON.stringify([z.zeitArt, z.zeit, z.fertig || "", z.fVon, z.fBis, z.dauer, z.personen]);
+  if (a.jeTag && tage.some(z => bild(z) !== bild(tage[0]))) teile.push("je Tag verschieden");
+  else {
+    const z = tage[0];
+    const zeit = z.zeitArt === "fest" ? (hatZeit(z.zeit) ? `ab ${z.zeit}${hatZeit(z.fertig) ? ", fertig bis " + z.fertig : ""}` : "")
+               : z.zeitArt === "spanne" ? (hatZeit(z.fVon) && hatZeit(z.fBis) ? `${z.fVon}–${z.fBis}` : hatZeit(z.fBis) ? `bis ${z.fBis}` : hatZeit(z.fVon) ? `ab ${z.fVon}` : "")
+               : "frei eingeplant";
+    if (zeit) teile.push(zeit);
+    if (hat(z.dauer)) teile.push(zahlZeigen(z.dauer) + " h");
+    if (hat(z.personen) && !(best && nz(z.personen) === 1)) teile.push(nz(z.personen) === 1 ? "1 Person" : zahlZeigen(z.personen) + " Personen");
+  }
+  const ohneDauer = tage.some(z => !hat(z.dauer)), ohnePers = tage.some(z => !hat(z.personen));
+  // Eine Bestellung ohne Dauer steht mit ihrer Frist im Plan — sie wird nur nicht eingeplant
+  if (best && ohneDauer) return {text: teile.join(" · "), fehlt: "", leise: "ohne Dauer — nur die Frist steht im Plan"};
+  return {text: teile.join(" · "), fehlt: ohneDauer ? "Dauer fehlt" : ohnePers ? "Personenzahl fehlt" : "", leise: ""};
+}
+
 function aufgabenKarte(w, p){
   const a = state.aufgaben[w.id];
   const best = w.gruppe === "bestellung";
   let offenerTag = null;      // welcher Tag aufgeklappt ist, wenn je Tag verschieden
-  const t = el(`<div class="task">
-    <div class="task-top"><h3>${esc(w.anzeige || w.name)}${a.neu ? ' <span class="tag neu">neu</span>' : ""}</h3>
-      <label class="switch schalter"><input type="checkbox" data-aktiv ${a.aktiv ? "checked" : ""}>
-        <span data-aktivtext>${a.aktiv ? "aktiv" : "abgeschaltet"}</span></label></div>
+  // Eine Zeile je Aufgabe; antippen öffnet die Einstellungen. Neues steht gleich offen da.
+  const t = el(`<div class="task${a.neu ? "" : " zu"}">
+    <h3 class="task-h"><button class="task-kopf" type="button" aria-expanded="${a.neu ? "true" : "false"}">
+      <span class="task-name">${esc(w.anzeige || w.name)}${a.neu ? ' <span class="tag neu">neu</span>' : ""}</span>
+      <span class="task-info" data-kurz></span>
+      <span class="task-pfeil" aria-hidden="true">${symbol("weiter")}</span></button></h3>
     <div class="body">
-      <div class="days" role="group" aria-label="Wochentage ${esc(w.anzeige || w.name)}"></div>
-      <label class="switch jetag"><input type="checkbox" data-jetag ${a.jeTag ? "checked" : ""}>
-        an den Tagen unterschiedlich</label>
-      <div data-felder></div>
-      <div class="pstd">= <b>?</b> Pers.-Std/Woche</div>
+      <label class="switch schalter"><input type="checkbox" data-aktiv ${a.aktiv ? "checked" : ""}>
+        <span data-aktivtext>${a.aktiv ? "aktiv" : "abgeschaltet"}</span></label>
+      <div data-inhalt>
+        <div class="days" role="group" aria-label="Wochentage ${esc(w.anzeige || w.name)}"></div>
+        <label class="switch jetag"><input type="checkbox" data-jetag ${a.jeTag ? "checked" : ""}>
+          an den Tagen unterschiedlich</label>
+        <div data-felder></div>
+        <div class="pstd">= <b>?</b> Pers.-Std/Woche</div>
+      </div>
     </div></div>`);
+  const kopf = t.querySelector(".task-kopf");
+  kopf.onclick = () => { const zu = t.classList.toggle("zu"); kopf.setAttribute("aria-expanded", String(!zu)); };
   const daysBox = t.querySelector(".days");
   const felderBox = t.querySelector("[data-felder]");
   const out = t.querySelector(".pstd b");
@@ -7374,7 +7999,12 @@ function aufgabenKarte(w, p){
     out.textContent = bekannt ? h1(tage.reduce((s,x) => s + nz(x.dauer) * nz(x.personen), 0)) : "?";
     t.classList.toggle("off", !a.aktiv);
     t.querySelector("[data-aktivtext]").textContent = a.aktiv ? "aktiv" : "abgeschaltet";
-    t.querySelector(".body").style.display = a.aktiv ? "" : "none";
+    t.querySelector("[data-inhalt]").style.display = a.aktiv ? "" : "none";
+    // die Zeile: was eingestellt ist — und was noch fehlt
+    const z = aufgabenZeile(w, a);
+    t.querySelector("[data-kurz]").innerHTML = [z.text ? esc(z.text) : "", z.fehlt ? `<b class="task-fehlt">${esc(z.fehlt)}</b>` : "",
+      z.leise ? `<span class="task-leise">${esc(z.leise)}</span>` : ""].filter(Boolean).join(" · ");
+    t.classList.toggle("fehlt", !!z.fehlt);
     felderBox.querySelectorAll("[data-info]").forEach(s => s.textContent = tagesKurzinfo(a.proTag[s.dataset.info]));
     p.querySelector("#sumP").textContent = h1(auswertung().aufgaben);
     sichern();
@@ -7386,8 +8016,8 @@ function aufgabenKarte(w, p){
       <label class="f">Zeit<select data-art>${ZEITARTEN.map(([v,l]) =>
         `<option value="${v}"${z.zeitArt === v ? " selected" : ""}>${l}</option>`).join("")}</select></label>
       <div class="zeitfelder" data-zeit></div>
-      <label class="f">Dauer (h)<input type="number" data-dauer min="0" step="0.25" placeholder="?" value="${esc(z.dauer)}"></label>
-      <label class="f">Personen<input type="number" data-pers min="1" step="1" placeholder="?" value="${esc(z.personen)}"></label>
+      <label class="f">Dauer (h)${zahlFeld('data-dauer placeholder="?"', z.dauer, "h", {min: 0})}</label>
+      <label class="f">Personen${zahlFeld('data-pers placeholder="?"', z.personen, "", {min: 1, ganz: true})}</label>
     </div>`);
     const zeitBox = box.querySelector("[data-zeit]");
     const zeiten = () => {
@@ -7410,8 +8040,8 @@ function aufgabenKarte(w, p){
       }
     };
     box.querySelector("[data-art]").onchange = e => { z.zeitArt = e.target.value; zeiten(); frisch(); };
-    box.querySelector("[data-dauer]").oninput = e => { z.dauer = e.target.value; frisch(); };
-    box.querySelector("[data-pers]").oninput  = e => { z.personen = e.target.value; frisch(); };
+    box.querySelector("[data-dauer]").oninput = e => { z.dauer = zahlWert(e.target); frisch(); };
+    box.querySelector("[data-pers]").oninput  = e => { z.personen = zahlWert(e.target); frisch(); };
     zeiten();
     return box;
   };
@@ -7545,12 +8175,12 @@ function personEntfernen(i){
   const m = state.mitarbeiter[i];
   if (!m || !confirm(`${m.name} wirklich entfernen? Alte Pläne behalten die Person, Urlaub und Krankheit werden gelöscht.`)) return;
   state.mitarbeiter.splice(i, 1);
-  Object.values(state.abwesend || {}).forEach(woche => {
+  [state.abwesend, state.onlineStand, state.listenStand].forEach(feld => Object.values(feld || {}).forEach(woche => {
     const neu = {};
     Object.keys(woche).forEach(k => { const n = +k; if (n < i) neu[n] = woche[k]; else if (n > i) neu[n - 1] = woche[k]; });
     Object.keys(woche).forEach(k => delete woche[k]);
     Object.assign(woche, neu);
-  });
+  }));
   state.ereignisse = (state.ereignisse || []).filter(e => e.name !== m.name);
   bearbeite = null;
   sichern(); render();
@@ -7582,14 +8212,18 @@ function personSeite(){
           Wird jemand 18, hier umstellen.</span></label>
       </div>
       <div class="grid g3" style="margin-top:12px">
-        <label class="f" id="wrapVertrag"><span id="vertragText">Stunden laut Vertrag</span><input type="number" id="mVertrag" min="0" step="0.5" placeholder="leer lassen, wenn unklar" value="${esc(m.vertrag || "")}">
+        <label class="f" id="wrapVertrag"><span id="vertragText">Stunden laut Vertrag</span>${zahlFeld('id="mVertrag" placeholder="leer lassen, wenn unklar"', m.vertrag || "", "h", {min: 0})}
           <span class="hint" id="vertragHinweis" hidden>Orientierung, keine Pflicht. Fest ist nur die Minijob-Grenze im Monat — ein Stundenkonto gibt es für Aushilfen nicht.</span></label>
         <label class="f" id="wrapLj" hidden>Lehrjahr<select id="mLj">${[1,2,3].map(j =>
           `<option value="${j}"${m.lehrjahr === j ? " selected" : ""}>${j}. Lehrjahr</option>`).join("")}</select></label>
-        <label class="f" id="wrapBetrieb" hidden>Stunden im Betrieb<input type="number" id="mBetrieb" min="0" step="0.5" placeholder="leer lassen, wenn unklar" value="${esc(m.betrieb || "")}"></label>
-        <label class="f" id="wrapSaldo">Überstunden zu Beginn KW ${kwVon(jetzt)}<input type="number" id="mSaldo" step="0.25" placeholder="0"
-          value="${standJetzt === null || standJetzt === undefined ? esc(m.saldo ?? "") : standJetzt}">
-          <span class="hint">+ Überstunden, − Minusstunden. Danach rechnet der Plan jede Woche selbst weiter.</span></label>
+        <label class="f" id="wrapBetrieb" hidden>Stunden im Betrieb${zahlFeld('id="mBetrieb" placeholder="leer lassen, wenn unklar"', m.betrieb || "", "h", {min: 0})}</label>
+        ${neuM
+          ? `<label class="f" id="wrapSaldo">Überstunden zum Start (KW ${kwVon(jetzt)})${zahlFeld('id="mSaldo" placeholder="0"', "", "h")}
+               <span class="hint">+ Überstunden, − Minusstunden. Danach rechnet der Plan jede Woche selbst weiter.</span></label>`
+          : `<div class="f konto-feld" id="wrapSaldo"><span>Stundenkonto zu Beginn KW ${kwVon(jetzt)}</span>
+               <div class="konto-stand"><b class="num" id="kontoStand">${ueText(standJetzt || 0) || "0,0"} h</b>
+                 <button class="btn ghost small" id="kontoKorr" type="button">Konto korrigieren</button></div>
+               <span class="hint">Rechnet der Plan jede Woche selbst weiter — Ist minus Soll.</span></div>`}
       </div>
       <div class="grid g2" style="margin-top:12px">
         <label class="switch" style="align-items:flex-start">
@@ -7627,6 +8261,9 @@ function personSeite(){
     };
     typ.onchange = umschalten; umschalten();
 
+    const korr = f.querySelector("#kontoKorr");
+    if (korr) korr.onclick = () => kontoDialog(bearbeite, stand => { f.querySelector("#kontoStand").textContent = (ueText(stand) || "0,0") + " h"; });
+
     const altF = f.querySelector("#mAlter");
     altF.onchange = () => altF.classList.remove("fehlt");
 
@@ -7636,9 +8273,9 @@ function personSeite(){
         name: f.querySelector("#mName").value.trim(),
         typ: typ.value,
         volljaehrig: altF.value === "voll" ? true : altF.value === "minder" ? false : undefined,
-        vertrag: az ? "" : f.querySelector("#mVertrag").value,
+        vertrag: az ? "" : zahlWert(f.querySelector("#mVertrag")),
         lehrjahr: az ? parseInt(f.querySelector("#mLj").value,10) : null,
-        betrieb: az ? f.querySelector("#mBetrieb").value : "",
+        betrieb: az ? zahlWert(f.querySelector("#mBetrieb")) : "",
         geteilt: f.querySelector("#mGeteilt").checked,
         ueberstunden: f.querySelector("#mUeber").checked,
         qual: [...f.querySelectorAll("#mQual input:checked")].map(i => i.value)
@@ -7656,6 +8293,7 @@ function personSeite(){
   speichern.onclick = () => {
     const d = lesen();
     if (!d.name){ f.querySelector("#err").textContent = "Bitte einen Namen eintragen."; return; }
+    if (!zahlenOk(f)){ f.querySelector("#err").textContent = "Eine Zahl ist nicht lesbar — bitte das rot markierte Feld berichtigen."; return; }
     if (d.volljaehrig === undefined){
       altF.classList.add("fehlt");
       f.querySelector("#err").textContent = "Bitte angeben, ob die Person 18 oder älter ist — davon hängen Pausen, Arbeitszeiten und Ruhezeiten ab.";
@@ -7664,12 +8302,13 @@ function personSeite(){
     if (state.mitarbeiter.some((x, k) => x.name === d.name && k !== bearbeite)){
       f.querySelector("#err").textContent = "Diesen Namen gibt es schon — bitte den Nachnamen dazuschreiben."; return;
     }
-    // Den Überstundenstand nur neu setzen, wenn er geändert wurde — sonst bleibt
-    // die Rechnung über die Wochen hinweg unangetastet
-    const eingabe = f.querySelector("#mSaldo").value;
-    // (bei Aushilfen gar nicht: Sie haben kein Konto, ein alter Stand bleibt unberührt liegen)
-    const geaendert = d.typ !== "Aushilfe (Minijob)" && (neuM || (hat(eingabe) ? nz(eingabe) : 0) !== (standJetzt || 0));
-    if (geaendert){ d.saldo = hat(eingabe) ? viertel(nz(eingabe)) : 0; d.saldoAb = wochenSchluessel(jetzt); }
+    // Der Kontostand wird hier nur beim Anlegen gesetzt. Später ändert ihn allein der Dialog
+    // „Konto korrigieren“ — eine stille Änderung beim Speichern setzte früher unbemerkt einen
+    // neuen Stichtag. (Aushilfen haben kein Konto.)
+    if (neuM && d.typ !== "Aushilfe (Minijob)"){
+      const eingabe = zahlWert(f.querySelector("#mSaldo"));
+      d.saldo = eingabe === "" ? 0 : viertel(+eingabe); d.saldoAb = wochenSchluessel(jetzt);
+    }
     if (neuM) state.mitarbeiter.push(d);
     else {
       const alt = state.mitarbeiter[bearbeite];
@@ -7784,6 +8423,48 @@ function standardwoche(){
   return p;
 }
 
+/* Konto korrigieren: der Stand, wie er zustande kommt, und ein neuer Stand zu Beginn der
+   laufenden Woche. Gespeichert wird sofort; fertig(stand) bekommt den neuen Stand. */
+function kontoDialog(i, fertig){
+  const m = state.mitarbeiter[i], mo = aktuellerMontag(), kw = kwVon(mo);
+  const zeichnen = () => {
+    const k = kontoHerkunft(i, mo);
+    const kwText = sl => "KW " + (+sl.slice(-2));
+    const rechnung = [`Stand zu Beginn ${kwText(k.ab)}: ${ueText(k.start) || "0,0"} h`]
+      .concat(k.wochen.map(w => `${kwText(w.sl)}: ${ueText(w.aenderung) || "±0,0"} h`));
+    return el(`<div class="konto-dialog">
+      <h3>Stundenkonto · ${esc(m.name)}</h3>
+      <p class="konto-gross"><b class="num">${ueText(k.stand) || "0,0"} h</b><span>zu Beginn KW ${kw}</span></p>
+      <p class="hint">So kommt der Stand zustande: ${esc(rechnung.join(" · "))}.
+        Jede Woche mit Plan bringt Ist minus Soll dazu; Urlaub, Krankheit und Feiertage zählen wie gearbeitet.</p>
+      <label class="f" style="margin-top:14px">Neuer Stand zu Beginn KW ${kw}${zahlFeld('data-neu placeholder="z. B. 0 oder −2,5"', "", "h")}
+        <span class="hint">+ Überstunden, − Minusstunden. Sinnvoll nach einer Auszahlung oder wenn die Lohnabrechnung etwas anderes sagt.
+        Ab KW ${kw} rechnet der Plan von diesem Stand aus weiter.</span></label>
+      <p class="err" data-fehler></p>
+      <div class="dialog-knoepfe"><button class="btn" data-setzen type="button">Stand setzen</button>
+        <button class="btn ghost" data-zu type="button">Schließen</button></div>
+      ${k.korrekturen.length ? `<div class="konto-verlauf"><span class="eyebrow">Bisherige Korrekturen</span>
+        ${k.korrekturen.map(x => `<div class="konto-zeile"><span>${esc(deVon(new Date(x.am + "T12:00:00")))}</span>
+          <span class="num">${ueText(x.alt) || "0,0"} → ${ueText(x.neu) || "0,0"} h</span><span>ab ${kwText(x.ab)}</span></div>`).join("")}</div>` : ""}
+    </div>`);
+  };
+  let inhalt = zeichnen();
+  const d = dialogZeigen(inhalt);
+  const verdrahten = () => {
+    inhalt.querySelector("[data-zu]").onclick = () => d.remove();
+    inhalt.querySelector("[data-setzen]").onclick = () => {
+      const feld = inhalt.querySelector("[data-neu]"), wert = zahlWert(feld);
+      if (wert === ""){ zahlRueckmeldung(feld); inhalt.querySelector("[data-fehler]").textContent = "Bitte den neuen Stand als Zahl eintragen, z. B. 0 oder −2,5."; return; }
+      if (!kontoKorrigieren(i, +wert, mo)){ inhalt.querySelector("[data-fehler]").textContent = "Das ist schon der Stand — es ändert sich nichts."; return; }
+      sichern();
+      if (fertig) fertig(kontoHerkunft(i, mo).stand);
+      // den Dialog mit dem neuen Stand und dem Verlauf neu zeigen
+      const neu = zeichnen(); inhalt.replaceWith(neu); inhalt = neu; verdrahten();
+    };
+  };
+  verdrahten();
+}
+
 // ==== app/34-stundenliste.js ====
 /* Stundenliste der Bereichsleitung */
 
@@ -7813,10 +8494,10 @@ function stundenliste(){
       TAGE.map(([,l]) => `<th class="n">${l}</th>`).join("")}<th class="n">Woche</th></tr></thead>
       <tbody>
         <tr><td>Stunden</td>${TAGE.map(([k]) =>
-          `<td><input type="number" min="0" step="0.5" data-f="stunden" data-t="${k}" value="${liste.stunden[k] ?? ""}"></td>`).join("")}
+          `<td>${zahlFeld(`data-f="stunden" data-t="${k}" aria-label="Stunden ${k}"`, liste.stunden[k] ?? "", "h", {min: 0, echo: false})}</td>`).join("")}
           <td class="n" id="sumH">–</td></tr>
         <tr><td>Umsatz €<span class="hint"> optional</span></td>${TAGE.map(([k]) =>
-          `<td><input type="number" min="0" step="100" data-f="umsatz" data-t="${k}" value="${liste.umsatz[k] ?? ""}"></td>`).join("")}
+          `<td>${zahlFeld(`data-f="umsatz" data-t="${k}" aria-label="Umsatz ${k}"`, liste.umsatz[k] ?? "", "€", {min: 0, echo: false})}</td>`).join("")}
           <td class="n" id="sumU">–</td></tr>
         <tr><td>Leistung €/h<span class="hint"> berechnet</span></td>${TAGE.map(([k]) =>
           `<td class="n" data-l="${k}">–</td>`).join("")}<td class="n" id="sumL">–</td></tr>
@@ -7866,7 +8547,7 @@ function stundenliste(){
   };
 
   p.querySelectorAll("input[data-f]").forEach(i => i.oninput = () => {
-    liste[i.dataset.f][i.dataset.t] = i.value === "" ? "" : nz(i.value);
+    liste[i.dataset.f][i.dataset.t] = zahlWert(i) === "" ? "" : +zahlWert(i);
     frisch(); sichern();
   });
   p.querySelector("#kw").onchange = e => { listenWoche = e.target.value; render(); };
@@ -7917,7 +8598,7 @@ function stundenliste(){
     // Felder neu befüllen
     p.querySelectorAll("input[data-f]").forEach(i => {
       const v = liste[i.dataset.f][i.dataset.t];
-      i.value = v === "" || v === undefined ? "" : v;
+      i.value = zahlZeigen(v);
     });
     frisch();
     sagen("Übernommen aus " + dateiname + ".");
@@ -8062,7 +8743,7 @@ function pruefen(){
   // ---- Aushilfen ----
   const aus = p.querySelector("#aushilfen");
   const lohnFeld = el(`<div class="grid g3"><label class="f">Stundenlohn der Aushilfen
-      <input type="number" step="0.01" min="0" id="aLohn" placeholder="${mindestlohn(x.jahr).toFixed(2)}" value="${esc((state.einstellungen || {}).aushilfeLohn || "")}">
+      ${zahlFeld(`id="aLohn" placeholder="${mindestlohn(x.jahr).toFixed(2).replace(".", ",")}"`, (state.einstellungen || {}).aushilfeLohn || "", "€", {min: 0})}
       <span class="hint">leer = Mindestlohn ${euro(mindestlohn(x.jahr))}</span></label>
     <div class="tile"><span class="eyebrow">Minijob-Grenze ${x.jahr}</span><div class="v">${minijobGrenze(x.jahr)} €</div>
       <div class="sub">= ${hGenau(minijobStunden(x.jahr))} h im Monat bei ${euro(aushilfeLohn(x.jahr))}</div></div>
@@ -8070,7 +8751,7 @@ function pruefen(){
       <div class="sub">Mindestlohn dann ${euro(mindestlohn(x.jahr + 1))}</div></div></div>`);
   lohnFeld.querySelector("#aLohn").onchange = e => {
     state.einstellungen = state.einstellungen || {};
-    state.einstellungen.aushilfeLohn = e.target.value;
+    state.einstellungen.aushilfeLohn = zahlWert(e.target);
     sichern(); const y = window.scrollY; render(); window.scrollTo(0, y);
   };
   aus.appendChild(lohnFeld);
@@ -8288,9 +8969,12 @@ function tagesAnalyse(){
 
     // ---- 4. Warum wer eingeplant ist ----
     const gruende = el(`<div class="ta-gruende"></div>`);
+    // Lange Schichten (über 8 h Arbeit) stehen bei der Person — mit dem Grund aus dem Plan
+    const lange = langeSchichten(plan).filter(x => x.ti === analyseTag);
     e.reihen.forEach(r => {
       const b = schichtBegruendung(plan, analyseTag, r, e);
-      const eigene = zumTag.filter(m => m.text.includes(r.name));
+      const eigene = zumTag.filter(m => m.text.includes(r.name))
+        .concat(lange.filter(x => x.name === r.name).map(x => ({art: "warn", text: "Lange Schicht: " + x.text.split(": ").slice(1).join(": ") + " " + LANG_HINWEIS})));
       const woche = konten.find(x => x.name === r.name);
       gruende.appendChild(el(`<div class="ta-grund"><div class="ta-grundkopf"><b>${esc(r.name)}</b>
         <span>${hhmm(r.schicht.von)}–${hhmm(r.schicht.bis)} · ${h1(r.stunden)} h${woche ? ` · Woche ${h1(woche.k.ist)} von ${h1(woche.k.soll)} h` : ""}</span></div>
@@ -8686,6 +9370,9 @@ function startseite(o){
   const marken = markierungen();
   // Gelb ist immer der nächste Schritt: erst den Plan erstellen, dann ausgeben
   const planFehlt = !gespeichert || (marken.planen || []).length > 0;
+  // Wartet ein Entwurf auf die Freigabe, ist das der nächste Schritt — der Knopf führt direkt dorthin
+  const entwurfMarke = (marken.planen || []).find(x => /^entwurf:/.test(x.id));
+  const entwurfKw = entwurfMarke ? kwVon(montagAusSchluessel(entwurfMarke.id.slice(8))) : null;
   const heute = new Date();
 
   const p = el(`<div class="start${nurPlan ? " wochenplan" : ""}">
@@ -8698,7 +9385,8 @@ function startseite(o){
       <div class="startkopf-knoepfe">
         ${nurPlan ? `<button class="btn ghost" id="aendern" type="button"${gespeichert ? "" : " disabled"}>${symbol("stift")}<span>Plan ändern</span></button>`
                   : `<button class="btn ghost" id="ausfall" type="button">${symbol("ausfall")}<span>Ausfall eintragen</span></button>`}
-        <button class="btn${planFehlt ? " haupt" : ""}" id="neuerPlan" type="button">${symbol("plus")}<span>Plan erstellen</span></button>
+        <button class="btn${planFehlt ? " haupt" : ""}" id="neuerPlan" type="button">${symbol(entwurfMarke ? "weiter" : "plus")}<span>${
+          entwurfMarke ? `Entwurf KW ${entwurfKw} öffnen` : "Plan erstellen"}</span></button>
       </div>
     </header>
   </div>`);
@@ -8722,7 +9410,7 @@ function startseite(o){
   }
   p.appendChild(planKarte(mo, !planFehlt));
 
-  p.querySelector("#neuerPlan").onclick = () => geheZu("planen");
+  p.querySelector("#neuerPlan").onclick = () => geheZu("planen", entwurfMarke);
   if (nurPlan) p.querySelector("#aendern").onclick = () => planAendernOeffnen(sl);
   else p.querySelector("#ausfall").onclick = ausfallDialog;
   return p;
@@ -8735,8 +9423,8 @@ function startseite(o){
 let planEntwurf = null;
 
 function planenAnsicht(){
-  // Für welche Woche? Vorgewählt ist die, die oben auf der Startseite steht.
-  planWoche = planWoche || isoVon(aktuellerMontag());
+  // Für welche Woche? Ohne Vorgabe die nächste, die noch keinen Plan hat.
+  planWoche = planWoche || isoVon(naechsteWocheOhnePlan());
   const mo = montagDer(planWoche);
   const sl = wochenSchluessel(mo);
   state.abwesend[sl] = state.abwesend[sl] || {};
@@ -8765,8 +9453,12 @@ function planenAnsicht(){
       <div class="phasenwahl" role="radiogroup" aria-label="Art der Woche" id="phasenwahl"></div>
       <div id="phasenDetail"></div>
     </div>
-    <h3 style="margin:18px 0 8px">Wer fällt aus, wer kann nur zu bestimmten Zeiten?</h3>
-    <div class="tablewrap"><table><thead><tr><th>Mitarbeiter</th>${
+    <h3 style="margin:18px 0 4px">Abwesenheiten in KW ${kwVon(mo)}</h3>
+    <p class="hint" style="margin-bottom:8px">Eine Liste für die Woche — egal, ob etwas hier, unter „Urlaub & Krankheit“ oder über
+      „Zeiten der Mitarbeiter“ eingetragen wurde. Dahinter steht, woher es stammt.</p>
+    <div id="abwListe"></div>
+    <h3 style="margin:16px 0 8px;font-size:.95rem">Eintragen oder ändern: Wer fällt aus, wer kann nur zu bestimmten Zeiten?</h3>
+    <div class="tablewrap"><table class="abwtabelle"><thead><tr><th>Mitarbeiter</th>${
       TAGE.map(([,l]) => `<th>${l}</th>`).join("")}</tr></thead><tbody id="abwBody"></tbody></table></div>
     <p class="hint" style="margin-top:8px">„nur …“ und „nicht …“ brauchen beide Uhrzeiten —
     fehlt eine, wird das Feld rot und der Plan wartet, bis sie eingetragen ist.</p>
@@ -8824,11 +9516,23 @@ function planenAnsicht(){
     const tr = el(`<tr><td><b>${esc(m.name)}</b></td></tr>`);
     TAGE.forEach(([k]) => {
       const td = el(`<td class="abwzelle" data-mi="${i}" data-tag="${k}"></td>`);
-      td.appendChild(abwFeld(abw, i, k, () => bereitZeigen()));
+      td.appendChild(abwFeld(abw, i, k, () => { ereignisseNachfuehren(); abwListeZeigen(); bereitZeigen(); }));
       tr.appendChild(td);
     });
     tb.appendChild(tr);
   });
+
+  // Die Liste der Woche und die Herkunft an den Zellen — nach jeder Änderung neu
+  function abwListeZeigen(){
+    const box = p.querySelector("#abwListe");
+    box.innerHTML = "";
+    box.appendChild(abwListeKarte(sl, () => { const y = window.scrollY; render(); window.scrollTo(0, y); }, {titel: false}));
+    tb.querySelectorAll(".abwzelle").forEach(td => {
+      const h = abwHerkunft(sl, +td.dataset.mi, td.dataset.tag);
+      if (h && h !== "hand") td.dataset.herkunft = ABW_HERKUNFT[h]; else delete td.dataset.herkunft;
+    });
+  }
+  abwListeZeigen();
 
   // Art der Woche — wird je Woche gemerkt, auch wenn noch kein Plan entsteht
   const ph = state.phasen[sl] = phaseNormal(state.phasen[sl] || (state.plaene[sl] && state.plaene[sl].phase));
@@ -8846,28 +9550,28 @@ function planenAnsicht(){
     if (ph.art === "sparen"){
       const box = el(`<div class="phasendetail">
         <label class="switch"><input type="radio" name="sparArt" value="prozent"${ph.sparArt !== "stunden" ? " checked" : ""}>
-          alle Aufgaben <input type="number" class="kurzzahl" data-prozent min="1" max="50" step="1" value="${esc(ph.prozent)}"> % schneller rechnen</label>
+          alle Aufgaben ${zahlFeld('data-prozent aria-label="Prozent"', ph.prozent, "%", {min: 1, max: 50, klasse: "kurzzahl", echo: false})} % schneller rechnen</label>
         <label class="switch"><input type="radio" name="sparArt" value="stunden"${ph.sparArt === "stunden" ? " checked" : ""}>
-          in der Woche <input type="number" class="kurzzahl" data-stunden min="0" step="0.5" placeholder="?" value="${esc(ph.stunden)}"> Stunden einsparen</label>
+          in der Woche ${zahlFeld('data-stunden placeholder="?" aria-label="Stunden"', ph.stunden, "h", {min: 0, klasse: "kurzzahl", echo: false})} Stunden einsparen</label>
         <p class="hint">Gespart wird zuerst bei denen, die Überstunden haben. Zum Vergleich rechnet
         der Planer die Standardwoche mit und sagt, wie viel es gebracht hat.</p></div>`);
       box.querySelectorAll("[name=sparArt]").forEach(r => r.onchange = () => { ph.sparArt = r.value; sichern(); });
-      box.querySelector("[data-prozent]").oninput = e => { ph.prozent = e.target.value; ph.sparArt = "prozent";
+      box.querySelector("[data-prozent]").oninput = e => { ph.prozent = zahlWert(e.target); ph.sparArt = "prozent";
         box.querySelector("[name=sparArt][value=prozent]").checked = true; sichern(); };
-      box.querySelector("[data-stunden]").oninput = e => { ph.stunden = e.target.value; ph.sparArt = "stunden";
+      box.querySelector("[data-stunden]").oninput = e => { ph.stunden = zahlWert(e.target); ph.sparArt = "stunden";
         box.querySelector("[name=sparArt][value=stunden]").checked = true; sichern(); };
       detail.appendChild(box);
     } else if (ph.art === "mehr"){
       const box = el(`<div class="phasendetail">
         <div class="grid g2">
-          <label class="f">Zusätzliche Stunden in der Woche<input type="number" data-mehr min="0" step="0.5" placeholder="z. B. 12" value="${esc(ph.mehr)}"></label>
+          <label class="f">Zusätzliche Stunden in der Woche${zahlFeld('data-mehr placeholder="z. B. 12"', ph.mehr, "h", {min: 0})}</label>
           <label class="f">Wofür <span class="hint">optional, steht im Plan bei der Schicht</span><input type="text" data-was placeholder="z. B. Umbau Aktionsfläche" value="${esc(ph.was)}"></label>
         </div>
         <div style="margin-top:10px"><span class="eyebrow">an diesen Tagen</span>
           <div class="days" data-tage></div></div>
         <p class="hint">Keine Tage gewählt heißt: über die ganze Woche verteilt. Die Stunden gehen
         zuerst an die, die Minusstunden haben, dann an alle, die Überstunden machen können.</p></div>`);
-      box.querySelector("[data-mehr]").oninput = e => { ph.mehr = e.target.value; sichern(); };
+      box.querySelector("[data-mehr]").oninput = e => { ph.mehr = zahlWert(e.target); sichern(); };
       box.querySelector("[data-was]").oninput = e => { ph.was = e.target.value.trim(); sichern(); };
       const tb = box.querySelector("[data-tage]");
       TAGE.forEach(([k,l]) => {
@@ -9124,6 +9828,7 @@ function termineAnsicht(){
     <div id="online"></div>
     <div id="vorschau"></div>
     <div id="letzter"></div>
+    <div id="abwStand"></div>
     <details class="anderewege"${ONLINE_BEREIT && state.online ? "" : " open"}>
     <summary>${ONLINE_BEREIT && state.online ? "Andere Wege: Excel-Datei oder Nachricht einlesen" : "Excel-Datei oder Nachricht einlesen"}</summary>
     <div class="termin-wege">
@@ -9380,6 +10085,10 @@ function termineAnsicht(){
   function letzter(){
     const box = p.querySelector("#letzter");
     box.innerHTML = "";
+    // Dieselbe Liste wie in „Plan erstellen“: so steht es jetzt für die Planwoche
+    const stand = p.querySelector("#abwStand");
+    stand.innerHTML = "";
+    stand.appendChild(abwListeKarte(wochenSchluessel(montagDer(planWoche || isoVon(naechsteWocheOhnePlan()))), () => { sichern(); letzter(); }));
     const imp = state.terminImport;
     if (!imp) return;
     const z = el(`<p class="hint" style="margin-top:14px">Zuletzt eingelesen am ${new Date(imp.am).toLocaleString("de-DE",
@@ -9418,6 +10127,7 @@ function sicherungsAnsicht(){
   if (TESTMODUS) p.querySelector("#knoepfe").appendChild(el(`<p class="hint">In der Testfassung gibt es keine
     Sicherungsdateien — sie würden echte und Testdaten vermischen.</p>`));
   else p.querySelector("#knoepfe").appendChild(sicherungsKnoepfe());
+  p.querySelector("#orte").before(whKachel());
   if (inApp) p.querySelector("#orte").before(testfassungKasten());
   (async () => {
     const liste = inApp ? await bekannteFilialen() : lokaleFilialen();
@@ -9661,6 +10371,10 @@ function planEntwurfAnsicht(){
     oben.appendChild(k);
   }
 
+  // ---- Lange Schichten: kein Fehler, aber eine Ausnahme, die man sehen soll ----
+  const lange = langeSchichtenKarte(pr.plan);
+  if (lange) oben.appendChild(lange);
+
   // ---- Der Entwurf ----
   const planKarte = el(`<section class="karte entwurf"><div class="karte-kopf"><h3>Entwurf</h3>
     <div class="legende"><span><i class="neu"></i> von dir dazugenommen oder geändert — die gerechnete Zeit klein darunter</span>
@@ -9743,6 +10457,16 @@ function planEntwurfAnsicht(){
     ansicht = "start"; render();
   };
   return p;
+}
+
+/* Lange Schichten des Entwurfs (über 8 h Arbeit) — mit dem Grund aus dem Plan und dem Hinweis,
+   was dabei gilt. null, wenn es keine gibt. */
+function langeSchichtenKarte(plan){
+  const lange = langeSchichten(plan);
+  if (!lange.length) return null;
+  return el(`<section class="karte lang"><h3>${symbol("uhr")} Lange Schicht${lange.length > 1 ? "en" : ""}</h3>
+    <div>${lange.map(x => `<div class="todo"><span>${esc(x.text)}</span></div>`).join("")}</div>
+    <p class="hint">${esc(LANG_HINWEIS)}</p></section>`);
 }
 
 // ==== app/45-ereignisse.js ====
@@ -9872,12 +10596,28 @@ function ereignisAnsicht(){
   const neu = () => { const y = window.scrollY; render(); window.scrollTo(0, y); };
   p.appendChild(el(`<div class="legende"><span><i class="urlaub"></i> Urlaub</span><span><i class="krank"></i> Krank</span>
     <span><i></i> verfügbar</span></div>`));
-  p.appendChild(ereignisUeberblick());
-  p.appendChild(el(`<h3 class="abschnitt">Alle Einträge</h3>`));
-  p.appendChild(ereignisListe(null, neu));
+  // Überblick und Listen stehen in eigenen Kästen: Nach einem neuen Eintrag werden nur sie
+  // neu gezeichnet — der Hinweis, was der Eintrag für bestehende Pläne bedeutet, bleibt stehen.
+  const oben = el(`<div></div>`), unten = el(`<div></div>`);
+  const listen = () => {
+    oben.innerHTML = ""; unten.innerHTML = "";
+    oben.appendChild(ereignisUeberblick());
+    oben.appendChild(el(`<h3 class="abschnitt">Alle Einträge</h3>`));
+    oben.appendChild(ereignisListe(null, neu));
+    // Dieselbe Liste wie in „Plan erstellen“: alles, was für die laufende und die nächste Woche
+    // eingetragen ist — auch „kann nicht“ und die Abgaben der Mitarbeiter
+    unten.appendChild(el(`<h3 class="abschnitt">Alle Abwesenheiten dieser und der nächsten Woche</h3>`));
+    unten.appendChild(el(`<p class="hint" style="margin-bottom:10px">Urlaub und Krankheit stehen immer hier — egal, ob sie hier, in
+      „Plan erstellen“ oder über „Zeiten der Mitarbeiter“ eingetragen wurden.</p>`));
+    const mo = aktuellerMontag(), danach = new Date(mo); danach.setDate(mo.getDate() + 7);
+    [mo, danach].forEach(w => unten.appendChild(abwListeKarte(wochenSchluessel(w), neu)));
+  };
+  listen();
+  p.appendChild(oben);
   const d = el(`<details class="aufklapp"><summary>Neuen Eintrag hier anlegen</summary></details>`);
-  d.appendChild(ereignisFormular(null, () => {}));
+  d.appendChild(ereignisFormular(null, listen));
   p.appendChild(d);
+  p.appendChild(unten);
   return p;
 }
 
@@ -9890,6 +10630,147 @@ function personOeffnen(i){
   render();
   const f = document.querySelector("#form");
   if (f) f.scrollIntoView({block: "start"});
+}
+
+/* Die eine Abwesenheitsliste einer Woche — dieselbe in „Plan erstellen“, „Urlaub & Krankheit“
+   und „Zeiten der Mitarbeiter“. Je Person, was eingetragen ist und woher es stammt. Wo eine
+   Abgabe von Hand überschrieben wurde, steht der Widerspruch dabei und lässt sich auflösen.
+   nachher: wird nach einer Auflösung aufgerufen. optionen.titel: false lässt die Kopfzeile weg. */
+function abwListeKarte(sl, nachher, optionen){
+  const mo = montagAusSchluessel(sl), eintraege = abwesenheitsListe(sl);
+  const box = el(`<div class="abw-liste"></div>`);
+  if (!optionen || optionen.titel !== false) box.appendChild(el(`<div class="abw-kopf"><span class="eyebrow">Abwesenheiten · KW ${kwVon(mo)}</span>
+    <span class="abw-zahl">${eintraege.length ? `${eintraege.length} ${eintraege.length === 1 ? "Eintrag" : "Einträge"}` : ""}</span></div>`));
+  if (!eintraege.length){
+    box.appendChild(el(`<p class="zt-leer">${symbol("haken")}<span>Nichts eingetragen — alle sind verfügbar.</span></p>`));
+    return box;
+  }
+  eintraege.forEach(x => {
+    const z = el(`<div class="abw-zeile${x.abweichung ? " abweichung" : ""}"><b>${esc(x.name)}</b>
+      <span class="abw-was">${esc(tageText(x.tage))} · ${esc(x.text)}</span>
+      <span class="abw-herkunft ${x.herkunft}">${ABW_HERKUNFT[x.herkunft]}</span></div>`);
+    if (x.abweichung){
+      const w = el(`<div class="abw-widerspruch"><span>${esc(x.abweichung.text)}</span>
+        <span class="knopfreihe"><button class="btn ghost small" type="button" data-abgabe>Abgabe gilt</button>
+        <button class="btn ghost small" type="button" data-lassen>So lassen</button></span></div>`);
+      const loesen = abgabe => { abwAbweichungLoesen(sl, x.i, x.tag, abgabe); sichern(); if (nachher) nachher(); };
+      w.querySelector("[data-abgabe]").onclick = () => loesen(true);
+      w.querySelector("[data-lassen]").onclick = () => loesen(false);
+      z.appendChild(w);
+    }
+    box.appendChild(z);
+  });
+  return box;
+}
+
+// ==== app/46-zugang.js ====
+/* Wiederherstellungscode: der Weg zurück, wenn das Kennwort vergessen ist.
+
+   Beim Anlegen einer Filiale — und auf Wunsch unter „Sicherung“ — erzeugt die App einen
+   zufälligen Code und zeigt ihn genau einmal, zum Aufschreiben oder Ausdrucken. Gespeichert
+   wird nur sein Streuwert (state.wh), nie der Code selbst. In der Anmeldung lässt sich damit
+   ein neues Kennwort setzen; danach ist der Code verbraucht und es gibt einen neuen.
+   Wie das Kennwort ist das eine Zugangssperre auf diesem Gerät, keine Verschlüsselung. */
+
+const WH_ZEICHEN = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";       // ohne I, O, 0 und 1 — nichts zu verwechseln
+// 16 Zeichen aus 32 = 80 Bit Zufall, in Vierergruppen: „K7MF-2QXP-9TRA-HB3D“
+function whCodeNeu(){
+  const z = new Uint8Array(16);
+  crypto.getRandomValues(z);
+  return [...z].map(b => WH_ZEICHEN[b % 32]).join("").replace(/(.{4})(?=.)/g, "$1-");
+}
+// Was getippt wurde, vergleichbar machen: Großbuchstaben, ohne Striche und Leerzeichen
+const whForm = code => String(code || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const whStreuwert = (nr, code) => hash(String(nr) + ":wh:" + whForm(code));
+
+// Für die angemeldete Filiale einen neuen Code anlegen (ein alter wird damit ungültig) → der Code
+async function whAnlegen(){
+  const code = whCodeNeu();
+  state.wh = await whStreuwert(state.nr, code);
+  state.whAm = isoVon(new Date());
+  await speichere();
+  return code;
+}
+
+// Mit dem Code ein neues Kennwort setzen. Gelingt es, ist die Filiale geladen (state) und der
+// Code durch einen neuen ersetzt → {code} oder {fehler}
+let whFehlversuche = 0;
+async function whEinloesen(nr, code, neuesKennwort){
+  const daten = await ladeFiliale(nr);
+  if (!daten) return {fehler: `Für N ${nr} gibt es auf diesem Gerät keinen Bereich.`};
+  if (!daten.wh) return {fehler: "Für diese Filiale wurde noch kein Wiederherstellungscode angelegt. Ohne Code lässt sich das Kennwort nicht zurücksetzen."};
+  if (whForm(code).length !== 16 || daten.wh !== await whStreuwert(nr, code)){
+    // jeder Fehlversuch kostet etwas länger — Raten lohnt nicht
+    whFehlversuche++;
+    await new Promise(fertig => setTimeout(fertig, Math.min(8000, 600 * whFehlversuche)));
+    return {fehler: "Der Code stimmt nicht. Er hat 16 Zeichen in vier Gruppen — bitte genau so eintragen, wie er notiert wurde."};
+  }
+  whFehlversuche = 0;
+  state = Object.assign(leer(), daten);
+  state.pw = await hash(String(nr) + ":" + neuesKennwort);
+  return {code: await whAnlegen()};
+}
+
+/* Den Code zeigen — nur jetzt. Schließen lässt sich das Fenster erst, wenn bestätigt ist,
+   dass er notiert wurde. anlass: neu | ersetzt | sicherung */
+function whZeigen(code, anlass){
+  return new Promise(fertig => {
+    const inhalt = el(`<div class="wh">
+      <h3>Wiederherstellungscode für N ${esc(state.nr)}</h3>
+      <p class="hint">${anlass === "ersetzt" ? "Das neue Kennwort gilt. Der alte Code ist damit verbraucht — hier ist der neue."
+        : anlass === "sicherung" ? "Ein früherer Code gilt ab jetzt nicht mehr." : "Die Filiale ist angelegt."}
+        Mit diesem Code setzt du ein neues Kennwort, wenn das alte einmal fehlt.</p>
+      <div class="wh-code" aria-label="Wiederherstellungscode">${esc(code)}</div>
+      <div class="note warn"><span class="ic">!</span><span>Der Code wird <b>nur jetzt</b> gezeigt. Schreib ihn auf oder druck ihn aus
+        und bewahre ihn getrennt vom Gerät auf — wer ihn hat, kann das Kennwort ändern.</span></div>
+      <div class="dialog-knoepfe"><button class="btn ghost" data-blatt type="button">${inApp ? "Als Blatt teilen oder drucken" : "Als Blatt (PDF) sichern"}</button></div>
+      <label class="switch" style="margin-top:14px"><input type="checkbox" data-notiert> Ich habe den Code notiert oder ausgedruckt</label>
+      <div class="dialog-knoepfe unten"><div class="spacer"></div><button class="btn" data-fertig type="button" disabled>Fertig</button></div></div>`);
+    const d = dialogZeigen(inhalt);
+    d.onclick = null;                                  // nicht versehentlich wegtippen
+    inhalt.querySelector("[data-notiert]").onchange = e => inhalt.querySelector("[data-fertig]").disabled = !e.target.checked;
+    inhalt.querySelector("[data-blatt]").onclick = () => whBlatt(code);
+    inhalt.querySelector("[data-fertig]").onclick = () => { d.remove(); fertig(); };
+  });
+}
+
+// Ein Blatt zum Ausdrucken: Filiale, Code, was damit zu tun ist
+function whBlatt(code){
+  if (!window.jspdf){ alert("Die PDF-Bibliothek ist nicht geladen — bitte den Code von Hand notieren."); return; }
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF({orientation: "portrait", unit: "mm", format: "a4"});
+  doc.setFont("helvetica", "bold"); doc.setFontSize(18);
+  doc.text("Filialplaner — Wiederherstellungscode", 20, 30);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(12);
+  doc.text(`Filiale N ${state.nr}${state.ort ? " · " + state.ort : ""}`, 20, 42);
+  doc.text(`Erstellt am ${new Date().toLocaleDateString("de-DE")}`, 20, 49);
+  doc.setDrawColor(40); doc.setLineWidth(0.5); doc.roundedRect(20, 60, 170, 28, 3, 3);
+  doc.setFont("courier", "bold"); doc.setFontSize(26);
+  doc.text(code, 105, 78, {align: "center"});
+  doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+  ["Mit diesem Code lässt sich in der Anmeldung über „Kennwort vergessen?“ ein neues Kennwort setzen.",
+   "Der Code gilt genau einmal. Danach zeigt die App einen neuen — dieses Blatt dann ersetzen.",
+   "Getrennt vom Gerät aufbewahren, zum Beispiel bei den Filialunterlagen. Wer den Code hat,",
+   "kann das Kennwort ändern."].forEach((zeile, n) => doc.text(zeile, 20, 102 + n * 6.5));
+  anbieten(doc.output("blob"), `Wiederherstellungscode-N${state.nr}.pdf`);
+}
+
+// Kachel unter „Sicherung“: Gibt es einen Code? Neu anlegen (der alte wird ungültig)
+function whKachel(){
+  const k = el(`<div class="wh-kachel"><span class="eyebrow">Kennwort vergessen?</span>
+    <h3>Wiederherstellungscode</h3>
+    <p class="hint">${state.wh
+      ? `Angelegt${state.whAm ? " am " + deVon(new Date(state.whAm + "T12:00:00")) : ""}. Mit ihm lässt sich in der Anmeldung ein neues Kennwort setzen.
+         Ist das Blatt verloren, hier einen neuen Code anlegen — der alte gilt dann nicht mehr.`
+      : "Noch keiner angelegt. Ohne Code gibt es keinen Weg zurück, wenn das Kennwort vergessen ist."}</p>
+    <button class="btn ${state.wh ? "ghost " : ""}small" type="button">${state.wh ? "Neuen Code anlegen" : "Code anlegen"}</button></div>`);
+  k.querySelector("button").onclick = async () => {
+    if (state.wh && !confirm("Einen neuen Code anlegen? Der bisherige gilt dann nicht mehr.")) return;
+    const code = await whAnlegen();
+    await whZeigen(code, "sicherung");
+    render();
+  };
+  return k;
 }
 
 // ==== app/47-aendern.js ====
@@ -9952,16 +10833,20 @@ function aendernAnsicht(){
     <button class="btn ghost" id="aeZurueck" type="button">${symbol("zurueck")}<span>Zurück</span></button>
     <span class="pille ${offenN ? "rot" : "gruen"}">${offenN ? `${offenN} noch zu tun` : "nichts offen"}</span>
     <span class="pille ${aktiv.length ? "gruen" : ""}">${aktiv.length} ${aktiv.length === 1 ? "Änderung" : "Änderungen"}</span>
+    <button class="btn ghost small nur-schmal" id="aeZumPlan" type="button">Plan ansehen ↓</button>
     <div class="spacer"></div>
     <button class="btn ghost small" id="aeVerwerfen" type="button"${eintrag.aenderungen.some(a => a.quelle !== "abwesenheit") ? "" : " disabled"}>Entwurf verwerfen</button>
     <button class="btn haupt" id="aeUebernehmen" type="button"${aktiv.length ? "" : " disabled"}>Übernehmen</button></div>`);
   p.appendChild(status);
 
   // Oben über die ganze Breite: was zu tun ist und der Entwurf im Filialformular.
-  // Darunter zweispaltig: Lösungen | Assistent. Zurückgenommen wird eine Änderung dort, wo sie
+  // Darunter zweispaltig: Lösungen | Assistent. Am Handy (in der Filiale) steht der Assistent
+  // vorn, die Lösungen direkt darunter und der Plan danach — siehe .aendern-plan im Stil. Zurückgenommen wird eine Änderung dort, wo sie
   // entstanden ist: an der Zelle („wie im gültigen Plan“), an der Lösungs- oder Assistentenkarte.
   const oben = el(`<div class="aendern-oben"></div>`);
   p.appendChild(oben);
+  const planBlock = el(`<div class="aendern-plan"></div>`);
+  p.appendChild(planBlock);
   const raster = el(`<div class="aendern-raster"><div class="aendern-haupt"></div><div class="aendern-seite"></div></div>`);
   p.appendChild(raster);
   const haupt = raster.querySelector(".aendern-haupt"), seite = raster.querySelector(".aendern-seite");
@@ -9987,6 +10872,9 @@ function aendernAnsicht(){
     oben.appendChild(k);
   }
 
+  const lange = langeSchichtenKarte(pr.plan);
+  if (lange) oben.appendChild(lange);
+
   // ---- Der Entwurf ----
   const planKarte = el(`<section class="karte entwurf"><div class="karte-kopf"><h3>Entwurf</h3>
     <div class="legende"><span><i class="neu"></i> geändert, passt — alte Zeit klein darunter</span>
@@ -9994,7 +10882,7 @@ function aendernAnsicht(){
   planKarte.appendChild(planAnzeige(planLaden(pr.plan), {notizImmer: true, zellen: pr.zellen, luecken: pr.luecken,
     zelleKlick: (i, ti) => zelleBearbeiten(sl, eintrag, i, ti, pr.plan, neuZeichnen),
     notizKlick: ti => notizBearbeiten(eintrag, ti, pr.plan, neuZeichnen)}));
-  oben.appendChild(planKarte);
+  planBlock.appendChild(planKarte);
 
   // ---- Lösungen je Ausfall ----
   const vk = el(`<section class="karte loesungen"><h3>${symbol("funke")} Lösungen</h3><div></div></section>`);
@@ -10008,6 +10896,8 @@ function aendernAnsicht(){
   // ---- Assistent ----
   seite.appendChild(assistentKarte(sl, kurz, eintrag, neuZeichnen));
 
+  // am Handy steht der Plan unter Assistent und Lösungen — ein Tipp führt hin
+  p.querySelector("#aeZumPlan").onclick = () => planBlock.scrollIntoView({block: "start", behavior: "smooth"});
   p.querySelector("#aeWoche").onchange = e => planAendernOeffnen(e.target.value);
   p.querySelector("#aeZurueck").onclick = zurStartseite;
   p.querySelector("#aeVerwerfen").onclick = () => {
@@ -10105,7 +10995,8 @@ function wegKarte(w, n, an, g){
   const k = el(`<div class="lkarte${an ? " an" : ""}${w.voll ? "" : " teil"}">
     <div class="lk-kopf"><span class="lk-nr">${w.voll ? (n === 0 ? "Empfohlen" : `Lösung ${n + 1}`) : "Teillösung"}</span>
       <b>${esc(w.titel)}</b>
-      <span class="tag">${w.mehr > 0.01 ? "+" + h1(w.mehr) + " h" : w.mehr < -0.01 ? h1(w.mehr) + " h" : "±0 h"}</span></div>
+      <span class="tag">${w.mehr > 0.01 ? "+" + h1(w.mehr) + " h" : w.mehr < -0.01 ? h1(w.mehr) + " h" : "±0 h"}</span>${
+        (w.lang || []).length ? `<span class="tag lang">lange Schicht</span>` : ""}</div>
     <ul class="lk-zeilen">${w.zeilen.map(z => `<li><b>${esc(z.name)}</b>: ${z.vorher ? `<s>${esc(z.vorher)}</s> → ` : ""}${esc(z.nachher || "frei")}</li>`).join("")}</ul>
     <div class="lk-balken"></div>
     <p class="lk-ergebnis ${w.voll ? "ok" : "teil"}">${w.voll ? `✓ Lücke ${spannenText(w.luecke)} geschlossen`
@@ -10459,15 +11350,23 @@ async function planExcel(plan){
     TAGSPALTEN.forEach(([a,b], i) => { ws.mergeCells(z,a,z,b); ws.getCell(z,a).value = l.tage[i]; });
     z++;
   });
-  // Bestellungen: eine Zeile, je Frist eine Textzeile in der Zelle
-  let zBestellung = null;
+  // Bestellungen: eine Zeile, ausgeschrieben wie im PDF — je Frist eine fette Zeile,
+  // darunter untereinander, was bis dahin bestellt sein muss
+  let zBestellung = null, bestellZeilenMax = 1;
   if (r.mitBestellung){
     zBestellung = z;
     ws.getCell(z,1).value = "Bestellung";
     TAGSPALTEN.forEach(([a,b], i) => {
       ws.mergeCells(z,a,z,b);
-      ws.getCell(z,a).value = r.bestellung[i].join("\n");
-      ws.getCell(z,a).alignment = {wrapText:true, horizontal:"center", vertical:"middle"};
+      const teile = [];
+      let zeilen = 0;
+      r.bestellungVoll[i].forEach(([frist, namen], n) => {
+        if (frist){ teile.push({font: {name:"Calibri", size:9, bold:true}, text: (teile.length ? "\n" : "") + frist}); zeilen++; }
+        namen.forEach(name => { teile.push({font: {name:"Calibri", size:9}, text: (teile.length ? "\n" : "") + name}); zeilen++; });
+      });
+      bestellZeilenMax = Math.max(bestellZeilenMax, zeilen);
+      ws.getCell(z,a).value = teile.length ? {richText: teile} : "";
+      ws.getCell(z,a).alignment = {wrapText:true, horizontal:"center", vertical:"top"};
       ws.getCell(z,a).font = {name:"Calibri", size:9};
     });
     z++;
@@ -10529,7 +11428,7 @@ async function planExcel(plan){
   for (let rr = 4; rr <= zSumme; rr++){
     const obereMaZeile = rr >= ersteMa && rr < zSumme && (rr - ersteMa) % 2 === 0;
     ws.getRow(rr).height = rr === 4 ? 28 : obereMaZeile ? 24
-      : rr === zBestellung ? Math.max(15, 12 * Math.max(1, ...r.bestellung.map(x => x.length)) + 3) : 15;
+      : rr === zBestellung ? Math.max(15, 12 * bestellZeilenMax + 3) : 15;
     for (let cc = 1; cc <= P; cc++){
       const cell = ws.getCell(rr,cc);
       cell.border = rahmen;
@@ -10754,12 +11653,23 @@ document.getElementById("abmelden").onclick = () => {
   planEntwurf = null; planWoche = null; zeigeWoche = null; listenWoche = null; render();
 };
 
-/* Nachgeladene Oberfläche: Fassung anzeigen und auf Neuladungen reagieren */
-if (inApp && window.appFassung){
-  // 2026-11-06-4 → „Fassung vom 6.11.2026“
-  const t = /^(\d{4})-(\d{2})-(\d{2})/.exec(window.appFassung);
-  document.getElementById("fuss").textContent += " · Fassung "
-    + (t ? "vom " + (+t[3]) + "." + (+t[2]) + "." + t[1] : window.appFassung);
+/* Fußzeile: Bundesland der Filiale (danach richten sich Feiertage und Ladenöffnung), die
+   Fassung der Oberfläche — und nur bei der Beispielfiliale der Hinweis auf erfundene Daten.
+   Früher stand dort immer „Baden-Württemberg · Testversion mit erfundenen Daten“. */
+function fussZeichnen(){
+  const f = document.getElementById("fuss");
+  if (!f) return;
+  const teile = [];
+  if (state.nr && ansicht !== "anmeldung"){
+    teile.push((BUNDESLAENDER.find(([k]) => k === landVon()) || [, ""])[1]);
+    if (state.nr === "999" && state.ort === "Musterstadt") teile.push("Beispielfiliale mit erfundenen Daten");
+  }
+  if (inApp && window.appFassung){
+    // 2026-11-06-4 → „Fassung vom 6.11.2026“
+    const t = /^(\d{4})-(\d{2})-(\d{2})/.exec(window.appFassung);
+    teile.push("Fassung " + (t ? "vom " + (+t[3]) + "." + (+t[2]) + "." + t[1] : window.appFassung));
+  }
+  f.textContent = teile.filter(Boolean).join(" · ");
 }
 
 /* Testfassung: ein Band, das man nicht übersehen kann — mit dem Weg zurück */

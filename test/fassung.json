@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-16-5-test",
+  "fassung": "2026-11-17-1-test",
   "datei": "filialplaner.html",
-  "pruefsumme": "f5f37499a4138f4add4f736134f23164a99d922f25985e8687edb017b80d0784",
-  "hinweis": "Azubis immer auf ihren Stunden, Aushilfen ohne Konto mit Monatsgrenze, Zeile „Leistungswirksame Stunden“"
+  "pruefsumme": "622b6a6c2a95fddd561c36157dfde751789139e0ed0819b5ca9461aa7ea6d908",
+  "hinweis": "Gesamtoptimierung: lange Schichten nur als Ausweg, eine Abwesenheitsliste, Zahlen mit Komma, Wiederherstellungscode, Konto korrigieren, Wochenaufgaben als Liste, Assistent am Handy vorn"
 }
