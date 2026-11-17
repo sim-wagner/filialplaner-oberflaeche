@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-17-1-test",
+  "fassung": "2026-11-17-2-test",
   "datei": "filialplaner.html",
-  "pruefsumme": "622b6a6c2a95fddd561c36157dfde751789139e0ed0819b5ca9461aa7ea6d908",
-  "hinweis": "Gesamtoptimierung: lange Schichten nur als Ausweg, eine Abwesenheitsliste, Zahlen mit Komma, Wiederherstellungscode, Konto korrigieren, Wochenaufgaben als Liste, Assistent am Handy vorn"
+  "pruefsumme": "762d77cd18d4b5ddddd463a17891f37857b7bf86cdb9c0b4afb10d9ee63b1511",
+  "hinweis": "Verbesserungen: Vertragsstunden einklappbar, Farben rot/grün/blau, Leitung nicht an der Kasse, Aushilfen an der Minijob-Grenze, Dashboard, kürzere Texte"
 }
