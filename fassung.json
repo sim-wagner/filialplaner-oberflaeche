@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-16-3",
+  "fassung": "2026-11-17-1",
   "datei": "filialplaner.html",
-  "pruefsumme": "4755e0e928b7e978ab96b6adda87b5dc17e7c027239f098bef6d2912468d7c34",
-  "hinweis": "Planer legt Aufgaben nacheinander, Plan erst als Entwurf mit Freigabe, Tagesanalyse je Aufgabe, Assistent neu gestaltet, Aushang mit ausgeschriebenen Bestellungen"
+  "pruefsumme": "db850397fb41e0e67b3a5e76d3c7e9af185d316060a2e1db1da9e1f8ec6443f6",
+  "hinweis": "Gesamtoptimierung: lange Schichten nur als Ausweg, eine Abwesenheitsliste, Zahlen mit Komma, Wiederherstellungscode, Konto korrigieren, Wochenaufgaben als Liste, Assistent am Handy vorn; dazu Azubis, Aushilfen und leistungswirksame Stunden vom 16.11."
 }
