@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-18-2-test">
+<meta name="fassung" content="2026-11-18-3-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -1835,6 +1835,15 @@ function schichtLaengeOk(m, anwesend, lang){
 }
 // Lang ist ein Tag mit mehr als 8 h Arbeit
 const istLang = arbeit => arbeit > REGELN.maxArbeitTag + 0.01;
+// Über 8 h an einem Tag nur, wenn die Woche bei höchstens 48 h bleibt (§ 3 ArbZG, Hausregel) —
+// für jeden Tag der Woche, nicht nur für die Schicht, die gerade dazukommt. jeTag: Stunden je Tag.
+const wocheLangOk = jeTag => !jeTag.some(istLang) || jeTag.reduce((a, b) => a + b, 0) <= REGELN.langWoche + 0.01;
+// Arbeitsstunden von Person j je Tag im Plan — ohne die Schicht `ohne`, mit `dazu` Stunden am Tag ti
+const arbeitJeTag = (plan, j, ohne, ti, dazu) => plan.tage.map((t, k) =>
+  t.schichten.filter(x => x.mi === j && x !== ohne).reduce((a, x) => a + x.arbeit, 0) + (k === ti ? dazu || 0 : 0));
+// Lange Schichten (über 8 h) nur für, wer Überstunden machen darf — Azubis und alle mit
+// „keine Überstunden“ nie (seit 18.11.2026)
+const langErlaubt = m => darfUeberstunden(m) && !minderjaehrig(m);
 
 function schicht(m, tag){
   const s = (m.standard || {})[tag];
@@ -1923,6 +1932,9 @@ function pruefeStandard(m){
   }
   if (minder && belegt.length > 5)
     out.push({art:"bad", text:`${belegt.length} Arbeitstage — unter 18 sind höchstens 5 erlaubt.`});
+  // Über 8 h an einem Tag nur, wenn die Woche bei höchstens 48 h bleibt (seit 18.11.2026 geprüft)
+  if (!wocheLangOk(belegt.map(x => x.s.arbeit)))
+    out.push({art:"bad", text:`${h1(belegt.reduce((a, x) => a + x.s.arbeit, 0))} h in der Woche — mit einem Tag über 8 h höchstens ${REGELN.langWoche} h (§ 3 ArbZG).`});
   return out;
 }
 
@@ -2912,6 +2924,8 @@ function ausgleichen(plan){
     if (tage >= maxTageFuer(minderj(i))) return false;
     if (!schichtLaengeOk(ms[i], (sch.bis - sch.von)/60)) return false;
     if (!jungOk(i, (sch.bis - sch.von)/60 - pauseFuer(ms[i], (sch.bis - sch.von)/60))) return false;
+    // Über 8 h an einem Tag nur bis 48 h in der Woche
+    if (!wocheLangOk(arbeitJeTag(plan, i, null, ti, (sch.bis - sch.von)/60 - pauseFuer(ms[i], (sch.bis - sch.von)/60)))) return false;
     if (!minijobPasst(plan, i, ti, sch.von, sch.bis)) return false;       // Aushilfen: Monatsgrenze
     return ruheOk(i, ti, sch.von, sch.bis);
   };
@@ -2975,6 +2989,7 @@ function ausgleichen(plan){
         if (minderj(a) && !jugendZeit(zwei.von, zwei.bis, t.datum)) return;
         const arbeitFuer = (i, s) => (s.bis - s.von)/60 - pauseFuer(ms[i], (s.bis - s.von)/60);
         if (!jungOk(b, arbeitFuer(b, sch) - zwei.arbeit) || !jungOk(a, arbeitFuer(a, zwei) - sch.arbeit)) return;
+        if (!wocheLangOk(arbeitJeTag(plan, b, zwei, ti, arbeitFuer(b, sch))) || !wocheLangOk(arbeitJeTag(plan, a, sch, ti, arbeitFuer(a, zwei)))) return;
         const sich2 = {mi:zwei.mi, pause:zwei.pause, arbeit:zwei.arbeit,
                        pauseVon:zwei.pauseVon, pauseBis:zwei.pauseBis};
         const vorA = istStunden(plan, a), vorB = istStunden(plan, b);
@@ -3077,7 +3092,7 @@ function erzeugePlanRoh(montagISO, phase, summe, basisPlan, nurNoetig){
   azubisBegrenzen(beste);
   lueckenMitLaengerenSchichten(beste);
   // Zum Schluss die Pausen so, dass der Tag ruhig läuft (wenige Kassenwechsel, Aufgaben bei einer Person)
-  beste.tage.forEach((t, ti) => pausenLegenTag(beste, ti, false));
+  beste.tage.forEach((t, ti) => { pausenLegenTag(beste, ti, false); aufgabenUmPausen(beste, ti); });
   nachrechnen(beste);
   beste.phase = vorgabe.phase;
   return beste;
@@ -3150,6 +3165,11 @@ function schichtWerkzeug(plan){
     if (minderj(i) && !jugendZeit(von, bis, plan.tage[ti].datum)) return false;
     if (!schichtLaengeOk(ms[i], (bis - von)/60)) return false;
     if (!minijobPasst(plan, i, ti, von, bis, plan.tage[ti].schichten.find(x => x.mi === i))) return false;
+    // Über 8 h an einem Tag nur bis 48 h in der Woche
+    {
+      const alt = plan.tage[ti].schichten.find(x => x.mi === i), anw = (bis - von)/60;
+      if (!wocheLangOk(arbeitJeTag(plan, i, alt, ti, anw - pauseFuer(ms[i], anw)))) return false;
+    }
     // Jugendliche: höchstens 40 h, Berufsschultage zählen mit 8 h
     if (minderj(i)){
       const alt = plan.tage[ti].schichten.find(x => x.mi === i);
@@ -3583,6 +3603,12 @@ function handPruefung(plan, ohneLuecken){
         raus.push(`${t.label}: ${m.name} arbeitet ${h1(heute)} h — über 8 h am Tag nur, wenn die Woche bei höchstens ${REGELN.langWoche} h bleibt (hier ${h1(woche)} h).`);
       if (s.pause + 0.01 < pauseFuer(m, anw))
         raus.push(`${t.label}: ${m.name} hat ${h1(s.pause*60/60)} h Pause, nötig sind ${h1(pauseFuer(m, anw))} h.`);
+      // Nie länger am Stück als 6 h (unter 18: 4,5 h) — § 4 ArbZG, § 11 JArbSchG
+      else if (s.pauseVon !== null && s.pauseVon !== undefined && s.pauseBis > s.pauseVon){
+        const amStueck = Math.max(s.pauseVon - s.von, s.bis - s.pauseBis) / 60;
+        if (amStueck > amStueckFuer(minder) / 60 + 0.01)
+          raus.push(`${t.label}: ${m.name} arbeitet ${h1(amStueck)} h am Stück — höchstens ${h1(amStueckFuer(minder) / 60)} h (${minder ? "§ 11 JArbSchG" : "§ 4 ArbZG"}).`);
+      }
       if (minder && s.bis > jugendBisAm(t.datum))
         raus.push(`${t.label}: ${m.name} ist unter 18 und arbeitet bis ${hhmm(s.bis)} Uhr`
           + (jugendBisAm(t.datum) < JUGEND_BIS ? " — am 24. und 31.12. nur bis 14:00 Uhr (§ 18 JArbSchG)." : "."));
@@ -3611,8 +3637,13 @@ function handPruefung(plan, ohneLuecken){
     const tage = eigene.filter(x => x.length).length;
     if (!tage) return;
     if (blockWoche(abw, i)){ raus.push(`${m.name}: Blockwoche Berufsschule — diese Woche keine Arbeit im Betrieb.`); return; }
-    if (!minderjaehrig(m)) return;
     const schule = schulLast(abw, i), stunden = eigene.reduce((s, x) => s + x.reduce((a, y) => a + y.arbeit, 0), 0);
+    // Azubis arbeiten genau ihre Betriebsstunden (Hausregel seit 17.11.2026)
+    // (Soll auf die halbe Stunde aufgerundet wie im Planer: Feiertagswoche 28 h − 11,2 h → 17 h)
+    const soll = istAzubi(m) && hatVertrag(m) ? aufHalbe(sollWoche(m, i, plan.mo instanceof Date ? plan.mo : montagDer(plan.mo))) : null;
+    if (soll !== null && stunden > soll + 0.01)
+      raus.push(`${m.name}: ${h1(stunden)} h — über den Betriebsstunden (${h1(soll)} h). Azubis machen keine Überstunden.`);
+    if (!minderjaehrig(m)) return;
     if (tage + schule.tage > REGELN.maxTageJugend)
       raus.push(`${m.name}: ${tage} Arbeitstage${schule.tage ? ` und ${schule.tage} Tag${schule.tage > 1 ? "e" : ""} Berufsschule` : ""} — unter 18 höchstens 5 Tage (§ 15 JArbSchG).`);
     if (stunden + schule.stunden > REGELN.jugendWoche + 0.01)
@@ -3958,7 +3989,9 @@ const OPT = Object.freeze({
   leitungKasse: 20,       // je halbe Stunde der Öffnung, in der außer der Filialleitung niemand kassieren kann
   ueberListe: 6,          // je leistungswirksame Stunde über der Stundenliste
   azubiUnter: 30,         // je Stunde, die einem Azubi an den Betriebsstunden fehlt
-  azubiUeber: 2500        // je Stunde über den Betriebsstunden — Azubis machen keine Überstunden
+  azubiUeber: 2500,       // je Stunde über den Betriebsstunden — Azubis machen keine Überstunden
+  minijobUeber: 5000      // je Stunde über der Minijob-Grenze im Monat — teurer als eine Lücke: Wer
+                          // darüber liegt, wird sozialversicherungspflichtig (bis 18.11.2026: 300)
 });
 
 let _highs = null, _highsVersucht = false;
@@ -4189,7 +4222,7 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
 
   // Aushilfen: je Kalendermonat nicht über die Minijob-Grenze. Was schon in anderen Wochen des
   // Monats geplant ist, zählt mit. Ein Verstoß ist möglich (feste Standardwoche), kostet aber
-  // fast so viel wie eine Lücke.
+  // mehr als eine Lücke — wie beim Planer, für den die Grenze fest ist.
   ms.forEach((m, i) => {
     if (!istAushilfe(m)) return;
     const eigene = kand.map((k, n) => [k, n]).filter(([k]) => k.i === i);
@@ -4200,7 +4233,7 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
       const frei = Math.max(0, minijobStunden(+monat.slice(0, 4)) - (basis[monat] || 0));
       const s = `mj${i}_${monat.replace("-", "")}`;
       nb.push({name: `minijob${i}_${monat.replace("-", "")}`, op: "<=", rechts: frei, terme: hier.map(([k, n]) => [k.arbeit, v(n)]).concat([[-1, s]])});
-      ziele.push([300, s]); grenzen.push(`${s} >= 0`);
+      ziele.push([OPT.minijobUeber, s]); grenzen.push(`${s} >= 0`);
     });
   });
 
@@ -4275,7 +4308,50 @@ function loese(highs, modell, limit){
 
 // Pausen so legen, dass Kasse und Aufgaben besetzt bleiben — wie pausenVersetzen im Planer
 function pausenLegen(plan){
-  plan.tage.forEach((t, ti) => pausenLegenTag(plan, ti, false));
+  plan.tage.forEach((t, ti) => { pausenLegenTag(plan, ti, false); aufgabenUmPausen(plan, ti); });
+}
+
+/* Bleibt nach den Pausen eine Lücke bei einer Aufgabe — die Einzige, die sie kann, hat gerade
+   Pause —, rückt eine Aufgabe innerhalb ihres Fensters (Fristen bleiben) und die Pausen werden
+   neu gelegt. Seit 18.11.2026. Anlass N 540, Donnerstag: Die Leitung macht Bestellen, PÄ und
+   Kontoauszug bis 09:15 und Non-Food ab 10:00 — für ihre Stunde Pause ist dazwischen kein Platz.
+   Der Optimierer kennt keine Pausen und ließ 15 Minuten offen; der Planer schloss sie mit 30
+   Stunden mehr. Non-Food ab 10:15 löst es ohne eine Stunde mehr. */
+function aufgabenUmPausen(plan, ti){
+  const t = plan.tage[ti];
+  if (!t || t.feiertag || !tagesMaengel(plan, ti)) return;
+  const r = tagesRaster(t);
+  const pausen = () => t.schichten.map(s => [s.pauseVon, s.pauseBis]);
+  const setzePausen = p => t.schichten.forEach((s, k) => { s.pauseVon = p[k][0]; s.pauseBis = p[k][1]; });
+  for (let runde = 0; runde < 3; runde++){
+    const vorher = tagesMaengel(plan, ti);
+    if (!vorher) break;
+    const luecken = r.punkte.filter(m => tagesMaengelAm(plan, ti, m) > 0);
+    const p0 = pausen();
+    let beste = null;
+    (t.aufgaben || []).forEach(a => {
+      if (a.id === "zusatz" || !isFinite(a.frueh) || !isFinite(a.spaet)) return;
+      if (!luecken.some(m => m >= a.frueh - 120 && m < a.spaet + 120)) return;
+      const alt = a.von, dauer = a.bis - a.von;
+      for (let st = Math.ceil(a.frueh / 15) * 15; st + dauer <= a.spaet; st += 15){
+        if (st === alt) continue;
+        a.von = st; a.bis = st + dauer;
+        pausenLegenTag(plan, ti, true);            // schnell: nur Lücken, Pausen von ihrer Lage aus
+        const z = tagesMaengel(plan, ti);
+        if (z < vorher && (!beste || z < beste.z || (z === beste.z && Math.abs(st - alt) < beste.ab)))
+          beste = {a, st, z, ab: Math.abs(st - alt), p: pausen()};
+        setzePausen(p0);
+      }
+      a.von = alt; a.bis = alt + dauer;
+    });
+    if (!beste) break;
+    const d = beste.a.bis - beste.a.von;
+    beste.a.von = beste.st; beste.a.bis = beste.st + d;
+    // Pausen noch einmal ruhig legen (wenige Wechsel) — wird es dabei schlechter, gilt die gefundene Lage
+    pausenLegenTag(plan, ti, false);
+    if (tagesMaengel(plan, ti) > beste.z) setzePausen(beste.p);
+  }
+  t.aufgaben.sort((x, y) => x.von - y.von || x.bis - y.bis);
 }
 /* Wie unruhig ein Tag läuft: Kassenwechsel, Personen an der Kasse, Filialleitung an der Kasse
    und Aufgaben, die auf mehrere Personen verteilt sind. Je kleiner, desto besser — danach
@@ -4629,7 +4705,7 @@ function ausfallErlaubt(plan, j, ti, von, bis, ausser, lang, ohneAzubiGrenze){
   const minder = minderjaehrig(m);
   if (minder && !jugendZeit(von, bis, (plan.tage[ti] || {}).datum)) return false;
   const anw = (bis - von)/60;
-  if (!schichtLaengeOk(m, anw, lang)) return false;
+  if (!schichtLaengeOk(m, anw, lang && langErlaubt(m))) return false;
   const e = (((state.abwesend || {})[wochenSchluessel(plan.mo instanceof Date ? plan.mo : montagDer(plan.mo))] || {})[i] || {})[TAGE[ti][0]];
   if (e){
     if (typeof e === "string") return false;
@@ -4648,12 +4724,13 @@ function ausfallErlaubt(plan, j, ti, von, bis, ausser, lang, ohneAzubiGrenze){
   const tage = new Set(plan.tage.map((t, k) => t.schichten.some(x => x.mi === j && x !== ausser) || k === ti ? k : -1).filter(k => k >= 0));
   if (tage.size + schule.tage > maxTageFuer(minder)) return false;
   const arbeit = anw - pauseFuer(m, anw);
-  if (minder || istLang(arbeit)){
+  if (minder){
     const woche = plan.tage.reduce((s, t, k) => s + t.schichten.filter(x => x.mi === j && x !== ausser && k !== ti).reduce((a, x) => a + x.arbeit, 0), 0);
-    if (minder && woche + arbeit + schule.stunden > REGELN.jugendWoche + 0.01) return false;
-    // über 8 h am Tag nur, wenn die Woche bei höchstens 48 h bleibt (§ 3 ArbZG)
-    if (istLang(arbeit) && woche + arbeit > REGELN.langWoche + 0.01) return false;
+    if (woche + arbeit + schule.stunden > REGELN.jugendWoche + 0.01) return false;
   }
+  // Über 8 h an einem Tag nur, wenn die Woche bei höchstens 48 h bleibt (§ 3 ArbZG) — auch wenn
+  // der lange Tag ein anderer ist als der, um den es gerade geht (seit 18.11.2026)
+  if (!wocheLangOk(arbeitJeTag(plan, j, ausser, ti, arbeit))) return false;
   // Aushilfen: im Kalendermonat nie über die Minijob-Grenze
   if (!minijobPasst(plan, j, ti, von, bis, ausser)) return false;
   // Azubis: nie über die Betriebsstunden der Woche (keine Überstunden)
@@ -5361,6 +5438,12 @@ function bereitschaft(sl){
     if (a.qual.kasse > 1 && ohneKasse.length) h(`Ohne Funktion „Kassieren“: ${namen(ohneKasse)} — stimmt das?`, "personal");
     if (a.ohneStunden.length) h(`Ohne Stundenangabe: ${namen(a.ohneStunden)} — sie werden nur nach Bedarf eingeplant.`, "personal");
     if (a.offeneAufgaben.length) h(`Wochenaufgaben ohne Tag, Dauer oder Personenzahl: ${a.offeneAufgaben.join(", ")} — sie fehlen im Plan.`, "aufgaben");
+    // Eine Standardwoche gegen das Gesetz ginge Woche für Woche so in den Plan — ihre Schichten
+    // stehen fest (seit 18.11.2026 ein Blocker, vorher nur ein Hinweis in der Analyse)
+    ms.forEach(m => {
+      const falsch = pruefeStandard(m).filter(v => v.art === "bad");
+      if (falsch.length) b(`Standardwoche ${m.name}: ${falsch.map(v => v.text.replace(/\.$/, "")).join("; ")}.`, "standardwoche");
+    });
     const leitung = ms.filter(m => m.typ === "Filialleitung");
     if (leitung.length && !leitung.some(m => wochenStunden(m) > 0))
       h("Für die Filialleitung ist keine Standardwoche hinterlegt — der Plan legt ihre Zeiten selbst fest.", "standardwoche");
@@ -8411,15 +8494,17 @@ function markierungen(){
   Object.keys(state.plaene || {}).filter(sl => sl >= jetzt).forEach(sl => aufgabenAusserhalb(state.plaene[sl]).forEach(x =>
     add("aendern", `aufgaben:${sl}:${x.ti}`, "anpassen", `KW ${kwVon(montagAusSchluessel(sl))}, ${aufgabenAusserhalbText(x)}`)));
 
-  // Ab Donnerstag gehört der Plan der nächsten Woche gemacht
+  // Ab Dienstag erinnern: Spätestens Donnerstag soll der Plan der nächsten Woche hängen — vier Tage
+  // vorher, wie § 12 TzBfG es für Arbeit auf Abruf verlangt (bis 18.11.2026 erst ab Donnerstag)
   const heute = new Date(), wt = (heute.getDay() + 6) % 7;
   const naechste = new Date(montagDer(null)); naechste.setDate(naechste.getDate() + 7);
   // Ein Entwurf, der auf die Freigabe wartet, ist der nächste Schritt — nicht „kein Plan“
   const entwuerfe = Object.keys(state.planEntwurf || {}).filter(sl => sl >= jetzt).sort();
   entwuerfe.forEach(sl => add("planen", "entwurf:" + sl, "anpassen", `Der Entwurf für KW ${kwVon(montagAusSchluessel(sl))} wartet auf die Freigabe`));
   if (!(state.plaene || {})[jetzt]){ if (!entwuerfe.includes(jetzt)) add("planen", "plan:" + jetzt, "anpassen", `Für KW ${kwVon(aktuellerMontag())} gibt es noch keinen Plan`); }
-  else if (wt >= 3 && wt < 6 && !(state.plaene || {})[wochenSchluessel(naechste)] && !entwuerfe.includes(wochenSchluessel(naechste)))
-    add("planen", "plan:" + wochenSchluessel(naechste), "anpassen", `Für KW ${kwVon(naechste)} gibt es noch keinen Plan`);
+  else if (wt >= 1 && !(state.plaene || {})[wochenSchluessel(naechste)] && !entwuerfe.includes(wochenSchluessel(naechste)))
+    add("planen", "plan:" + wochenSchluessel(naechste), "anpassen", `Für KW ${kwVon(naechste)} gibt es noch keinen Plan`
+      + (wt <= 3 ? " — bis Donnerstag aushängen" : ""));
   // Stundenliste: nur, wenn die Filiale überhaupt mit Listen arbeitet
   if (Object.keys(state.listen || {}).length && wt >= 3 && wt < 6 && !(state.listen || {})[wochenSchluessel(naechste)])
     add("stundenliste", "liste:" + wochenSchluessel(naechste), "anpassen", `Stundenliste für KW ${kwVon(naechste)} fehlt`);
@@ -10323,6 +10408,10 @@ function wochenVorfaelle(mo){
     const d = new Date(mo); d.setDate(mo.getDate() + ti);
     const f = feiertagName(d);
     if (f) raus.push({art: "Feiertag", text: `${kurzName} ${d.getDate()}.${d.getMonth() + 1}. — ${f}`});
+    // Heiligabend und Silvester (seit 18.11.2026)
+    else if (oeffnungAm(d).sonder) raus.push({art: "Heiligabend", text: `${kurzName} ${d.getDate()}.${d.getMonth() + 1}. — Laden bis ${hhmm(oeffnungAm(d).bis)}`});
+    if (!f && jugendBisAm(d) < JUGEND_BIS && state.mitarbeiter.some(minderjaehrig))
+      raus.push({art: "Unter 18", text: `${kurzName} ${d.getDate()}.${d.getMonth() + 1}. — nur bis ${hhmm(jugendBisAm(d))} (§ 18 JArbSchG)`});
   });
   const ph = phaseNormal(kurz ? kurz.phase : (state.phasen || {})[sl]);
   if (ph.art !== "normal") raus.push({art: ph.art === "sparen" ? "Stunden sparen" : "Mehr Stunden", text: phasenText(ph)});
@@ -12431,7 +12520,9 @@ function assistentKarte(sl, kurz, eintrag, fertig){
 function planRaster(plan){
   const ms = state.mitarbeiter, s = planSummen(plan);
   const kw = kwVon(plan.mo);
-  const datum = plan.tage.map(t => t.label + " " + t.datum.toLocaleDateString("de-DE"));
+  // Heiligabend: früherer Ladenschluss im Kopf des Tages — im Plan, im Aushang und in Excel
+  const datum = plan.tage.map(t => t.label + " " + t.datum.toLocaleDateString("de-DE")
+    + (!t.feiertag && oeffnungAm(t.datum).sonder ? " · bis " + hhmm(oeffnungAm(t.datum).bis) : ""));
 
   // Lieferzeilen: was oben im Plan als Anlieferung steht
   const zeitVon = a => a.zeitArt === "fest" && hatZeit(a.zeit) ? a.zeit
