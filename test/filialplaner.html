@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-18-3-test">
+<meta name="fassung" content="2026-11-18-4-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -1384,6 +1384,8 @@ i.sw-schnitt{background:var(--sw-schnitt)} i.sw-woche{background:var(--sw-woche)
 .eo-plus{color:var(--good)} .eo-minus{color:var(--bad)}
 @media(max-width:560px){ .empf-optionen{margin-left:0} }
 
+/* Papierkorb (18.11.2026): je gelöschter Plan eine Karte */
+.pk-eintrag{margin-bottom:10px}
 </style>
 
 <div class="markenband" aria-hidden="true"></div>
@@ -1477,7 +1479,9 @@ const REGELN = Object.freeze({
   entwuerfe: 24,              // so viele Varianten rechnet der Planer durch
 
   // Archiv: so lange bleibt eine abgelaufene Woche, ab wann wird vorher gewarnt (Wochen)
-  archivWochen: 6, archivWarnung: 5
+  archivWochen: 6, archivWarnung: 5,
+  // Papierkorb: so lange liegt ein gelöschter Plan, bevor er endgültig weg ist (Tage)
+  papierkorbTage: 14
 });
 // Kurzformen, die sich auf das Alter beziehen
 const ruhezeitFuer = minder => minder ? REGELN.ruhezeitJugend : REGELN.ruhezeit;
@@ -3954,6 +3958,49 @@ function archivAufraeumen(){
   return loeschen.length;
 }
 
+/* ---- Papierkorb (seit 18.11.2026) --------------------------------------
+   Jeder Plan lässt sich löschen — abgelaufene wie die laufende oder kommende Woche. Er liegt
+   dann 14 Tage im Papierkorb, zusammen mit dem Entwurf, der zu ihm gehörte, und lässt sich
+   wiederherstellen oder endgültig löschen; danach ist er von selbst weg. Solange er dort
+   liegt, zählt er nirgends: nicht im Stundenkonto, nicht in der Analyse, nicht in „Mein Plan“.
+   Anders als beim Aufräumen des Archivs gehen seine Stunden nicht in den Stand über — ein
+   gelöschter Plan soll die Zahlen nicht mehr verfälschen. */
+const PAPIERKORB_TAGE = REGELN.papierkorbTage;
+
+function planLoeschen(sl){
+  const kurz = (state.plaene || {})[sl];
+  if (!kurz) return null;
+  const x = {id: "k" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), art: "plan", sl,
+             geloescht: new Date().toISOString(), plan: kurz};
+  if ((state.entwuerfe || {})[sl]) x.entwurf = state.entwuerfe[sl];
+  (state.papierkorb = state.papierkorb || []).push(x);
+  delete state.plaene[sl];
+  if (state.entwuerfe) delete state.entwuerfe[sl];
+  return x;
+}
+// Bis wann ein Eintrag noch im Papierkorb liegt
+const papierkorbBis = x => new Date(new Date(x.geloescht).getTime() + PAPIERKORB_TAGE * 864e5);
+// Was länger als 14 Tage liegt, ist weg → wie viele entfernt wurden
+function papierkorbAufraeumen(){
+  const vorher = (state.papierkorb || []).length;
+  state.papierkorb = (state.papierkorb || []).filter(x => papierkorbBis(x) > new Date());
+  return vorher - state.papierkorb.length;
+}
+// Wiederherstellen. Hat die Woche inzwischen einen anderen Plan, nur mit ersetzen — der jetzige
+// kommt dann seinerseits in den Papierkorb. → true, wenn wiederhergestellt
+function ausPapierkorb(id, ersetzen){
+  const x = (state.papierkorb || []).find(y => y.id === id);
+  if (!x) return false;
+  if ((state.plaene || {})[x.sl]){ if (!ersetzen) return false; planLoeschen(x.sl); }
+  state.papierkorb = state.papierkorb.filter(y => y !== x);
+  state.plaene[x.sl] = x.plan;
+  if (x.entwurf) (state.entwuerfe = state.entwuerfe || {})[x.sl] = x.entwurf;
+  return true;
+}
+function endgueltigLoeschen(id){
+  state.papierkorb = (state.papierkorb || []).filter(y => y.id !== id);
+}
+
 // ==== kern/12-optimierer.js ====
 /* Optimierer: die Woche als gemischt-ganzzahliges Programm (MILP), gelöst mit HiGHS.
 
@@ -4353,19 +4400,17 @@ function aufgabenUmPausen(plan, ti){
   }
   t.aufgaben.sort((x, y) => x.von - y.von || x.bis - y.bis);
 }
-/* Wie unruhig ein Tag läuft: Kassenwechsel, Personen an der Kasse, Filialleitung an der Kasse
-   und Aufgaben, die auf mehrere Personen verteilt sind. Je kleiner, desto besser — danach
-   werden die Pausen gelegt (seit 17.11.2026). */
+/* Wie unruhig ein Tag läuft: die Kassenfolge (Personen, Wechsel, wer an der Kasse steht —
+   KASSE_KOSTEN, seit 18.11.2026) und Aufgaben, die auf mehrere Personen verteilt sind oder ohne
+   Person bleiben. Je kleiner, desto besser — danach werden die Pausen gelegt (seit 17.11.2026). */
 function einteilungsUnruhe(plan, ti){
-  const e = tagesEinteilung(plan, ti, {ohneVerlauf: true});
+  const e = tagesEinteilung(plan, ti);
   if (!e) return 0;
-  const ms = state.mitarbeiter;
-  const leitung = e.kasse.filter(k => istLeitung(ms.find(m => m.name === k.name))).reduce((s, k) => s + (k.bis - k.von), 0) / 15;
   const geteilt = e.aufgaben.reduce((s, a) => s + 2 * Math.max(0, a.wer.length - a.pers) + Math.max(0, a.teile.length - a.wer.length), 0);
   // Aufgabenzeit ohne Person (fehlt) oder nur nebenher wiegt schwer: so wird keine Pause dorthin gelegt
   const ohne = e.aufgaben.reduce((s, a) => s + a.fehlt.reduce((x, [v, b]) => x + (b - v) / 15, 0) * 2
     + a.nebenher.reduce((x, n) => x + n.spannen.reduce((y, [v, b]) => y + (b - v) / 15, 0), 0), 0);
-  return 3 * Math.max(0, e.kasse.length - 1) + 2 * new Set(e.kasse.map(k => k.name)).size + leitung + geteilt + ohne;
+  return e.kasseKosten + 4 * (geteilt + ohne);
 }
 
 /* Die Pausen eines Tages. Erlaubt ist jede Lage ab einer Stunde nach Beginn bis eine Stunde
@@ -5497,6 +5542,14 @@ function dauerText(min){
   return h === 1 && !halb ? "1 Stunde" : `${h}${halb ? "½" : ""} Stunden`;
 }
 
+// Was den Entwurf von außen bestimmt: der gültige Plan, die Abwesenheiten der Woche und das
+// Personal. Ändert sich davon etwas, gehören Gespräch und Vorschläge zu einer anderen Lage.
+function entwurfStand(sl){
+  const kurz = (state.plaene || {})[sl];
+  return JSON.stringify([kurz ? kurz.erstellt : null, kurz ? kurz.geaendert || null : null, (state.abwesend || {})[sl] || {},
+    state.mitarbeiter.map(m => [m.name, m.typ, (m.qual || []).join(",")])]);
+}
+
 // Den Entwurf einer Woche holen — neu angelegt, wenn der Plan inzwischen ein anderer ist.
 // Abwesenheiten, die der Plan noch nicht kennt, kommen dabei als Ausfall hinein.
 function entwurfHolen(sl){
@@ -5505,6 +5558,13 @@ function entwurfHolen(sl){
   state.entwuerfe = state.entwuerfe || {};
   let e = state.entwuerfe[sl];
   if (!e || e.basis !== kurz.erstellt) e = state.entwuerfe[sl] = {basis: kurz.erstellt, aenderungen: []};
+  // Gespräch und angefragte Lösungen gelten nur, solange die Lage dieselbe ist (seit 18.11.2026):
+  // Hat sich der Plan, eine Abwesenheit oder das Personal geändert, zurück auf Anfang — was im
+  // Entwurf eingeschaltet ist, bleibt
+  if ((e.chat || []).length && e.stand !== entwurfStand(sl)){
+    e.chat = []; e.kontext = {}; delete e.stand;
+    e.aenderungen = e.aenderungen.filter(a => a.quelle !== "assistent" || a.aktiv);
+  }
   const offen = konflikteIm(sl, kurz);
   const schluessel = k => `abw:${k.name}:${k.ti}`;
   // erledigte (Abwesenheit wieder gelöscht) fallen heraus, neue kommen dazu
@@ -5542,7 +5602,8 @@ function aenderungAnwenden(plan, a){
     if (a.notiz) plan.notizen[tag.key] = a.notiz; else delete plan.notizen[tag.key];
     return true;
   }
-  if (a.typ === "pausen"){ pausenLegenTag(plan, a.ti, true); return true; }
+  // Pausen verschieben: bei einer Lücke so wenig wie möglich; „Kasse ruhiger“ legt sie neu
+  if (a.typ === "pausen"){ pausenLegenTag(plan, a.ti, !a.ruhiger); return true; }
   if (a.typ === "aufgaben"){ aufgabenNeuLegen(plan, a.ti); return true; }
   if (a.typ === "loesung"){
     const schritte = a.schritte.map(x => Object.assign({}, x, {i: personIndex(x.name)}));
@@ -5908,9 +5969,71 @@ function entwurfUebernehmen(sl){
   // Welche Art von Lösung gewählt wurde — nur die Art, nie die Personen (siehe wegeOrdnen)
   aktiv.forEach(a => { if (a.typ === "loesung") lernenMerken(a.art || wegArt(a.schritte)); else if (a.typ === "tage") lernenMerken("umplanen"); });
   einteilungFestschreiben(neu);             // die Schichten haben sich geändert — neu festhalten, wer was macht
+  meldungenAuffrischen(neu);
   state.plaene[sl] = neu;
   delete state.entwuerfe[sl];
   return neu;
+}
+
+/* Kasse ruhiger (seit 18.11.2026): Würden neu gelegte Pausen an diesem Tag weniger Personen,
+   deutlich weniger Wechsel oder die Leitung (Filialleitung, Stellvertretung) mindestens eine halbe
+   Stunde weniger an der Kasse ergeben — ohne neue Lücke? → {ti, vorher, nachher} oder null.
+   Nur die Pausen wandern; Schichten und Aufgaben bleiben. */
+function kasseRuhiger(plan, ti){
+  const t = plan.tage[ti];
+  if (!t || t.feiertag) return null;
+  const leitend = name => { const m = state.mitarbeiter.find(x => x.name === name); return !!m && (istLeitung(m) || m.typ === "Stellvertretung"); };
+  const zahl = e => ({wechsel: Math.max(0, e.kasse.length - 1), personen: new Set(e.kasse.map(k => k.name)).size, kosten: e.kasseKosten,
+    leitung: e.kasse.filter(k => leitend(k.name)).reduce((s, k) => s + k.bis - k.von, 0)});
+  const e0 = tagesEinteilung(plan, ti);
+  if (!e0) return null;
+  const probe = kopie(plan);
+  probe.mo = plan.mo; probe.tage.forEach((x, k) => { x.datum = plan.tage[k].datum; });
+  pausenLegenTag(probe, ti, false);
+  if (tagesMaengel(probe, ti) > tagesMaengel(plan, ti)) return null;
+  const vorher = zahl(e0), nachher = zahl(tagesEinteilung(probe, ti));
+  const besser = nachher.personen < vorher.personen || nachher.wechsel <= vorher.wechsel - 2 || nachher.leitung <= vorher.leitung - 30;
+  return besser && nachher.kosten < vorher.kosten - 0.5 ? {ti, vorher, nachher} : null;
+}
+// „Donnerstag: 3 statt 5 Kassenwechsel, 2 statt 3 Personen, Leitung/Vertretung 1 h weniger an der Kasse“
+const kasseRuhigerText = x => `${tagName(x.ti)}: ` + [
+  x.nachher.wechsel < x.vorher.wechsel ? `${x.nachher.wechsel} statt ${x.vorher.wechsel} Kassenwechsel` : "",
+  x.nachher.personen < x.vorher.personen ? `${x.nachher.personen} statt ${x.vorher.personen} Personen` : "",
+  x.nachher.leitung <= x.vorher.leitung - 30 ? `Leitung/Vertretung ${h1((x.vorher.leitung - x.nachher.leitung) / 60)} h weniger an der Kasse` : ""
+].filter(Boolean).join(", ");
+
+/* Die Hinweise unter einem Plan entstehen beim Erstellen. Nach Änderungen von Hand gelten die,
+   die vom Plan abhängen, nicht mehr unbedingt — vorher standen sie veraltet in Analyse und Excel
+   („Für die Schichtführung ist niemand verfügbar“, obwohl die Lücke längst zu war). Seit
+   18.11.2026 neu gerechnet: Lücken je Tag, Gesetz, Stunden über 50 % und „keine Überstunden“.
+   Hinweise auf Ziele des Planers fallen weg — das Ziel kennt nur der Planer beim Erstellen. */
+function meldungenAuffrischen(plan){
+  const mo = plan.mo instanceof Date ? plan.mo : montagDer(plan.mo);
+  const recht = new Set(rechtsVerstoesse(plan));
+  const tagMitLuecke = new Set(plan.tage.map((t, ti) => tagesMaengel(plan, ti) ? t.label : null).filter(Boolean));
+  const STUNDEN = /verplant, Ziel|Personen über Vertrag|mehr als 50 % über dem Vertrag|kann keine Überstunden machen|^Stundenliste KW/;
+  const LUECKE = /ist niemand verfügbar, der einsetzbar wäre|halbe Stunde\(n\) nicht richtig besetzt/;
+  const RECHT = /Ruhezeit|mehr als das Gesetz|Pause, nötig|unter 18|am Stück|Betriebsstunden|Arbeitstage|höchstens 40 h|Blockwoche|über 8 h nur/;
+  plan.meldungen = (plan.meldungen || []).filter(x => {
+    if (STUNDEN.test(x.text)) return false;
+    if (LUECKE.test(x.text)) return tagMitLuecke.has(x.text.split(/[ ,:]/)[0]);
+    if (x.art === "bad" && RECHT.test(x.text)) return recht.has(x.text);
+    return true;
+  });
+  const da = new Set(plan.meldungen.map(x => x.text));
+  recht.forEach(text => { if (!da.has(text)) plan.meldungen.push({art: "bad", text}); });
+  plan.tage.forEach((t, ti) => {
+    const n = tagesMaengel(plan, ti);
+    if (n && !plan.meldungen.some(x => LUECKE.test(x.text) && x.text.split(/[ ,:]/)[0] === t.label))
+      plan.meldungen.push({art: "bad", text: `${t.label}: ${n} halbe Stunde(n) nicht richtig besetzt.`});
+  });
+  ueberFuenfzig(plan).forEach(x => plan.meldungen.push({art: "warn", text: ueberFuenfzigText(x)}));
+  state.mitarbeiter.forEach((m, i) => {
+    const j = platzImPlan(plan, m.name), k = j < 0 ? null : stundenNach(plan, j);
+    if (k && !istAzubi(m) && !darfUeberstunden(m) && hatVertrag(m) && k.ist > k.soll + 0.25)
+      plan.meldungen.push({art: "bad", text: `${m.name} kann keine Überstunden machen, ist aber mit ${h1(k.ist)} h eingeplant (Soll ${h1(k.soll)} h).`});
+  });
+  return plan;
 }
 
 // ==== kern/17-analyse.js ====
@@ -6383,24 +6506,32 @@ function zuordnung(kosten){
 // wird neu gerechnet — 2: feste Kassenkraft statt ständiger Wechsel; 3: Aufgaben bleiben bei einer Person.
 const EINTEILUNG_STAND = 3;
 
+/* Kasse über den ganzen Tag (seit 18.11.2026). Jede Person hat ihr eigenes Kassenkonto: Wer neu
+   an die Kasse kommt, zählt erst die Kasse und meldet sich an; wer geht, holt seine Kasse heraus
+   und rechnet ab oder legt sie in den Tresor. Deshalb kostet jede weitere Person an der Kasse
+   viel, jeder Wechsel etwas — und je Viertelstunde, wer an der Kasse steht: wer mehr Funktionen
+   hat, gehört eher auf die Fläche; die Stellvertretung nur, wenn es nicht anders geht, die
+   Filialleitung erst danach; wer gerade für eine Aufgabe gebraucht wird, die sonst niemand kann,
+   bleibt dort. Gerechnet wird der ganze Tag auf einmal (kürzester Weg über die Viertelstunden),
+   nicht Viertelstunde für Viertelstunde — vorher lösten in einer Pause drei Personen
+   nacheinander ab. Wer nur eine Viertelstunde kassiert und dann wieder abgibt, kostet einen
+   Wechsel extra (kurz): Für 15 Minuten lohnt kein Ablösen. Die Filialleitung wiegt am meisten —
+   sie kassiert nur, wenn sonst niemand kann, oder kurz in einer Pause. */
+const KASSE_KOSTEN = {person: 16, wechsel: 10, kurz: 10, funktion: 0.5, vertretung: 4, leitung: 12, gebraucht: 8};
+
 /* Die Einteilung eines Tages.
-   Kasse: Während der Öffnung kassiert immer jemand. Wer zuerst kommt, geht an die Kasse und
-   bleibt dort, bis die Schicht endet (Hauptkasse); wer danach kommt, geht auf die Fläche.
-   In der Pause der Hauptkasse löst jemand von der Fläche ab, danach geht es zurück. Kommen
-   zwei gleichzeitig, entscheidet, wer die anstehenden Aufgaben eher kann, dann, wer in der
-   Woche schon kassiert hat. Kann jemand die Aufgaben auf der Fläche nicht (fehlende
-   Funktion), tauschen die beiden. Die Filialleitung kassiert nur, wenn es nicht anders geht.
-   optionen.ohneVerlauf: die Vortage nicht ansehen (für den Blick auf die Vortage selbst).
+   Kasse: siehe KASSE_KOSTEN — meist kassiert eine Person (Hauptkasse), in ihrer Pause löst eine
+   ab, danach geht es zurück. Kann jemand die Aufgaben auf der Fläche nicht, kassiert eher er.
+   optionen: (bis 18.11.2026 ohneVerlauf — die Vortage zählen nicht mehr mit)
    → {von, bis, offenVon, offenBis,
       reihen: [{name, m, schicht, segmente: [{von, bis, art, aufgabe, kurz}], stunden}],
       zeitpunkte: [{m, da, noetig, je}], summen: {kasse, laden, ware, bestell, sonst, pause},
-      kasse: [{name, von, bis}],
+      kasse: [{name, von, bis}], kasseKosten (Wert der Kassenfolge, für die Lage der Pausen),
       aufgaben: [{quelle, name, kurz, art, von, bis, frueh, spaet, pers, braucht, teile: [{name, von, bis}],
                   wer, fehlt, nebenher: [{name, spannen}]}]} */
 function tagesEinteilung(plan, ti, optionen){
   const t = plan && plan.tage[ti];
   if (!t || t.feiertag) return null;
-  const o = optionen || {};
   const SL = 15, ms = state.mitarbeiter, r = tagesRaster(t);
   const aussen = state.allein ? 1 : MIN_BESETZUNG;
   const nameVon = s => plan.namen ? plan.namen[s.mi] : (ms[s.mi] || {}).name;
@@ -6417,83 +6548,80 @@ function tagesEinteilung(plan, ti, optionen){
   const festAktuell = plan.einteilung === EINTEILUNG_STAND;
   const festgelegt = (a, n, m) => festAktuell && (a.wer || []).some(x => x.name === nameVon(schichten[n]) && x.von <= m && x.bis > m);
 
-  // Wie viele der Aufgaben bis zum Ende seiner Schicht jemand kann (ohne Aufgaben: ob er Ware verräumen kann)
-  const flaeche = (n, m) => {
-    const ende = schichten[n].bis;
-    const vor = aufgaben.filter(a => braucht(a) && a.von < ende && a.bis > m);
-    return vor.length ? vor.filter(a => kann(schichten[n], braucht(a))).length : (kann(schichten[n], "verraeumen") ? 1 : 0);
-  };
-  // Wie lange jemand an den Vortagen dieser Woche kassiert hat (nur bei Gleichstand gebraucht)
-  const vorher = new Map();
-  const kasseVorher = n => {
-    const name = nameVon(schichten[n]);
-    if (o.ohneVerlauf || ti === 0) return 0;
-    if (!vorher.has(name)){
-      let min = 0;
-      for (let tj = 0; tj < ti; tj++){
-        const e = tagesEinteilung(plan, tj, {ohneVerlauf: true});
-        if (e) e.kasse.forEach(k => { if (k.name === name) min += k.bis - k.von; });
-      }
-      vorher.set(name, min);
+  // ---- Die Kasse für den ganzen Tag (KASSE_KOSTEN) ----
+  const K = KASSE_KOSTEN;
+  const funktionen = n => (((wer(schichten[n]) || {}).qual) || []).filter(q => q !== "kasse").length;
+  const vertretung = n => ((wer(schichten[n]) || {}).typ) === "Stellvertretung";
+  const freiAm = (n, m) => daAm(n, m) && !inPause(schichten[n], m);
+  // Wird n gerade für eine Aufgabe gebraucht, die sonst niemand Freies kann — oder ist n dafür festgehalten?
+  const gebraucht = (n, m) => aufgaben.some(a => a.von <= m && a.bis > m && braucht(a) && kann(schichten[n], braucht(a))
+    && (festgelegt(a, n, m) || schichten.filter((s, x) => x !== n && freiAm(x, m) && kann(s, braucht(a))).length < a.pers));
+  const viertelKosten = (n, m) => K.funktion * funktionen(n) + (vertretung(n) ? K.vertretung : 0)
+    + (leitung(n) ? K.leitung : 0) + (gebraucht(n, m) ? K.gebraucht : 0);
+  const kasseTag = (() => {
+    const bit = new Map([...new Set(schichten.map(nameVon))].map((x, i) => [x, 2 ** i]));
+    let stufe = [{n: -1, used: 0, lang: 0, kosten: 0, vor: null, m: null}];
+    for (let m = r.offenVon; m < r.offenBis; m += SL){
+      const kand = schichten.map((s, n) => n).filter(n => freiAm(n, m) && kann(schichten[n], "kasse"));
+      const kv = new Map(kand.map(n => [n, viertelKosten(n, m)]));
+      const naechste = new Map();
+      stufe.forEach(z => (kand.length ? kand : [-1]).forEach(n => {
+        let kosten = z.kosten, used = z.used, lang = 0;
+        if (n >= 0){
+          const b = bit.get(nameVon(schichten[n]));
+          const bleibt = z.n >= 0 && nameVon(schichten[z.n]) === nameVon(schichten[n]);
+          kosten += kv.get(n) + (used & b ? 0 : K.person)
+            + (z.n >= 0 && !bleibt ? K.wechsel + (z.lang < 2 ? K.kurz : 0) : 0);
+          used |= b;
+          lang = bleibt ? Math.min(2, z.lang + 1) : 1;
+        }
+        const key = n + "|" + used + "|" + lang, alt = naechste.get(key);
+        if (!alt || kosten < alt.kosten - 1e-9) naechste.set(key, {n, used, lang, kosten, vor: z, m});
+      }));
+      // die besten Wege genügen — ein Tag hat selten mehr als acht Leute
+      stufe = [...naechste.values()].sort((a, b) => a.kosten - b.kosten).slice(0, 80);
     }
-    return vorher.get(name);
+    const wer = new Map();
+    let z = stufe[0];
+    const kosten = z ? z.kosten : 0;
+    for (; z && z.m !== null; z = z.vor) wer.set(z.m, z.n >= 0 ? z.n : null);
+    return {wer, kosten};
+  })();
+  const kasseAm = m => { const n = kasseTag.wer.get(m); return n === undefined ? null : n; };
+  // Hauptkasse: wer kassiert — außer bei einer Ablösung: Wer davor kassiert hat, ist in der Pause
+  // und kommt danach an die Kasse zurück, dann bleibt er die Hauptkasse
+  const hauptAm = m => {
+    const n = kasseAm(m);
+    if (n === null) return null;
+    let v = m - SL;
+    while (v >= r.offenVon && kasseAm(v) === n) v -= SL;
+    const davor = v >= r.offenVon ? kasseAm(v) : null;
+    if (davor !== null && davor !== n && inPause(schichten[davor], m) && kasseAm(schichten[davor].pauseBis) === davor) return davor;
+    return n;
   };
-  // Wie viel jemand auf der Fläche überhaupt kann
-  const FLAECHE = ["verraeumen", "foodauf", "nonfoodauf", "abendprog", "bestellung"];
-  const koennen = n => FLAECHE.filter(q => kann(schichten[n], q)).length;
-  // Reihenfolge für eine neue Hauptkasse: wer die anstehenden Aufgaben nicht kann, wer zuerst kam;
-  // bei gleichem Beginn, wer weniger der anstehenden Aufgaben kann, wer auf der Fläche weniger
-  // kann, wer in der Woche schon kassiert hat, wer länger bleibt
-  const hauptReihe = (kand, m) => kand.slice().sort((x, y) =>
-       (leitung(x) - leitung(y))
-    || ((flaeche(x, m) > 0) - (flaeche(y, m) > 0))
-    || (schichten[x].von - schichten[y].von)
-    || (flaeche(x, m) - flaeche(y, m))
-    || (koennen(x) - koennen(y))
-    || (kasseVorher(y) - kasseVorher(x))
-    || (schichten[y].bis - schichten[x].bis)
-    || (x - y));
 
   const was = schichten.map(() => ({}));            // je Schicht: Viertelstunde → {art, ref}
   const besetzt = new Map(aufgaben.map(a => [a, {fehlt: [], nebenher: {}}]));
   const zeitpunkte = [], kasseTeile = [];
-  let bisher = new Map(), kassierer = null, haupt = null;     // wer etwas angefangen hat, bleibt dabei
+  let bisher = new Map();                                    // wer etwas angefangen hat, bleibt dabei
   // Wer eine Aufgabe angefangen hat, behält sie bis zum Ende — in seiner Pause ruht sie, statt an
   // jemand anderen zu gehen (seit 17.11.2026: Aufgaben auf wenige Personen)
   const besitzer = new Map(aufgaben.map(a => [a, []]));
   const besitztGerade = (n, m) => aufgaben.some(a => a.von <= m && a.bis > m && besitzer.get(a).includes(n));
-  const anDerKasse = new Set();                               // wer heute schon kassiert hat
   for (let m = von; m < bis; m += SL){
     const da = schichten.map((s, n) => n).filter(n => daAm(n, m));
     const frei = new Set();
     da.forEach(n => { if (inPause(schichten[n], m)) was[n][m] = {art: "pause"}; else frei.add(n); });
     const offen = m >= r.offenVon && m < r.offenBis;
-    // Die Hauptkasse wechselt nur, wenn ihre Schicht endet — oder wenn sie die Leitung ist und
-    // jetzt jemand anderes kassieren kann
-    if (haupt !== null && !daAm(haupt, m)) haupt = null;
-    if (haupt !== null && leitung(haupt) && [...frei].some(n => !leitung(n) && kann(schichten[n], "kasse"))) haupt = null;
-    // Kann jemand die anstehenden Aufgaben auf der Fläche nicht, die Hauptkasse aber schon: tauschen
-    if (haupt !== null && frei.has(haupt) && flaeche(haupt, m)){
-      const n = [...frei].find(x => x !== haupt && !leitung(x) && kann(schichten[x], "kasse") && !flaeche(x, m));
-      if (n !== undefined) haupt = n;
-    }
+    const kassierer = offen ? kasseAm(m) : null, haupt = offen ? hauptAm(m) : null;
 
-    // Plätze: die Kasse (während der Öffnung) und je Aufgabe so viele, wie Personen nötig sind.
-    // Vergeben wird so, dass möglichst alle besetzt sind — die Kasse vor allem anderen — und
-    // dann nach Vorliebe: Hauptkasse bleibt; wer eine Aufgabe angefangen hat, bleibt dabei;
-    // wie im Plan festgehalten; wem der Planer die Aufgabe zugeschrieben hat; Aufgaben macht
-    // lieber das Team als die Filialleitung — sie springt ein, wo es sonst niemand kann.
+    // Plätze: die Kasse (während der Öffnung — wer, steht schon fest: kasseTag) und je Aufgabe so
+    // viele, wie Personen nötig sind. Vergeben wird so, dass möglichst alle besetzt sind, dann nach
+    // Vorliebe: wer eine Aufgabe angefangen hat, bleibt dabei; wie im Plan festgehalten; wem der
+    // Planer die Aufgabe zugeschrieben hat; Aufgaben macht lieber das Team als die Filialleitung —
+    // sie springt ein, wo es sonst niemand kann.
     const leute = [...frei], plaetze = [];
-    // Wer gerade eine Aufgabe hat, wird nur im Notfall an die Kasse geholt; wer heute schon
-    // kassiert hat, löst lieber ab als jemand Neues — so bleiben es wenige an der Kasse
-    if (offen){
-      const reihe = haupt === null ? hauptReihe(leute.filter(n => kann(schichten[n], "kasse")), m) : [];
-      plaetze.push({kasse: true, kosten: n => {
-        if (!kann(schichten[n], "kasse")) return Infinity;
-        const grund = haupt === null ? Math.min(3, reihe.indexOf(n)) : n === haupt ? 0 : (n === kassierer ? 2 : 4) + (anDerKasse.has(n) ? 0 : 1);
-        return grund + (n !== haupt && besitztGerade(n, m) ? 3 : 0) + (leitung(n) ? 20 : 0);
-      }, offen: 10000});
-    }
+    if (offen) plaetze.push({kasse: true, kosten: n => n === kassierer ? 0 : Infinity, offen: 10000});
     const laufend = aufgaben.filter(a => a.von <= m && a.bis > m);
     laufend.forEach(a => {
       // Besitzer, die gegangen sind, geben die Aufgabe ab; wer in der Pause ist und vor dem Ende
@@ -6536,7 +6664,6 @@ function tagesEinteilung(plan, ti, optionen){
     });
     // Besitz nachführen: Wer eine Aufgabe jetzt macht, besitzt sie; wer anderswo eingeteilt wurde, gibt sie ab —
     // außer in der Pause oder beim Ablösen an der Kasse (danach geht es mit der Aufgabe weiter)
-    const besitzVorher = new Set(laufend.flatMap(a => besitzer.get(a)));
     laufend.forEach(a => {
       const jetztDran = jetzt.get(a);
       const eigen = besitzer.get(a).filter(n => jetztDran.includes(n) || (inPause(schichten[n], m) && schichten[n].pauseBis < a.bis)
@@ -6544,18 +6671,7 @@ function tagesEinteilung(plan, ti, optionen){
       jetztDran.forEach(n => { if (!eigen.includes(n) && eigen.length < a.pers) eigen.push(n); });
       besitzer.set(a, eigen);
     });
-    if (k !== null){
-      was[k][m] = {art: "kasse"}; frei.delete(k); kasseTeile.push([nameVon(schichten[k]), m]); anDerKasse.add(k);
-      // Wer jetzt kassiert, wird Hauptkasse, wenn es keine gibt — oder wenn die bisherige auf der
-      // Fläche gebraucht wird (dann bleibt es beim Tausch, statt hin und her). Löst jemand in der
-      // Pause ab, der mindestens so lange bleibt und seine eigene Pause schon hinter sich hat,
-      // behält er die Kasse: ein Wechsel statt zwei.
-      const inDerPause = haupt !== null && (was[haupt][m] || {}).art === "pause";
-      const pauseVorbei = n => schichten[n].pauseVon === null || schichten[n].pauseVon === undefined || schichten[n].pauseBis <= m;
-      if (!leitung(k) && (haupt === null || (haupt !== k && (was[haupt][m] || {}).ref)
-          || (inDerPause && haupt !== k && schichten[k].bis >= schichten[haupt].bis && pauseVorbei(k) && !besitzVorher.has(k)))) haupt = k;
-    }
-    kassierer = k;
+    if (k !== null){ was[k][m] = {art: "kasse"}; frei.delete(k); kasseTeile.push([nameVon(schichten[k]), m]); }
     frei.forEach(n => was[n][m] = {art: "laden"});
     bisher = jetzt;
     const je = Object.fromEntries(TAETIGKEITEN.map(t => [t.id, 0]).concat([["pause", 0]]));
@@ -6585,7 +6701,7 @@ function tagesEinteilung(plan, ti, optionen){
   // Die Kasse als durchgehende Abschnitte je Person
   const kasse = [];
   kasseTeile.forEach(([name, m]) => { const l = kasse[kasse.length - 1]; if (l && l.name === name && l.bis === m) l.bis = m + SL; else kasse.push({name, von: m, bis: m + SL}); });
-  return {von, bis, offenVon: r.offenVon, offenBis: r.offenBis, reihen, zeitpunkte, summen, kasse,
+  return {von, bis, offenVon: r.offenVon, offenBis: r.offenBis, reihen, zeitpunkte, summen, kasse, kasseKosten: kasseTag.kosten,
     aufgaben: (t.aufgaben || []).slice().sort((a, b) => a.von - b.von || a.bis - b.bis).map(a => {
       const teile = teileVon.get(a).sort((x, y) => x.von - y.von);
       return {quelle: a, name: a.name, kurz: aufgabeKurz(a), art: taetigkeitVon(a), von: a.von, bis: a.bis,
@@ -7888,6 +8004,7 @@ function normalisiere(s){
   if (!s.listen) s.listen = {};
   if (!s.phasen) s.phasen = {};
   if (!s.ereignisse) s.ereignisse = [];
+  if (!Array.isArray(s.papierkorb)) s.papierkorb = [];
   // Planentwürfe (seit 16.11.2026): was nie freigegeben wurde und zwei Wochen zurückliegt, entfällt
   s.planEntwurf = s.planEntwurf || {};
   { const grenze = wochenSchluessel(new Date(aktuellerMontag().getTime() - 14 * 864e5));
@@ -8240,7 +8357,14 @@ async function meinPlanAbgleichen(){
       const m = new Date(mo); m.setDate(mo.getDate() + d);
       const sl = wochenSchluessel(m);
       const daten = meinPlanDaten(sl);
-      if (!daten) continue;
+      if (!daten){
+        // Gelöscht (Papierkorb): Was schon auf dem Server stand, leeren — sonst sähen alle den alten Plan
+        if (o.planStand[sl] && o.planStand[sl] !== "{}"){
+          await abgabeRuf("termine_plan_setzen", {p_nr: state.nr, p_schluessel: o.schluessel, p_woche: sl, p_plan: {}});
+          o.planStand[sl] = "{}";
+        }
+        continue;
+      }
       const stand = JSON.stringify(daten);
       if (o.planStand[sl] === stand) continue;
       await abgabeRuf("termine_plan_setzen", {p_nr: state.nr, p_schluessel: o.schluessel, p_woche: sl, p_plan: daten});
@@ -8281,6 +8405,7 @@ const SYMBOLE = {
   zahlen:   '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   tabelle:  '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14.5h18M9 4v16"/>',
   archiv:   '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M4.5 9v10.5h15V9M10 13h4"/>',
+  papierkorb: '<path d="M4 6.5h16M9.5 6.5V4h5v2.5M6 6.5l1 14h10l1-14"/><path d="M10 10.5v6M14 10.5v6"/>',
   schild:   '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6l8-3z"/><path d="M8.8 12.2l2.3 2.3 4.2-4.6"/>',
   zurueck:  '<path d="M15 5l-7 7 7 7"/>',
   funke:    '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M19 16l.8 2.2 2.2.8-2.2.8L19 22l-.8-2.2-2.2-.8 2.2-.8z"/>',
@@ -8559,6 +8684,7 @@ const NAV = [
     {ziel: "stundenliste", sym: "tabelle", titel: "Stundenliste"},
     {ziel: "analyse",      sym: "zahlen",  titel: "Analyse"},
     {ziel: "archiv",       sym: "archiv",  titel: "Archiv"},
+    {ziel: "papierkorb",   sym: "papierkorb", titel: "Papierkorb"},
     {ziel: "sicherung",    sym: "schild",  titel: "Sicherung"}]}
 ];
 const NAV_PUNKTE = NAV.reduce((a, g) => a.concat(g.punkte), []);
@@ -8754,6 +8880,7 @@ function render(){
   else if (ansicht === "planen")      v.appendChild(planenAnsicht());
   else if (ansicht === "entwurf")     v.appendChild(planEntwurfAnsicht());
   else if (ansicht === "archiv")      v.appendChild(archivAnsicht());
+  else if (ansicht === "papierkorb")  v.appendChild(papierkorbAnsicht());
   else if (ansicht === "sicherung")   v.appendChild(sicherungsAnsicht());
   else if (ansicht === "termine")     v.appendChild(termineAnsicht());
   else if (ansicht === "ereignisse")  v.appendChild(ereignisAnsicht());
@@ -8794,13 +8921,13 @@ async function pruefePlatz(){
     `<div class="note warn" id="platzhinweis" style="margin-bottom:14px"><span class="ic">!</span><span>${esc(text)}</span></div>`));
 }
 
-// Fußzeile der Schritte — in der Einrichtung mit Überspringen, sonst mit Fertig
+// Fußzeile der Schritte — in der Einrichtung mit Überspringen, sonst mit Speichern (bis 18.11.2026 „Fertig“)
 function navLeiste(idx){
   const a = el(`<div class="actions"></div>`);
   if (ansicht === "bereich"){
     // Wer aus der Prüfung vor dem Planen hierher kam, landet wieder dort
     const zurueck = () => { ansicht = zurueckNach || "start"; zurueckNach = null; render(); };
-    const f = el(`<button class="btn haupt">${zurueckNach === "planen" ? "Fertig, zurück zum Plan" : "Fertig"}</button>`);
+    const f = el(`<button class="btn haupt">${zurueckNach === "planen" ? "Speichern, zurück zum Plan" : "Speichern"}</button>`);
     f.onclick = async () => { await speichere(); zurueck(); };
     const ab = el(`<button class="btn ghost">Abbrechen</button>`);
     ab.onclick = zurueck;
@@ -8835,7 +8962,7 @@ function nav(zurueck, weiter, label){ return navLeiste(schritt); }
 
 function weiterZu(i){ bearbeite = null; maxSchritt = Math.max(maxSchritt, i); schritt = i; fehler = ""; sichern(); render(); }
 
-let zurueckNach = null;   // Ansicht, in die „Fertig“ zurückführt (sonst die Übersicht)
+let zurueckNach = null;   // Ansicht, in die „Speichern“ zurückführt (sonst die Übersicht)
 
 function oeffneBereich(id, zurueck){
   const b = BEREICHE.find(x => x.id === id);
@@ -8902,6 +9029,7 @@ function anmeldung(){
   const oeffnen = (daten) => {
     state = Object.assign(leer(), daten);
     archivAufraeumen();
+    if (papierkorbAufraeumen()) sichern();
     // „Urlaub & Krankheit“ folgt den eingetragenen Tagen (eine Liste, kein Nebeneinander)
     if (ereignisseNachfuehren()) sichern();
     merkeZugang(state.nr, state.ort, state.pw);
@@ -11440,13 +11568,51 @@ function archivSichern(){
            `Filialplaner-Archiv-N${state.nr}-${new Date().toISOString().slice(0,10)}.json`);
 }
 
+// Einen Plan löschen: er kommt in den Papierkorb (seit 18.11.2026)
+async function planLoeschenFragen(sl){
+  const kw = kwVon(montagAusSchluessel(sl));
+  if (!confirm(`KW ${kw} löschen? Der Plan liegt dann ${PAPIERKORB_TAGE} Tage im Papierkorb und lässt sich dort wiederherstellen. `
+    + `Solange zählen seine Stunden nicht im Stundenkonto.`)) return;
+  planLoeschen(sl);
+  await speichere();
+  render();
+}
+
+// Eine Karte je Plan: Woche, Zeitraum, Stunden, Alter — ansehen, PDF, Excel, löschen
+// (Karten statt Tabelle seit 18.11.2026: so passen die Knöpfe auch auf das Telefon)
+function archivZeile(sl, kurz, detail, mitAlter){
+  const plan = planLaden(kurz);
+  const su = planSummen(plan);
+  const bis = new Date(plan.mo.getTime() + 5*864e5);
+  const alt = mitAlter ? wochenZurueck(sl, state.plaene) : null;
+  const tr = el(`<div class="task pk-eintrag"><b>KW ${sl.slice(-2)}</b> <span class="hint">${deVon(plan.mo)} – ${deVon(bis)} · ${h1(su.bezahlt)} h${
+      mitAlter ? ` · <span class="${alt >= ARCHIV_WARNUNG ? "warnalt" : ""}">vor ${alt} ${alt === 1 ? "Woche" : "Wochen"}</span>` : ""}</span>
+    <div class="knopfreihe">
+      <button class="btn ghost small" data-zeig type="button">ansehen</button>
+      <button class="btn ghost small" data-pdf type="button">PDF</button>
+      <button class="btn ghost small" data-xls type="button">Excel</button>
+      <button class="btn ghost small" data-loeschen type="button">Löschen</button></div></div>`);
+  tr.querySelector("[data-zeig]").onclick = () => {
+    detail.innerHTML = "";
+    detail.appendChild(el(`<h3 style="margin:22px 0 8px">KW ${sl.slice(-2)} im Einzelnen</h3>`));
+    detail.appendChild(planTabelle(plan, false));
+    detail.scrollIntoView({behavior:"smooth", block:"start"});
+  };
+  tr.querySelector("[data-xls]").onclick = () => planExcel(plan);
+  tr.querySelector("[data-pdf]").onclick = () => planPDF(plan);
+  tr.querySelector("[data-loeschen]").onclick = () => planLoeschenFragen(sl);
+  return tr;
+}
+
 function archivAnsicht(){
   const p = el(`<div class="panel">
     <div class="head"><span class="eyebrow">Archiv</span>
-      <h1 style="margin-top:4px">Abgelaufene Wochen${infoHtml(`Pläne und Stundenlisten nach Kalenderwoche. Nach ${ARCHIV_WOCHEN} Wochen wird gelöscht — vorher steht ein Hinweis im Dashboard.`, "Archiv")}</h1></div>
+      <h1 style="margin-top:4px">Pläne nach Woche${infoHtml(`Pläne und Stundenlisten nach Kalenderwoche. Nach ${ARCHIV_WOCHEN} Wochen wird gelöscht — vorher steht ein Hinweis im Dashboard. Jeden Plan kannst du selbst löschen: Er liegt dann ${PAPIERKORB_TAGE} Tage im Papierkorb.`, "Archiv")}</h1></div>
     <div class="actions" style="margin-top:0;border-top:0;padding-top:0">
       <button class="btn ghost small" id="sichern">Ganzes Archiv sichern</button></div>
-    <h3 class="abschnitt" style="margin:20px 0 8px">Arbeitspläne</h3>
+    <h3 class="abschnitt" style="margin:20px 0 8px">Laufende und kommende Wochen</h3>
+    <div id="aktuell"></div>
+    <h3 class="abschnitt" style="margin:24px 0 8px">Abgelaufene Wochen</h3>
     <div id="plaene"></div>
     <h3 class="abschnitt" style="margin:24px 0 8px">Stundenlisten</h3>
     <div id="listen"></div>
@@ -11456,42 +11622,15 @@ function archivAnsicht(){
 
   p.querySelector("#sichern").onclick = () => archivSichern();
 
-  // --- Arbeitspläne ---
-  const pb = p.querySelector("#plaene");
-  const pl = archivSchluessel();
-  if (!pl.length){
-    pb.appendChild(el(`<p class="empty">Noch keine abgelaufene Woche.</p>`));
-  } else {
-    const tab = el(`<div class="tablewrap"><table><thead><tr>
-      <th>Woche</th><th>Zeitraum</th><th class="n">Stunden</th><th class="n">Alter</th><th></th></tr></thead><tbody></tbody></table></div>`);
-    const tb = tab.querySelector("tbody");
-    pl.forEach(sl => {
-      const kurz = state.plaene[sl];
-      const plan = planLaden(kurz);
-      const su = planSummen(plan);
-      const bis = new Date(plan.mo.getTime() + 5*864e5);
-      const alt = wochenZurueck(sl, state.plaene);
-      const tr = el(`<tr><td><b>KW ${sl.slice(-2)}</b><span class="hint"> ${sl.slice(0,4)}</span></td>
-        <td>${deVon(plan.mo)} – ${deVon(bis)}</td>
-        <td class="n">${h1(su.bezahlt)}</td>
-        <td class="n${alt >= ARCHIV_WARNUNG ? " warnalt" : ""}">${alt} W.</td>
-        <td class="n" style="white-space:nowrap">
-          <button class="btn ghost small" data-zeig>ansehen</button>
-          <button class="btn ghost small" data-pdf>PDF</button>
-          <button class="btn ghost small" data-xls>Excel</button></td></tr>`);
-      tr.querySelector("[data-zeig]").onclick = () => {
-        const d = p.querySelector("#detail");
-        d.innerHTML = "";
-        d.appendChild(el(`<h3 style="margin:22px 0 8px">KW ${sl.slice(-2)} im Einzelnen</h3>`));
-        d.appendChild(planTabelle(plan, false));
-        d.scrollIntoView({behavior:"smooth", block:"start"});
-      };
-      tr.querySelector("[data-xls]").onclick = () => planExcel(plan);
-      tr.querySelector("[data-pdf]").onclick = () => planPDF(plan);
-      tb.appendChild(tr);
-    });
-    pb.appendChild(tab);
-  }
+  // --- Arbeitspläne: laufende und kommende, dann abgelaufene ---
+  const detail = p.querySelector("#detail");
+  const jetzt = wochenSchluessel(aktuellerMontag());
+  const tabelle = (ziel, liste, mitAlter, leerText) => {
+    if (!liste.length){ ziel.appendChild(el(`<p class="empty">${leerText}</p>`)); return; }
+    liste.forEach(sl => ziel.appendChild(archivZeile(sl, state.plaene[sl], detail, mitAlter)));
+  };
+  tabelle(p.querySelector("#aktuell"), Object.keys(state.plaene).filter(sl => sl >= jetzt).sort(), false, "Für die laufende Woche gibt es noch keinen Plan.");
+  tabelle(p.querySelector("#plaene"), archivSchluessel(), true, "Noch keine abgelaufene Woche.");
 
   // --- Stundenlisten ---
   const lb = p.querySelector("#listen");
@@ -11555,6 +11694,54 @@ function testfassungKasten(){
 async function testfassungVerlassen(){
   await speichere();
   await appRuf("kanal", {setzen: "stabil"});
+}
+
+/* Papierkorb (seit 18.11.2026): gelöschte Pläne, je 14 Tage — wiederherstellen oder endgültig löschen */
+function papierkorbAnsicht(){
+  if (papierkorbAufraeumen()) sichern();
+  const p = el(`<div class="panel">
+    <div class="head"><span class="eyebrow">Papierkorb</span>
+      <h1 style="margin-top:4px">Gelöschte Pläne${infoHtml(`Gelöschte Pläne liegen hier ${PAPIERKORB_TAGE} Tage, dann sind sie von selbst weg. Solange zählen sie nirgends — nicht im Stundenkonto, nicht in der Analyse, nicht in „Mein Plan“.`, "Papierkorb")}</h1></div>
+    <div id="liste"></div><div id="detail"></div>
+    <div class="actions"><button class="btn ghost" id="zurueck">Zurück</button></div></div>`);
+  const box = p.querySelector("#liste"), detail = p.querySelector("#detail");
+  const liste = (state.papierkorb || []).slice().sort((a, b) => b.geloescht.localeCompare(a.geloescht));
+  const datum = d => new Date(d).toLocaleDateString("de-DE", {day: "2-digit", month: "2-digit", year: "numeric"});
+  if (!liste.length) box.appendChild(el(`<p class="empty">Der Papierkorb ist leer.</p>`));
+  else {
+    // Karten statt Tabelle — die Knöpfe passen so auch auf das Telefon
+    liste.forEach(x => {
+      const plan = planLaden(x.plan), bis = new Date(plan.mo.getTime() + 5*864e5), kw = kwVon(plan.mo);
+      const tr = el(`<div class="task pk-eintrag"><b>KW ${kw}</b> <span class="hint">${deVon(plan.mo)} – ${deVon(bis)} · ${h1(planSummen(plan).bezahlt)} h</span>
+        <div class="hint">Gelöscht am ${datum(x.geloescht)} · endgültig weg am ${datum(papierkorbBis(x))}</div>
+        <div class="knopfreihe">
+          <button class="btn small" data-zurueck type="button">Wiederherstellen</button>
+          <button class="btn ghost small" data-zeig type="button">ansehen</button>
+          <button class="btn ghost small" data-weg type="button">Endgültig löschen</button></div></div>`);
+      tr.querySelector("[data-zeig]").onclick = () => {
+        detail.innerHTML = "";
+        detail.appendChild(el(`<h3 style="margin:22px 0 8px">KW ${kw} (im Papierkorb)</h3>`));
+        detail.appendChild(planTabelle(plan, false));
+        detail.scrollIntoView({behavior: "smooth", block: "start"});
+      };
+      tr.querySelector("[data-zurueck]").onclick = async () => {
+        const besetzt = !!(state.plaene || {})[x.sl];
+        if (besetzt && !confirm(`Für KW ${kw} gibt es inzwischen einen anderen Plan. Ersetzen? Der jetzige kommt in den Papierkorb.`)) return;
+        ausPapierkorb(x.id, besetzt);
+        await speichere();
+        render();
+      };
+      tr.querySelector("[data-weg]").onclick = async () => {
+        if (!confirm(`KW ${kw} endgültig löschen? Das lässt sich nicht rückgängig machen.`)) return;
+        endgueltigLoeschen(x.id);
+        await speichere();
+        render();
+      };
+      box.appendChild(tr);
+    });
+  }
+  p.querySelector("#zurueck").onclick = () => { ansicht = "start"; render(); };
+  return p;
 }
 
 // ==== app/44-planentwurf.js ====
@@ -12043,6 +12230,8 @@ function heuteImPlan(kurz){
 
 // Ergebnisse des Optimierers je Ausfall, solange die Seite offen ist
 const umplanSpeicher = {};
+// „Kasse ruhiger“ je Lage (Stand + eingeschaltete Änderungen) — die Rechnung dauert je Tag einen Moment
+const ruhigerSpeicher = {};
 
 function aendernAnsicht(){
   const sl = aendernWoche;
@@ -12138,6 +12327,41 @@ function aendernAnsicht(){
   const lange = langeSchichtenKarte(pr.plan);
   if (lange) oben.appendChild(lange);
 
+  // ---- Kasse ruhiger: andere Pausen, weniger Wechsel und Personen an der Kasse (kein Muss) ----
+  const ruhigKey = entwurfStand(sl) + "|" + JSON.stringify(aktiv.map(a => a.id));
+  const ruhigKarte = el(`<section class="karte ruhiger" hidden><h3>Kasse ruhiger${infoHtml("Jede weitere Person an der Kasse zählt erst ihre Kasse und meldet sich an — jeder Wechsel kostet Zeit. Mit anders gelegten Pausen geht es an diesen Tagen ruhiger. Schichten und Aufgaben bleiben, wie sie sind.", "Kasse ruhiger")}</h3><div></div></section>`);
+  oben.appendChild(ruhigKarte);
+  const ruhigZeigen = liste => {
+    const box = ruhigKarte.querySelector("div");
+    box.innerHTML = "";
+    liste.filter(x => !eintrag.aenderungen.some(a => a.aktiv && a.id === "ruhiger:" + x.ti)).forEach(x => {
+      const z = el(`<div class="todo"><span>${esc(kasseRuhigerText(x))}</span></div>`);
+      const b = el(`<button class="btn small" type="button">Pausen verschieben</button>`);
+      b.onclick = () => {
+        eintrag.aenderungen = eintrag.aenderungen.filter(a => a.id !== "ruhiger:" + x.ti);
+        eintrag.aenderungen.push({id: "ruhiger:" + x.ti, typ: "pausen", ruhiger: true, ti: x.ti, aktiv: true, quelle: "hand", text: `${tagName(x.ti)}: Pausen für eine ruhigere Kasse`});
+        neuZeichnen();
+      };
+      z.appendChild(b);
+      box.appendChild(z);
+    });
+    ruhigKarte.hidden = !box.children.length;
+  };
+  if (ruhigerSpeicher[ruhigKey]) ruhigZeigen(ruhigerSpeicher[ruhigKey]);
+  else {
+    // Tag für Tag im Hintergrund — die Seite ist sofort bedienbar
+    const ergebnis = [], plan = planLaden(pr.plan), ab = heuteImPlan(kurz);
+    let ti = ab;
+    const schritt = () => {
+      if (!document.body.contains(ruhigKarte)) return;
+      if (ti > 5){ ruhigerSpeicher[ruhigKey] = ergebnis; ruhigZeigen(ergebnis); return; }
+      const x = kasseRuhiger(plan, ti++);
+      if (x) ergebnis.push(x);
+      setTimeout(schritt, 0);
+    };
+    setTimeout(schritt, 30);
+  }
+
   // ---- Der Entwurf ----
   const planKarte = el(`<section class="karte entwurf"><div class="karte-kopf"><h3>Entwurf</h3>
     <div class="legende"><span><i class="neu"></i> geändert, passt — alte Zeit klein darunter</span>
@@ -12215,15 +12439,17 @@ function aendernAnsicht(){
    mitUmplanen: die Umplanung über mehrere Tage nur, wenn sie verlangt wurde */
 function loesungsGruppe(g, sl, kurz, eintrag, fertig, zeigeWeg, mitUmplanen){
   const c = g.fuer, datum = deVon(tagDatum(kurz, c.ti));
+  // Ist schon eine Lösung eingeschaltet, ist der Fall gelöst — dann steht das oben, nicht die Lücke
+  const aktivL = eintrag.aenderungen.find(a => a.aktiv && a.fuer === c.id);
   const box = el(`<div class="lgruppe">
     <div class="problem"><b>${tagName(c.ti)}, ${datum}: ${esc(c.name)} fällt aus</b>
       <span>${esc(GRUND_NAME[c.grund] || "")} · geplant war ${hhmm(g.schicht.von)}–${hhmm(g.schicht.bis)}</span>
-      <p>${g.luecke.length ? `Ohne Ersatz ist <b>${spannenText(g.luecke)}</b> nicht richtig besetzt: ${esc(g.fehlt)}.`
+      <p>${aktivL && g.luecke.length ? `✓ Gelöst: ${esc(aktivL.titel || aktivL.text)}. Ohne Ersatz wäre ${spannenText(g.luecke)} offen.`
+        : g.luecke.length ? `Ohne Ersatz ist <b>${spannenText(g.luecke)}</b> nicht richtig besetzt: ${esc(g.fehlt)}.`
         : "Es entsteht keine Lücke — die übrige Besetzung reicht. Niemand muss einspringen."}</p>
       ${g.vergangen ? `<p class="hint">Der Tag ist vorbei — eine Lösung hier hält nur fest, wie es tatsächlich war.</p>` : ""}</div></div>`);
   if (!g.luecke.length) return box;
-  const aktivL = eintrag.aenderungen.find(a => a.aktiv && a.fuer === c.id);
-  if (!g.wege.length) box.appendChild(el(`<div class="note warn"><span class="ic">!</span><span>Am Tag ohne Regelverstoß nicht lösbar —
+  if (!g.wege.length && !aktivL) box.appendChild(el(`<div class="note warn"><span class="ic">!</span><span>Am Tag ohne Regelverstoß nicht lösbar —
     über mehrere Tage umplanen oder eine Ausnahme klären.</span></div>`));
   g.wege.forEach((w, n) => {
     if (zeigeWeg && !zeigeWeg(w)) return;
@@ -12239,7 +12465,8 @@ function loesungsGruppe(g, sl, kurz, eintrag, fertig, zeigeWeg, mitUmplanen){
     box.appendChild(karte);
   });
   // Über mehrere Tage: der Optimierer plant die Woche um, so wenig wie möglich anders
-  const merk = c.id + "|" + eintrag.aenderungen.filter(a => a.aktiv && a.fuer !== c.id).map(a => a.id).join(",");
+  // (mit dem Stand des Plans: ein „keine Lösung“ von gestern gilt nicht für einen geänderten Plan)
+  const merk = entwurfStand(sl) + "|" + c.id + "|" + eintrag.aenderungen.filter(a => a.aktiv && a.fuer !== c.id).map(a => a.id).join(",");
   const umplanen = el(`<button class="btn ghost small" type="button">Über mehrere Tage umplanen</button>`);
   const zeigeUmplanung = v => {
     const an = aktivL && aktivL.typ === "tage";
@@ -12438,6 +12665,7 @@ function assistentKarte(sl, kurz, eintrag, fertig){
     (erg.aus || []).forEach(id => aenderungAus(eintrag, id));
     eintrag.chat.push({wer: "du", text}, {wer: "assistent", text: erg.antwort, karten: erg.karten.map(a => a.id),
       still: (erg.still || []).map(a => a.id), knoepfe: erg.knoepfe || []});
+    eintrag.stand = entwurfStand(sl);          // ändert sich die Lage, beginnt das Gespräch neu (entwurfHolen)
     // Kürzen, aber nichts, woran noch eine eingeschaltete Karte hängt
     const ids = n => (n.karten || []).concat(n.still || []);
     while (eintrag.chat.length > 40 && !ids(eintrag.chat[0]).some(id => (eintrag.aenderungen.find(x => x.id === id) || {}).aktiv)) eintrag.chat.shift();
