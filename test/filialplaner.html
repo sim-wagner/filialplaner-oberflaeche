@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-18-7-test">
+<meta name="fassung" content="2026-11-18-8-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -6965,7 +6965,7 @@ const A_WORTE = new Set(("montag dienstag mittwoch donnerstag freitag samstag so
   + "anderer andere anderen anders lösung möglichkeit verhindert termin ausfall ausfallen vormittag vormittags nachmittag nachmittags "
   + "abend abends mittag mittags notiz besetzung lücke eingeplant eingeteilt gesund wieder ganzen ganzer ganze komplett leute personen "
   + "aushilfe azubi teilzeit vollzeit minijob filialleitung stellvertretung plan schicht frühschicht spätschicht laden kasse "
-  + "minuten halbe anderthalb zwei drei vier gleiche dasselbe genauso ebenfalls haus "
+  + "minuten halbe anderthalb zwei drei vier gleiche dasselbe genauso ebenfalls haus ging leiten leitet leitung aushilfen azubis versetzen versetzt "
   + "weiter vorschlag vorschläge vorschlägen lösungen nächste nächster nächsten passt anzeigen zeigen umplanen mehrere").split(" "));
 // Tippfehler werden nur zu diesen Wörtern hin verbessert — bei kurzen Alltagswörtern wäre es Raten
 const A_UNSCHARF = ("montag dienstag mittwoch donnerstag freitag samstag sonntag sonnabend übermorgen krank krankgeschrieben krankmeldung "
@@ -6983,8 +6983,11 @@ const A_STOPP = new Set(("der die das den dem des ein eine einen einem einer und
 /* Mundart, Umgangssprache und Kurzformen, wie sie am Telefon getippt werden (Training vom 18.11.2026:
    „dirk kann sa ned“, „hans heit krank“, „wer kan morgn“). Ganze Wörter, vor allem anderen. */
 const A_MUNDART = new Map(Object.entries({ned: "nicht", net: "nicht", nich: "nicht", heit: "heute", heut: "heute", morge: "morgen", morgn: "morgen",
-  isch: "ist", is: "ist", koi: "kein", koin: "keinen", koiner: "keiner", koine: "keine", kan: "kann", nix: "nichts", grad: "gerade",
-  ne: "eine", nen: "einen", nem: "einem", bissle: "etwas", bissl: "etwas", gell: "", halt: ""}));
+  isch: "ist", is: "ist", koi: "keine", koin: "keinen", koiner: "keiner", koine: "keine", kan: "kann", nix: "nichts", grad: "gerade",
+  ne: "eine", nen: "einen", nem: "einem", bissle: "etwas", bissl: "etwas", gell: "", halt: "",
+  // Training vom 18.11.2026 (4. Runde): Schwäbisch, Bairisch, Hessisch
+  kimmt: "kommt", kummt: "kommt", nit: "nicht", hot: "hat", hod: "hat", goht: "geht", schaffe: "arbeiten", vui: "viel",
+  dr: "der", schual: "schule", krankgschriebn: "krankgeschrieben", scho: "schon", neune: "9", zehne: "10", elfe: "11", zwölfe: "12"}));
 const A_TAGWORT = "montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|sonnabend|mo|di|mi|do|fr|sa";
 const A_ORDNUNG = {eins: 1, erste: 1, ersten: 1, erster: 1, erstes: 1, zwei: 2, zweite: 2, zweiten: 2, zweiter: 2, zweites: 2,
   drei: 3, dritte: 3, dritten: 3, dritter: 3, drittes: 3, 1: 1, 2: 2, 3: 3};
@@ -7101,9 +7104,22 @@ function aTage(t, mo){
   const sonntag = G(/\bsonntags?\b/).test(t);
   const andereWoche = G(/\b(nächste[nr]?|kommende[nr]?|übernächste[nr]?|letzte[nr]?|vorige[nr]?) woche\b/).test(t);
   t = t.replace(G(/\bheute (morgen|früh)\b/g), "heute").replace(G(/\bmorgen früh\b/g), "morgen");
+  // „26. November“ → „26.11.“; „vom 26. bis 28.“, „am 23. und 24.“ → mit dem Monat der Woche
+  const MONATE = ["januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember"];
+  t = t.replace(aNeu(`\\b(\\d{1,2})\\. ?(${MONATE.join("|")})\\b`, "g"), (_, d, m) => `${d}.${MONATE.indexOf(m) + 1}.`);
+  const mon = mo.getMonth() + 1;
+  t = t.replace(/(^|[\s(])(\d{1,2})\.(?=[\s,)-]|$)/g, (x, v, d) => `${v}${d}.${mon}.`);
+  const tagVon = (d, m) => { const x = new Date(mo); x.setMonth(+m - 1, +d); return Math.round((x - mo) / 864e5); };
+  const spanne = /\b(\d{1,2})\.(\d{1,2})\.\s*(?:-|bis(?: zum)?|und(?: am)?)\s*(\d{1,2})\.(\d{1,2})\./g;
+  while ((r = spanne.exec(t))){
+    const a = tagVon(r[1], r[2]), b = tagVon(r[3], r[4]), und = /und/.test(r[0]);
+    for (let k = Math.min(a, b); k <= Math.max(a, b); k++) if (!und || k === a || k === b) nimm(k);
+  }
+  t = t.replace(spanne, " ");
 
-  const bereich = aNeu(`\\b(${wort})\\b ?(?:-|bis(?: einschließlich| zum)?) ?\\b(${wort})\\b`, "g");
-  while ((r = bereich.exec(t))){ const a = index(r[1]), b = index(r[2]); for (let k = Math.min(a, b); k <= Math.max(a, b); k++) tage.add(k); }
+  const bereich = aNeu(`\\b(${wort}|heute|morgen|übermorgen)\\b ?(?:-|bis(?: einschließlich| zum)?) ?\\b(${wort})\\b`, "g");
+  const relTag = w => w === "heute" ? hi : w === "morgen" ? hi + 1 : w === "übermorgen" ? hi + 2 : index(w);
+  while ((r = bereich.exec(t))){ const a = relTag(r[1]), b = index(r[2]); for (let k = Math.min(a, b); k <= Math.max(a, b); k++) tage.add(k); }
   t = t.replace(bereich, " ");
   const ab = aNeu(`\\b(?:ab|seit) (${wort}|heute|morgen|übermorgen)\\b`).exec(t);
   const bis = aNeu(`\\bbis (?:einschließlich |einschl |inklusive |inkl |zum |am )?(${wort})\\b`).exec(t);
@@ -7136,9 +7152,28 @@ function aTage(t, mo){
 
 /* Uhrzeiten im Text → {von, bis} | {nurAb, nurBis} | {relativ: {art, min, ende}} | {dauer} */
 function aZeit(t){
-  t = t.replace(G(/\b\d{1,2}\.\d{1,2}\.(\d{2,4})?/g), " ").replace(G(/\bam \d{1,2}\.(?!\d)/g), " ");     // Datum ist keine Uhrzeit
+  t = t.replace(G(/\b\d{1,2}\.\d{1,2}\.(\d{2,4})?/g), " ").replace(G(/\b(am|vom|bis|zum|und|den) \d{1,2}\.(?!\d)/g), " ");     // Datum ist keine Uhrzeit
+  t = t.replace(G(/\bviertel nach (\d{1,2})\b/g), "$1:15").replace(G(/\b(?:viertel vor|dreiviertel) (\d{1,2})\b/g), (_, h) => `${h - 1}:45`)
+    .replace(G(/\bso lange wie (nötig|möglich)\b/g), "länger");
   t = t.replace(G(/\bhalb (\d{1,2})\b/g), (_, h) => `${h - 1}:30`).replace(G(/\b(ab|bis|um|gegen) mittags?\b/g), "$1 12");
+  // „9–17h“ ist eine Spanne, keine Dauer; „Ende 20 Uhr“ ein Ende; „geht es, dass …“ ist kein Gehen
+  t = t.replace(G(/(\d{1,2}(?::\d{2})?) ?- ?(\d{1,2}(?::\d{2})?) ?h\b/g), "$1-$2").replace(G(/\bende (\d)/g), "bis $1")
+    .replace(G(/\bgeht (es|das)\b/g), " ");
   t = t.replace(G(/(\d) ?h\b/g), "$1 stunden").replace(G(/(\d{1,2}) uhr (\d{2})\b/g), "$1:$2");
+  /* Ein Teil des Tages, der nicht geht: „kann vormittags nicht“ → ab 13, „abends nicht“ → bis 18,
+     „früh nicht“ → Spätschicht, „vor 10 nicht“ → ab 10, „ab 15 nicht mehr“ → bis 15 */
+  { const nein = "(?:nicht|nicht mehr)\\b";
+    const nv = aNeu(`\\b(?:nicht )?vor (\\d{1,2})(?:[:.](\\d{2}))? (?:uhr )?${nein}|\\bnicht vor (\\d{1,2})(?:[:.](\\d{2}))?`).exec(t);
+    if (nv) return {nurAb: (+(nv[1] || nv[3])) * 60 + (+(nv[2] || nv[4] || 0)), nurBis: null};
+    const nn = aNeu(`\\b(?:nach|ab) (\\d{1,2})(?:[:.](\\d{2}))? (?:uhr )?${nein}|\\bnicht nach (\\d{1,2})(?:[:.](\\d{2}))?`).exec(t);
+    if (nn){ const h = +(nn[1] || nn[3]); return {nurAb: null, nurBis: (h < 5 ? h + 12 : h) * 60 + (+(nn[2] || nn[4] || 0))}; }
+    if (aNeu(`\\b(vormittags?|vormittag)\\b(?: \\S+){0,3} ${nein}|\\b(vormittags?) (?:\\S+ ){0,2}(beim arzt|termin|arzttermin)`).test(t)) return {nurAb: 13 * 60, nurBis: null};
+    if (aNeu(`\\bnachmittags?\\b(?: \\S+){0,3} ${nein}`).test(t)) return {nurAb: null, nurBis: 13 * 60};
+    if (aNeu(`\\babends?\\b(?: \\S+){0,3} ${nein}`).test(t)) return {nurAb: null, nurBis: 18 * 60};
+    if (aNeu(`\\b(morgens|früh)\\b(?: \\S+){0,3} ${nein}`).test(t)) return {schicht: "spaet"};
+    if (aNeu(`\\bspät\\b(?: \\S+){0,3} ${nein}`).test(t)) return {schicht: "frueh"}; }
+  // „kommt nach dem Zahnarzt“, „kommt danach“, „erst nach der Kita“: später anfangen
+  t = t.replace(G(/\b(kommt|komme|kommen|kann) ((?:\S+ ){0,2})(erst )?(nach (dem|der|den)|danach)\b/g), "$1 $2später ");
   // „kann nicht bis zum Ende bleiben“ ist früher gehen; „erst mittags“ ab 12; „hängt eine Stunde dran“ ist länger
   t = t.replace(G(/\bnicht bis (?:zum )?(?:ende|schluss|ladenschluss)\b/g), "früher gehen").replace(G(/\berst mittags?\b/g), "ab 12")
     .replace(G(/\bhängt\b(.*?)\bdran\b/g), "bleibt$1länger").replace(G(/\bverlänger\S*/g), "länger")
@@ -7179,7 +7214,7 @@ function aZeit(t){
   const ab = aNeu(`\\b(?:ab|um|gegen)\\s*${z}`).exec(t);
   // „geht um 15“ ist ein Ende, „kommt um 9“ ein Anfang
   const ende = G(/\b(geht|gehen|feierabend|schluss|aufhören|hört auf|weg|los|ende)\b|keine zeit/).test(t);
-  if (bis) raus.nurBis = nachmittag(min(bis[1], bis[2]));
+  if (bis && +bis[1] <= 24) raus.nurBis = nachmittag(min(bis[1], bis[2]));
   if (ab){ if (ende && !bis) raus.nurBis = nachmittag(min(ab[1], ab[2])); else raus.nurAb = nachmittag(min(ab[1], ab[2])); }
   if (raus.nurAb === undefined && raus.nurBis === undefined){
     if (G(/\bvormittags?\b/).test(t)) raus.nurBis = 13 * 60;
@@ -7201,10 +7236,10 @@ const aHatZeit = z => !!z && (z.von !== undefined || (z.nurAb !== null && z.nurA
 function aGrund(t){
   // Das Kind ist krank, die Kita zu: die Person selbst ist nicht krank — sie kann nicht
   if (G(/\bkind (?:\S+ ){0,2}krank|\bkrankes kind\b|\bkita\b/).test(t)) return "nicht";
-  if (G(/\bkrank|krankgeschrieben|krankmeldung|krankenschein|erkältet|grippe|fieber|migräne|\barzt\b|attest|liegt flach|magen|verletzt|\bau\b|übergeben|gesundheitlich|fühlt sich (?:\S+ ){0,3}(nicht gut|schlecht|unwohl|krank)|(ist|wird) (\S+ ){0,1}(schlecht|übel)\b|unwohl|schwindel|kopfweh|kopfschmerz|bauchweh|bauchschmerz/).test(t)) return "krank";
+  if (G(/\bkrank|krankgeschrieben|krankmeldung|krankenschein|erkältet|grippe|fieber|migräne|\barzt\b|attest|liegt flach|magen|verletzt|\bau\b|übergeben|gesundheitlich|fühlt sich (?:\S+ ){0,3}(nicht gut|schlecht|unwohl|krank)|(ist|wird) (\S+ ){0,1}(schlecht|übel)\b|unwohl|schwindel|kopfweh|kopfschmerz|bauchweh|bauchschmerz|erkältung|kränk|gelbe[nr]? schein/).test(t)) return "krank";
   if (G(/urlaub|\bferien\b|frei genommen|freigenommen/).test(t)) return "urlaub";
   if (G(/berufsschule|\bschule\b|schultag|unterricht|klassenarbeit|\bbs\b/).test(t)) return "schule";
-  if (G(/kann nicht|kann (?:\S+ ){0,4}nicht|können nicht|fällt (?:\S+ ){0,3}aus|\bausfall\b|\bausfallen\b|nicht da\b|verhindert|termin\b|kommt nicht|schafft (?:\S+ ){0,3}nicht\b|nicht verfügbar|\bist (?:\S+ ){0,2}weg\b|erscheint (?:\S+ ){0,2}nicht\b|(zu ?hause|daheim) geblieben\b|bleibt (?:\S+ ){0,2}(zu ?hause|daheim)\b|ausgefallen|außer haus|fällt (?:\S+ ){0,3}weg\b|keine zeit\b|nicht (gekommen|erschienen)\b|\bwird (?:\S+ ){0,2}fehlen\b|sagt (?:\S+ ){0,3}ab\b|meldet sich (?:\S+ ){0,3}ab\b|kommt (?:\S+ ){0,3}nicht|\bfehlt\b|abgesagt|sagt ab|schafft es nicht|ist raus\b|nicht kommen|nicht arbeiten|\babsage\b|nicht (kann|kommt|könnte)\b|abgemeldet|meldet sich ab|vorstellungsgespräch|beerdigung|hochzeit|\bumzug\b|\bamt\b|behörde|\bgericht\b|\bkita\b/).test(t)) return "nicht";
+  if (G(/kann nicht|kann (?:\S+ ){0,4}nicht|können nicht|fällt (?:\S+ ){0,3}aus|\bausfall\b|\bausfallen\b|nicht da\b|verhindert|termin\b|kommt nicht|schafft (?:\S+ ){0,3}nicht\b|nicht verfügbar|\bist (?:\S+ ){0,2}weg\b|erscheint (?:\S+ ){0,2}nicht\b|(zu ?hause|daheim) geblieben\b|bleibt (?:\S+ ){0,2}(zu ?hause|daheim)\b|ausgefallen|außer haus|fällt (?:\S+ ){0,3}weg\b|keine?n? zeit\b|nicht (gekommen|erschienen)\b|\bfehlen\b|kommen (?:\S+ ){0,3}nicht\b|fallen (?:\S+ ){0,3}aus\b|können (?:\S+ ){0,3}nicht\b|gefehlt|\bist (?:\S+ ){0,3}weg\b|prüfung|fortbildung|schulung|seminar|lehrgang|\bwird (?:\S+ ){0,2}fehlen\b|sagt (?:\S+ ){0,3}ab\b|meldet sich (?:\S+ ){0,3}ab\b|kommt (?:\S+ ){0,3}nicht|\bfehlt\b|abgesagt|sagt ab|schafft es nicht|ist raus\b|nicht kommen|nicht arbeiten|\babsage\b|nicht (kann|kommt|könnte)\b|abgemeldet|meldet sich ab|vorstellungsgespräch|beerdigung|hochzeit|\bumzug\b|\bamt\b|behörde|\bgericht\b|\bkita\b/).test(t)) return "nicht";
   return null;
 }
 
@@ -7215,7 +7250,8 @@ function aGrund(t){
 function assistentVerstehen(text, mo, o){
   o = o || {};
   const roh0 = String(text || "").trim();
-  let roh = roh0.toLowerCase().replace(G(/[–—]/g), "-").replace(G(/\bo ?\+ ?g\b/g), "og").replace(G(/[,;!?()"„“”'…]/g), " ")
+  let roh = roh0.toLowerCase().replace(/<->|↔/g, " tauscht mit ").replace(/→|->/g, " auf ").replace(G(/[–—]/g), "-").replace(G(/\bo ?\+ ?g\b/g), "og")
+    .replace(G(/\b(ned|net|nit|nicht) do\b/g), "nicht da").replace(G(/\b(is|isch|ist) ((?:\S+ )?)do\s*\??\s*$/), "$1 $2da").replace(G(/[,;!?()"„“”'…]/g), " ")
     .replace(/([a-zäöüß])\s*\/\s*([a-zäöüß])/g, "$1 und $2").replace(/\//g, " ")          // „Eva/Hans“ sind zwei
     .replace(G(/\s+/g), " ").trim();
   // „Samstagnachmittag“, „Freitagabend“: Tag und Tageszeit getrennt — „Montagmorgen“ ist Montag früh, nicht morgen
@@ -7224,7 +7260,9 @@ function assistentVerstehen(text, mo, o){
     .replace(aNeu(`\\b(${A_TAGWORT}) morgen\\b`, "g"), "$1 früh");
   // Notiz: „Notiz Freitag: Aktionsware“ oder ohne Doppelpunkt „Notiz Do Kühlung defekt“
   const nt = G(/\b(?:notiz|notiere|notier|vermerk|hinweis|bemerkung|info|schreib|merk|trag|füg)\S*\b[^:]*:\s*(.+)$/i).exec(roh0)
-    || aNeu(`^\\s*(?:am |für )?(?:${A_TAGWORT}|heute|morgen|übermorgen)\\.?\\s*:\\s*(.+)$`, "i").exec(roh0)
+    || aNeu(`^\\s*(?:und )?(?:am |für )?(?:${A_TAGWORT}|heute|morgen|übermorgen)\\.?\\s*:\\s*((?:hinweis|info|notiz|bemerkung)\\b.+)$`, "i").exec(roh0)
+    || aNeu(`^\\s*und (?:am |für )?(?:${A_TAGWORT}|heute|morgen|übermorgen)\\.?\\s*:\\s*(.+)$`, "i").exec(roh0)
+    || aNeu(`^\\s*(?:am |für )?(?:${A_TAGWORT}|heute|morgen|übermorgen)\\.? (?:notiz|hinweis|info)\\b[\\s:–-]*(.+)$`, "i").exec(roh0)
     || aNeu(`\\b(?:notiz|notiere|notier|vermerk)\\b(?: für| am| zum)? ?(?:den |am )?(?:${A_TAGWORT}|heute|morgen|übermorgen)\\.?\\b:? (.+)$`, "i").exec(roh0);
   const notiz = nt && nt[1].trim() ? nt[1].trim() : null;
   const gruss = G(/^(hallo|hi|hey|moin|servus|guten (morgen|tag|abend)|danke|dankeschön|vielen dank|super|top|prima|perfekt|alles klar|passt|okay|ok|tschüs+|ciao|merci|thx|gute arbeit|klasse|bis (später|dann|morgen))\b/).test(roh);
@@ -7246,23 +7284,29 @@ function assistentVerstehen(text, mo, o){
   /* „will nach Hause“, „ist gegangen“, „während der Schicht“: jemand geht jetzt — heute, ab sofort
      (Training 18.11.2026: „fühlt sich während seiner Schicht nicht gut und will nach Hause“) */
   const heuteIndex = (() => { const h = new Date(); h.setHours(12, 0, 0, 0); return Math.round((h - mo) / 864e5); })();
-  const jetzt = leute.personen.length > 0 && !aHatZeit(zeit) && heuteIndex >= 0 && heuteIndex <= 5 && (!tage.length || (tage.length === 1 && tage[0] === heuteIndex))
+  // In der Vergangenheit erzählt („ist früher heim“, „hat Feierabend gemacht“) zählt auch mit einer Zeitangabe
+  const gegangen = G(/\bist (?:\S+ ){0,4}(heim|gegangen|heimgegangen|heimgefahren)\b|feierabend gemacht|schicht abgebrochen|\bging heim\b|krankenhaus|notaufnahme|krankenwagen|rettungswagen|\bverlässt (jetzt |gerade )?(die filiale|den laden)\b|\bist seit (\d{1,2})(?:[:.]\d{2})? (uhr )?weg\b/).test(ohneNamen);
+  const jetzt = leute.personen.length > 0 && (!aHatZeit(zeit) || gegangen) && heuteIndex >= 0 && heuteIndex <= 5 && (!tage.length || (tage.length === 1 && tage[0] === heuteIndex))
+    && (gegangen || G(/\b(ist|sind) (gerade |eben |schon |jetzt )?weg $|\bgeht (sofort|gleich (heim|nach ?hause))\b|\bsofort (los|weg|gehen)\b|abgebrochen|heimgefahren|nicht (mehr )?weiterarbeiten|\b(jetzt|sofort) auf\b|\bist (?:\S+ ){0,4}gegangen\b|nach ?hause geschickt/).test(ohneNamen) || (!tage.length && G(/\bist (gerade |eben |schon |jetzt )?weg\b/).test(ohneNamen))) || leute.personen.length > 0 && heuteIndex >= 0 && heuteIndex <= 5 && !aHatZeit(zeit) && (!tage.length || (tage.length === 1 && tage[0] === heuteIndex))
     && G(/\b(will|muss|möchte|geht|ging|darf|wollte|musste|soll) (?:\S+ ){0,3}(nach ?hause|heim)\b|\bnach ?hause (gegangen|gehen|geschickt|geht)\b|\bheim(gegangen|geschickt|gehen)\b|\bw[äae]h?rend (seiner|ihrer|der) sch|\bist (eben |gerade |schon )?gegangen\b|\bab (jetzt|sofort)\b|\bjetzt (gehen|weg|heim)\b|\b(muss|musste|will|wollte|möchte) (?:\S+ ){0,2}(los|weg|gehen)\b|\bfährt (?:\S+ ){0,2}heim\b|\bschick\S* (?:\S+ ){0,3}heim\b|\bbricht (?:\S+ ){0,3}ab\b|\b(wird|wurde) (?:\S+ ){0,2}abgeholt\b/).test(ohneNamen);
-  if (jetzt){ const n = new Date(); tage = [heuteIndex]; zeit = {nurAb: null, nurBis: Math.floor((n.getHours() * 60 + n.getMinutes()) / 15) * 15}; }
+  if (jetzt){
+    const n = new Date(), seit = G(/\bseit (\d{1,2})(?:[:.](\d{2}))?/).exec(ohneNamen);
+    tage = [heuteIndex]; zeit = {nurAb: null, nurBis: seit ? (+seit[1]) * 60 + (+(seit[2] || 0)) : Math.floor((n.getHours() * 60 + n.getMinutes()) / 15) * 15};
+  }
   // „von denen, die sowieso da sind“, „ohne jemanden, der frei hat“: Lösungen nur mit Mehrstunden der Anwesenden
-  const nurDa = G(/\bsowieso\b|\beh (da|schon)\b|\b(schon|bereits) da\b|\banwesend|die (eh |sowieso |schon |heute )?da sind|die (eh |sowieso |schon )?(arbeiten|im laden sind)\b|nicht frei (haben|hat)\b|\bohne (?:\S+ ){0,4}(frei hat|frei haben)\b|\bmehrstunden|mehr stunden (der|von)\b|länger (bleiben|machen|arbeiten)\b|aus dem frei\b|\bdie (?:\S+ ){0,2}eingeplant sind\b|extra kommen|\b(der|die) frei (hat|haben)\b|\bwer (kann|könnte) (?:\S+ ){0,3}länger\b|\b(der|die) (eh|sowieso|schon) (arbeitet|arbeiten|da ist)\b/).test(ohneNamen);
+  const nurDa = !(leute.personen.length && aHatZeit(zeit)) && G(/ohne zusätzlich|verlänger|vorhandene[nm]? (personal|leute)|ohne neue (schicht|leute)|\bkeine?r? extra\b|eingeplant\S* leute|\bschon eingeplant\b|ohne jemand\S* (zu )?(rufen|anrufen|holen)|\bvor ort\b|\bwer da ist\b|\bsowieso\b|\beh (da|schon)\b|\b(schon|bereits) da\b|\banwesend|die (eh |sowieso |schon |heute )?da sind|die (eh |sowieso |schon )?(arbeiten|im laden sind)\b|nicht frei (haben|hat)\b|\bohne (?:\S+ ){0,4}(frei hat|frei haben)\b|\bmehrstunden|mehr stunden (der|von)\b|länger (bleiben|machen|arbeiten)\b|aus dem frei\b|\bdie (?:\S+ ){0,2}eingeplant sind\b|extra kommen|\b(der|die) frei (hat|haben)\b|\bwer (kann|könnte) (?:\S+ ){0,3}länger\b|\b(der|die) (eh|sowieso|schon) (arbeitet|arbeiten|da ist)\b/).test(ohneNamen);
   // Welche Ware: Namen der Wochenaufgaben und ihre Kurzformen („Trocken“, „Kühl“, „TK“, „O+G“)
   const KURZ = {tro: ["trocken"], kue: ["kühl"], tk: ["tk", "tiefkühl"], ff: ["fleisch", "ff"], og: ["obst", "gemüse", "og"]};
   const waren = WAREN.filter(w => !w.gruppe && (state.aufgaben || {})[w.id] && state.aufgaben[w.id].aktiv
     && w.name.toLowerCase().split(G(/[^a-zäöüß]+/)).concat(KURZ[w.id] || []).some(x => x.length >= 2 && !["aufbau", "gelbe", "mappe", "und"].includes(x) && aNeu("\\b" + x).test(ohneNamen)))
     .map(w => w.id);
   // „Eva ist morgen früh krank“: mit einem Grund ist „früh“ die Tageszeit, keine Frühschicht
-  if (grund && zeit.schicht) delete zeit.schicht;
+  if (grund && zeit.schicht && !G(/\b(früh|spät|morgens)\b(?: \S+){0,3} nicht\b/).test(ohneNamen)) delete zeit.schicht;
   const t = ohneNamen;
   const teil = G(/\bganze[rn]? tag\b|\bden ganzen tag\b|\bkomplett\b|\bganztags\b|\bgar nicht\b/).test(t) ? "ganz"
     : G(/\bkommt später\b|\bspäter kommen\b|\berst später\b/).test(t) ? "spaeter" : G(/\bgeht früher\b|\bfrüher gehen\b|\bfrüher weg\b/).test(t) ? "frueher" : null;
   const pronomen = G(/\b(sie|er|ihn|ihm|ihr|ihre|seine|dieselbe|derselbe|die gleiche|der gleiche)\b/).test(t);
-  const zurueck = !jetzt && !G(/^ *wann\b/).test(ohneNamen) && G(/\bdoch nicht\b|\bwieder gesund\b|\bwieder da\b|\bwieder fit\b|\bkommt doch\b|\bkann doch\b|rückgängig|zurücknehmen|\bnimm\b.*\b(raus|zurück|weg)\b|\bstreich|\bvergiss\b|\blösch|war falsch|\birrtum\b|stimmt nicht|war ein fehler|\bzurück damit\b|\bmach das (wieder )?weg\b|\bvertan\b|falsch eingegeben|falsch eingetragen|\bdoch (kein|keine|keinen|wieder|da)\b|\b(kommt|ist|arbeitet|kann) (?:\S+ ){0,2}doch\b|\bzurück $|alten stand|\bzurück zum\b|\blass (das|es)( sein| weg| bleiben)? $|^ ?stopp?\b|wie vorher\b|\bundo\b|\bletzte[nr]? (änderung|eingabe|schritt)\b/).test(t);
+  const zurueck = !jetzt && !G(/^ *wann\b/).test(ohneNamen) && G(/\bdoch nicht\b|\bwieder gesund\b|\bwieder da\b|\bwieder fit\b|\bkommt doch\b|\bkann doch\b|rückgängig|zurücknehmen|\bnimm\b.*\b(raus|zurück|weg)\b|\bstreich|\bvergiss\b|\blösch|war falsch|\birrtum\b|stimmt nicht|war ein fehler|\bzurück damit\b|\bmach das (wieder )?weg\b|\bvertan\b|falsch eingegeben|falsch eingetragen|\bdoch (kein|keine|keinen|wieder|da)\b|\b(kommt|ist|arbeitet|kann) (?:\S+ ){0,2}doch\b|\bzurück $|alten stand|\bzurück zum\b|\blass (das|es)( sein| weg| bleiben)? $|^ ?stopp?\b|wie vorher\b|\bundo\b|\bletzte[nr]? (änderung|eingabe|schritt)\b|wieder rein\b|\bdoch zeit\b|nicht mehr krank|\b(hat|ist) (?:\S+ ){0,2}doch\b|ungeschehen|^ *zurück( bitte)? *$|stornier|\bups\b|nicht so gemeint|weg damit|raus damit|wollte ich nicht|wie geplant\b|\bdas letzte\b/).test(t);
   const hatLeute = leute.personen.length || leute.mehrdeutig.length;
   const hatTag = tage.length > 0;
   const verb = G(/\b(arbeitet|arbeiten|kommt|kommen|bleibt|bleiben|geht|gehen|fängt|anfangen|schluss|feierabend|länger|früher|später|kürzer|macht|machen)\b/).test(t);
@@ -7272,9 +7316,10 @@ function assistentVerstehen(text, mo, o){
   const plus = (a, n) => { p[a] = (p[a] || 0) + n; };
   const mind = (a, n) => { p[a] = Math.max(p[a] || 0, n); };       // weiteres Zeichen für dieselbe Absicht — zählt nicht doppelt
   // Hilfe — mit einem Namen ist „Hilfe, Eva kommt heute nicht“ ein Hilferuf zur Sache, keine Frage nach der Bedienung
-  if (G(/\bhilfe\b|was kannst du|was du kannst|wie geht das|wie funktionier|\bbeispiele?\b|was (kann|darf|soll) ich (dich |hier |alles )?(fragen|schreiben|sagen)|weiß nicht weiter|wobei hilfst|was verstehst du|wie rede ich|kannst du mir helfen|was geht hier|\bbefehle\b|\banleitung\b|was mach ich hier|assistent|wie du funktionierst|^ ?hilf (mir|uns) $|^ ?wie geht (tag|man|ein|eine)\b/).test(t)) plus("hilfe", hatLeute ? 2 : 10);
+  if (G(/\bhilfe\b|was kannst du|was du kannst|wie geht das|wie funktionier|\bbeispiele?\b|was (kann|darf|soll) ich (dich |hier |alles )?(fragen|schreiben|sagen)|weiß nicht weiter|wobei hilfst|was verstehst du|wie rede ich|kannst du mir helfen|was geht hier|\bbefehle\b|\banleitung\b|was mach ich hier|assistent|\bmit dir\b|wie du funktionierst|^ ?hilf (mir|uns) $|^ ?wie geht (tag|man|ein|eine)\b/).test(t)) plus("hilfe", hatLeute ? 2 : 10);
   // „Wie suche ich einen Ersatz?“, „Wie wähle ich einen Vorschlag?“ — eine Frage nach der Bedienung, kein Auftrag
-  else if (!hatLeute && !hatTag && G(/^ ?wie (gebe|suche|schreibe|nehme|sehe|wähle|trage|mache|ändere|tausche|lösche|finde|bekomme|stelle|lege|benutze|bediene|nutze|plane) ich\b/).test(t) && !G(/gültig|entwurf|kasse|pause|aufgabe/).test(t)) plus("hilfe", 10);
+  else if (!hatLeute && !hatTag && G(/^ ?wie (gebe|suche|schreibe|nehme|sehe|wähle|trage|mache|ändere|tausche|lösche|finde|bekomme|stelle|lege|benutze|bediene|nutze|plane|frage) ich\b/).test(t) && !G(/gültig|entwurf|kasse|pause|aufgabe|weiter\b|lücke/).test(t)) plus("hilfe", 10);
+  else if (!hatLeute && !hatTag && G(/^ *wie geht (?!es\b)\S+( \S+)? *$|^ *was kann ich bei\b/).test(t)) plus("hilfe", 10);
   else if (!hatLeute && !hatTag && G(/^ ?was (heißt|bedeutet)\b/).test(t)) plus("hilfe", 10);
   // Fragen zur Bedienung („Wie trage ich Urlaub ein?“) verlieren gegen ein Anliegen, das sich gleich erledigen lässt
   else if (!hatLeute && !hatTag && G(/^ ?wie (kann|muss|soll|mache|trage|benutze|bediene|nutze|ändere|lösche)\b/).test(t)) plus("hilfe", 7.5);
@@ -7287,7 +7332,7 @@ function assistentVerstehen(text, mo, o){
   // Tausch zweier Personen — oder eine Person wechselt den Tag („Dirk Do statt Mi“, „Dirk Mi auf Do verschieben“)
   const dafuer = G(/\bdafür\b|\bstattdessen\b/).test(t);
   const tagWechsel = leute.personen.length === 1 && tage.length === 2 && !aHatZeit(zeit) && (!grund || (grund === "nicht" && dafuer))
-    && G(/\bstatt\b|\bauf\b|\bgegen\b|tausch|verschieb|verleg|\bwechsel|\bals\b|\bdafür\b|\bstattdessen\b/).test(t);
+    && G(/\bstatt\b|\bauf\b|\bgegen\b|tausch|verschieb|verleg|\bwechsel|\bals\b|\bdafür\b|\bstattdessen\b|\bsondern\b|\blieber\b|\bmit\b/).test(t);
   if (tagWechsel) plus("tausch", 9);
   else if (G(/tausch|\bwechseln\b.*\bmit\b|\bstatt\b|umgekehrt/).test(t) || (leute.personen.length >= 2 && G(/\bwechseln\b/).test(t))) plus("tausch", leute.personen.length >= 2 ? 9 : 6);
   const ja = !grund && leute.stellen.has(1);
@@ -7302,14 +7347,17 @@ function assistentVerstehen(text, mo, o){
       || (hatLeute && !grund && G(/^ *(schicht|dienst|zeiten|diese woche) *$/).test(t))) plus("wer", 8);
   // „den Plan übernehmen“ ist der Abschluss, kein Einspringen
   const planUebernehmen = G(/\bübernehme?n?\b.*\b(plan|entwurf)\b|\b(plan|entwurf)\b(?: \S+){0,3} übernehme?n?\b/).test(t);
-  if (!planUebernehmen && G(/\bwer kann\b|\bwer (hat|hätte) (?:\S+ ){0,6}zeit\b|\bwer könnte\b|\bwer springt\b|ersetz|vertret|einspring|übernehm|übernimm|\bersatz\b|aushelfen|\b(brauche?n?|bräuchte|benötige|benötigen|suche|suchen) (?:\S+ ){0,5}(jemand|wen\b|einen\b|eine\b|ersatz)|jemand(en)? (finden|suchen|für)|\b(kann|könnte) jemand\b|\b(hat|hätte) (noch )?jemand (?:\S+ ){0,4}zeit\b|lücke (füllen|schließen|stopfen)|\bwer noch\b.*\bkann\b|vertritt|\bspringt (?:\S+ ){0,4}ein\b|verstärkung|\bwer (hat|hätte) (?:\S+ ){0,6}lust\b|\bfehlt (?:\S+ ){0,2}(jemand|einer|wen|wer)\b/).test(t)
+  if (!planUebernehmen && G(/\bwer kann\b|\bwer (hat|hätte) (?:\S+ ){0,6}zeit\b|\bwer könnte\b|\bwer springt\b|\bersetz|vertret|einspring|übernehm|übernimm|\bersatz\b|aushelfen|\b(brauche?n?|bräuchte|benötige|benötigen|suche|suchen) (?:\S+ ){0,5}(jemand|wen\b|einen\b|eine\b|ersatz)|jemand(en)? (finden|suchen|für)|\b(kann|könnte) jemand\b|\b(hat|hätte) (noch )?jemand (?:\S+ ){0,4}zeit\b|lücke (füllen|schließen|stopfen)|\bwer noch\b.*\bkann\b|vertritt|\bspringt (?:\S+ ){0,4}ein\b|verstärkung|\bwer (hat|hätte) (?:\S+ ){0,6}lust\b|\bfehlt (?:\S+ ){0,2}(jemand|einer|wen|wer)\b/).test(t)
       || (!grund && G(/^ *jemand\b/).test(t) && !G(/\bander/).test(t))) plus("ersatz", 8);
   // „wer kommt Dienstag für Hans“, „Hans für Fritz Mo“, „wer macht die Schicht von Carla“: für jemanden — ein Ersatz
   const fuerPerson = leute.orte.some(x => woerter[x.pos - 1] === "für");
   if ((fuerPerson && (leute.orte.length >= 2 || G(/\bwer\b|\bjemand|\bwen\b/).test(t)))
       || G(/\b(wer|macht|mach|übernimmt|übernehmen)\b(?: \S+){0,3} schicht von\b|\banstelle von\b/).test(t)) mind("ersatz", 9);
-  if (G(/konto|stundenstand|plusstunden|wochenstunden|arbeitszeit von\b|soll und ist|\bplus\b|\bminus\b|\bsaldo\b|\bwie viel hat\b|(über|unter) (dem )?soll\b|\bwie voll\b|\büberstunden\b|\bminusstunden\b|wie viele? stunden|\bstunden hat\b|\bstunden von\b|\bkonten\b|wie viel (darf|kann|soll) (?:\S+ ){0,3}arbeiten/).test(t)
-      || (hatLeute && !aHatZeit(zeit) && zeit.dauer === undefined && G(/\bstunden\b|\bstd\b/).test(t))) plus("konto", 8);
+  if (G(/konto|stundenstand|plusstunden|wochenstunden|arbeitszeit von\b|soll und ist|konten|vertragsstunden|wochenarbeitszeit|prozent|\b(das|vom|dem|zum) soll\b|\bsoll von\b|\bsaldo\b|\bwie viel hat\b|(über|unter) (dem )?soll\b|\bwie voll\b|\büberstunden\b|\bminusstunden\b|wie viele? stunden|\bstunden hat\b|\bstunden von\b|\bkonten\b|wie viel (darf|kann|soll) (?:\S+ ){0,3}arbeiten/).test(t)
+      || (!grund && G(/\bplus\b|\bminus\b/).test(t))
+      || (hatLeute && !aHatZeit(zeit) && zeit.dauer === undefined && G(/stunden\b|\bstd\b|^ *ist (?:\S+ ){0,3}voll\b/).test(t))) plus("konto", 8);
+  // „wer hat die meisten Überstunden?“, „wer muss noch Stunden machen?“ — eine Frage nach den Konten
+  if (G(/\bwer (hat|muss|kann|liegt|ist) (?:\S+ ){0,3}(stunden|überstunden|minusstunden|minus|plus|soll)\b/).test(t) && !G(/abbau|sparen|kürzen|\d stunden/).test(t)) mind("konto", 10);
   // „Hans kann auch nicht“ setzt etwas fort — das ist ein Nein zu einem Vorschlag, kein neuer Ausfall
   if (G(/\b(keiner|keine|niemand|nein|nö|nee)\b|leider nicht|\bgeht nicht\b|klappt nicht|können (?:\S+ ){0,2}nicht|\bauch nicht\b|will nicht|wollen nicht|hat abgesagt|haben abgesagt|lieber nicht/).test(t))
     plus("nein", G(/\bauch nicht\b/).test(t) ? 9 : hatLeute && grund && !G(/\bkeiner\b|\bniemand\b/).test(t) ? 3 : 7);
@@ -7332,7 +7380,7 @@ function assistentVerstehen(text, mo, o){
   if (hatTag && !hatLeute && G(/\bschlägst du\b|\bschlag (?:\S+ ){0,3}vor\b/).test(t)) mind("vorschlag", 9);
   // „was mach ich jetzt am Samstag“, „hast du eine Idee für Donnerstag?“, „der Freitag passt nicht, was nun?“
   if (hatTag && !hatLeute && G(/\bwas (mach|mache|machen|tu|tue|tun) (ich|wir|man)\b|\bwas (kann|soll|könnte) (ich|man|wir)(?: \S+){0,3} (machen|tun)\b|\bwas tun\b|\bidee\b|(bekomme?n?|kriege?n?) (?:\S+ ){0,3}voll\b|\bhilf (mir|uns)\b|\bdas beste\b|\bwas nun\b|\bpasst nicht\b/).test(t)) mind("vorschlag", 8);
-  if (weitere || G(/\bsonst\b|andere[nrs]? (möglichkeit|lösung|weg|idee|vorschl|variante|option)|\balternativ|jemand anders|jemand anderes|\bwer noch\b|\bwer sonst\b|\bnoch (jemand|wer|was|eine|einen)\b|\bweitere\b|was (geht|ginge) noch|wie (geht|ginge) es|anders lösen|\banders\b/).test(t)) plus("sonst", 7);
+  if (!(hatLeute && aHatZeit(zeit)) && !G(/\bals sonst\b/).test(t) && (weitere || G(/andere[nrs]? (person|kombination|leute)|\bnoch andere\b|weiter (suchen|leute|personen)|nächste möglichkeit|\bplan b\b|mehr ideen|\bsonst\b|andere[nrs]? (möglichkeit|lösung|weg|idee|vorschl|variante|option)|\balternativ|jemand anders|jemand anderes|\bwer noch\b|\bwer sonst\b|\bnoch (jemand|wer|was|eine|einen)\b|\bweitere\b|was (geht|ginge) noch|wie (geht|ginge) es|anders lösen|\banders\b/).test(t))) plus("sonst", 7);
   if (grund) plus("ausfall", hatLeute ? 8 : 6);
   if ((G(/\bfrei\b|freigeben|soll nicht arbeiten|nicht einplanen|rausnehmen|aus dem plan|\bdarf (?:\S+ ){0,3}(zu ?hause|daheim) bleiben/).test(t) || (hatLeute && G(/\braus\b/).test(t) && !G(/\bwieder\b|\bnimm\b|\bfällt\b/).test(t)))
       && zeit.von === undefined && grund !== "urlaub") plus("frei", 7);
@@ -7351,7 +7399,7 @@ function assistentVerstehen(text, mo, o){
   else if (G(/\bpause/).test(t) && G(/verschieb|\bneu\b|anders|\blegen\b|überschneid|tausch|später|früher|anpass|verteil|entzerr|schlecht|optimier|ändern|gleichzeitig|\beng\b|korrigier|passen nicht/).test(t)) plus("pausen", 8.5);
   const aufgabeGenannt = aufgabenWorte().some(w => G(new RegExp("\\b" + w)).test(t));
   // „das Obst ist zu spät dran“: die Aufgabe liegt zu spät — nicht die Lieferung
-  const aufgabeSpaet = G(/zu spät (dran|eingeräumt|fertig)\b|nicht rechtzeitig/).test(t);
+  const aufgabeSpaet = G(/zu spät (dran|eingeräumt|fertig|verräumt|eingeplant)\b|nicht rechtzeitig/).test(t);
   if ((G(/\baufgabe/).test(t) && G(/\bneu\b|verschieb|verteil|\blegen\b|zu spät|zu früh|\bfrist|anpass|passen nicht|zeitfenster|korrigier|(stimmen|passen) (?:\S+ ){0,2}nicht\b|ändern/).test(t))
       || (aufgabeGenannt && G(/zu spät|zu früh|\bfrist|verschieb|\bneu\b/).test(t)) || aufgabeSpaet) plus("aufgaben", aufgabeSpaet ? 11 : 9);
   // Einen gezeigten Vorschlag nehmen: „nimm den zweiten“, „Vorschlag 2“, „nimm Hans“, „Hans macht das“
@@ -7372,6 +7420,61 @@ function assistentVerstehen(text, mo, o){
   if (!jetzt && (!hatLeute || G(/\b(sparen|einsparen)\b/).test(t)) && G(/\bwo (?:\S+ ){0,3}(sparen|spare|kürzen|einsparen)\b|\bspare (ich|wir)\b|\bluft\b|nicht so viele|zu teuer|personalkosten|stunden runter|schlanker|budget|\bkürzen\b|weniger stunden|zu viele (da|eingeplant)\b|zu voll|personal (reduzier|abbau|kürz)|\b(einer|jemand) (?:\S+ ){0,3}(früher|eher) (gehen|heim)|\bstunden?\b(?: \S+){0,3} (sparen|einsparen|kürzen|streichen|reduzieren|abbauen|wegfallen|weg)\b|\b(sparen|einsparen|kürzen|reduzieren|streichen)\b(?: \S+){0,3} stunden?\b|zu viele (stunden|leute|personen)|zu viel personal|überbesetz|\bwer (kann|könnte|darf) (?:\S+ ){0,3}(früher|eher) (gehen|heim|nach ?hause)|ohne dass (etwas|was) fehlt|\bheim ?schicken|nach ?hause schicken|nicht (zwingend|unbedingt|wirklich) (gebraucht|nötig|notwendig)|überflüssig/).test(t)) plus("sparen", 9);
   if (!aufgabeSpaet && (waren.length || G(/ware\b|\bwaren\b|lieferung|\blkw\b|\blaster\b|anlieferung|spedition|lieferverzug|\bfahrer\b/).test(t))
       && G(/(ware|lieferung|\blkw)\S*(?: \S+){0,4} später\b|\b(kommt|kommen|ist|sind|wird|werden)\b(?: \S+){0,6} (später|zu spät|verspätet|noch nicht (da|gekommen|geliefert)|erst (um|ab|gegen|nach))\b|verspätung|verspätet|später geliefert|noch nicht (da|gekommen|geliefert)\b|verzöger|verzug|\bstau\b|pünktlich|\berst (um|ab|gegen|nach|in|mittags?|nachmittags?)\b|keine ware|ware (?:\S+ ){0,2}nicht da\b/).test(t)) plus("lieferung", 10);
+  /* ---- Training vom 18.11.2026, vierte Runde (Tests/daten/saetze-runde4.js) ---- */
+  const frageZeichen = /\?\s*$/.test(roh0);
+  // Ja/Nein-Fragen: „ist Bernd Montag früh?“, „Hans Dienstag da?“, „hat Dirk am Dienstag frei?“
+  if (frageZeichen && leute.personen.length === 1 && !grund && !G(/jemand|einspring|\bfür\b|möglich|\bok\b|okay|stunden|konto|\bplus\b|\bminus\b|\bsoll\b|\bvoll\b|\bwarum|\bwieso|zurück|\bdoch\b/).test(t)
+      && (["ist", "hat", "kommt", "arbeitet", "muss", "steht"].includes(woerter[0])
+        || G(/^ *(?:am )?(?:\S+ )?(da|eingeplant|eingeteilt|im plan|dran) *$/).test(t))) mind("wer", 10);
+  // „wer ist Freitag um 18 Uhr da?“ — fragt, wer arbeitet, nicht nach einer neuen Zeit
+  if (G(/^ *wer (ist|sind|arbeitet|hat|steht|kommt|macht)\b/).test(t) && !G(/\bkann\b|\bkönnte\b|einspring|übernimm|ersatz|\blust\b|\bzeit\b|\bfür\b|stunden|\bsitzt\b|schicht von/).test(t)) mind("wer", 9);
+  // Ersatz: „wer kommt dafür?“, „wen kann ich fragen?“, „wer rein?“, „wer statt Hans“, „wer darf schließen?“
+  if ((grund && hatLeute && G(/\bwer (kommt|kann|macht|übernimmt|könnte|springt)\b|\bwen (kann|könnte) ich\b/).test(t))
+      || G(/\bwer (?:\S+ ){0,3}(kommen|einspringen|arbeiten|aushelfen) (kann|könnte)\b|\bwer rein\b|\bwer statt\b|\bwer darf\b(?! früher)|\bwer (?:\S+ ){0,5}schicht von\b/).test(t)
+      || (fuerPerson && G(/welche|kommen|könnte|\bkann\b/).test(t))) mind("ersatz", 9);
+  if (fuerPerson && G(/\bwer\b/).test(t)) mind("ersatz", 11);              // „wer macht die Spätschicht für Hans?“
+  // Nein zu Vorschlägen
+  if (G(/^ *(der|die|das) (kann|will|geht) nicht\b|\bgeht so nicht\b|kann ich nicht nehmen|nicht in frage|auf keinen fall|\bscheidet aus\b/).test(t)
+      || (hatLeute && G(/\bbitte nicht\b|^ *nicht mit *$|\bgeht nicht\b/).test(t))) mind("nein", 9);
+  // Einen Vorschlag mit Namen nehmen: „der Vorschlag mit Bernd“, „Carla ist gut“, „dann Hans“
+  if (leute.personen.length === 1 && !grund && !hatTag && !aHatZeit(zeit)
+      && G(/\b(vorschlag|lösung|variante|karte) mit *$|^ *ist gut *$|^ *geh mit *$|^ *dann *$|^ *passt *$|\bnehm\b|entscheide/).test(t)) mind("waehlen", 9.5);
+  // Kasse, Pausen, Aufgaben in weiteren Worten
+  if (G(/\bkasse|kassier/).test(t) && G(/glätt|optimier|\bwer sitzt\b/).test(t)) mind("kasse", 9);
+  if (G(/\bpause/).test(t) && (G(/übereinander|staffel|\bleer\b|umleg|schieb|entflecht|auseinander|nacheinander|umsortier|sinnvoll|versetz|\bplan|reihenfolge/).test(t) || G(/^ *und (die )?pausen?\b/).test(t))) mind("pausen", 9);
+  if (!p.lieferung && ((G(/\baufgabe/).test(t) && G(/falsch|umleg|nach vorne|früher|einplan|einhalt|überschritten|zeitlich/).test(t))
+      || ((aufgabeGenannt || waren.length) && G(/zu spät|zu früh|falsch|nicht rechtzeitig|außerhalb/).test(t) && !G(/\b(kommt|kommen|wird|werden|geliefert|lieferung)\b/).test(t)))) mind("aufgaben", 9.5);
+  // Stunden sparen in weiteren Worten; jemanden heimschicken
+  if (!jetzt && (!hatLeute || G(/\b(sparen|einsparen)\b/).test(t)) && !G(/kasse|pause/).test(t) && G(/\bwo (?:\S+ ){0,5}(sparen|spare|kürzen|einsparen)\b|nicht (brauchen|gebraucht)|zu lang\b|zu viel (eingeplant|personal|stunden)|zu viele? stunden|stunden (?:\S+ ){0,2}zu (hoch|viel)|stunden los\b|weniger (personal|leute)|stunden (optimier|reduzier)|\b(jemand|einer|wer) (?:\S+ ){0,3}(früher|eher) (gehen|heim|schluss|weg|nach)|wenig los|\bschick\S* (?:\S+ ){0,3}heim\b|früher abmelden|nicht alle\b|überflüssig|nach ?hause schicken|früher (nach ?hause|heim)/).test(t)) mind("sparen", 9.5);
+  if (p.sparen && p.zurueck) p.zurueck = 0;                                   // „Stunden streichen“
+  // Ware kommt später in weiteren Worten
+  if ((waren.length || G(/ware\b|\bwaren\b|lieferung|\blkw\b|anlieferung|spedition|palette/).test(t)) && !aufgabeSpaet
+      && G(/verschiebt|nach plan|\bspäter\b|verspätet|verzöger|(kommt|kommen|wird) (?:\S+ ){0,4}(gegen|erst) (\d|mittag)|\berst (um|ab) \d/).test(t)
+      && !hatLeute) mind("lieferung", 10);
+  // Wo ist eine Lösung hin?
+  if (!hatLeute && G(/finde (?:\S+ ){0,3}(vorschl|lösung|karte)\S* nicht\b|(vorschl|lösung|karte)\S* fehlen\b|wo (sind|ist) (meine |die )?karten?\b|wo (landet|bleibt|bleiben)\b|wohin (ist|sind)\b|\balte lösung\b/).test(t)) mind("wohin", 10);
+  // Den Entwurf übernehmen oder verwerfen
+  if (!hatLeute && !hatTag && G(/(das|es) so übernehmen|so übernehmen|übernimm (den |das )?(plan|entwurf)|\bentwurf (anwenden|weg|speichern|gültig)|änderungen (übernehmen|speichern)|vergiss (den |das )?(entwurf|plan)|\bplan ist fertig\b|^ *fertig machen|wie verwerfe|nicht behalten/).test(t)) mind("abschluss", 11);
+  // Was ist noch offen? / Vorschläge ohne Tag
+  if (!hatLeute && G(/nicht gelöst|steht noch aus|baustelle|zu erledigen|offenen punkte|unbesetzt|\bwarnungen\b|noch probleme|welche probleme|wo hakt|noch ran\b|noch lücken/).test(t)) mind("offen", 9);
+  if (!hatLeute && !G(/\bander|\bmehr\b|\bweiter\S* (vorschl|leute|möglich|idee|option|lösung)|\bnoch\b/).test(t) && G(/schlägst du|\bideen?\b|empfiehlst|empfehlung|rätst|was soll ich tun|was (kann|könnte) man (da )?(machen|tun)|wie mache ich weiter|lücke zu\b|beste lösung|deine lösung|einen vorschlag|^ *lösung *$|vorschläge *$/).test(t)) mind("vorschlag", 9);
+  // Frei in weiteren Worten
+  if (hatLeute && G(/freiwunsch|gleittag|frei ?nehmen|freinehmen|(möchte|will) (?:\S+ ){0,3}nicht arbeiten\b|beantragt (?:\S+ )?frei|bittet um (?:\S+ )?frei|frei (bekommen|haben|sein|geht)\b|gerne? (mal )?frei\b|einen freien tag/).test(t) && grund !== "urlaub" && !G(/\bwer\b/).test(t)) mind("frei", 9.5);
+  // Die Woche neu verteilen
+  if (!grund && G(/optimier\S* (?:\S+ ){0,2}woche|wochenplan|verteil\S* (?:\S+ ){0,3}neu\b|anders aufteil|neu einteil|\bplan\S* (?:\S+ ){0,4}neu\b|mehrere tage|neue verteilung|woche neu\b|neu (planen|berechnen|erzeugen|ordnen|durch)|umstellen|berechne/).test(t) && !G(/pause|kasse|aufgabe/).test(t)) mind("umplanen", 9);
+  // Gruß und Dank
+  if (!Object.keys(p).length && G(/^(cool|vielen|tausend dank|das hilft|spitze|sehr gut|danke\S*|läuft|schönen|prima|super|klasse)\b/).test(roh)) p.gruss = 1;
+  // Eine andere Zeit mit Grund („kommt wegen Arzt erst um 10“, „hat um 9 Arzt und kommt danach“): die Zeit zählt
+  const terminGrund = grund && !G(/\bkrank|krankgeschrieben|fieber|grippe|erkältet|übel|schlecht|verletzt/).test(t);
+  if (hatLeute && terminGrund && p.zeit && p.ausfall && aHatZeit(zeit)) p.zeit = Math.max(p.zeit, p.ausfall + 1);
+  // ungesehene Sätze der vierten Runde
+  if (G(/schicht von (?:\S+ )?die von\b/).test(t)) mind("tausch", 11);          // „nimmt die Schicht von Gina, Gina die von Fritz“
+  if (G(/stunden(übersicht|zahl)/).test(t)) mind("konto", 9);
+  if (!hatLeute && G(/was würdest du|kriege (?:\S+ ){0,3}hin\b/).test(t)) mind("vorschlag", 9);
+  if (G(/gäbe es noch|mit den anderen\b/).test(t)) mind("sonst", 9);
+  if (leute.personen.length === 1 && !grund && !hatTag && G(/^ *wähl/).test(t)) mind("waehlen", 9.5);
+  if (G(/\bwer (?:\S+ ){0,5}\S*schicht von\b/).test(t)) mind("ersatz", 11);
+  if (!hatLeute && !jetzt && G(/\beinsparen\b|\bspar\b|haben wir zu viele\b|\bwer (geht|kann|darf|will) (?:\S+ ){0,2}(früher|eher)\b|früher feierabend für jemand/).test(t) && !G(/\bmit dir\b|kasse|pause/).test(t)) mind("sparen", 9.5);
   if (jetzt) plus("zeit", 10);
   // Ein Ersatz-Satz mit Grund („Wer kann für Eva einspringen, sie ist krank“) bleibt eine Frage nach Ersatz
   if (p.ersatz && p.ausfall) p.ausfall -= 3;
@@ -7395,8 +7498,14 @@ function assistentVerstehen(text, mo, o){
   // Nur Angaben, sonst nichts: „und am Freitag?“, „Hans auch“, „Dienstag“
   const restText = (" " + woerter.map((w, n) => leute.stellen.has(n) ? "" : aKanon(w)).join(" ") + " ")
     .replace(G(/\d{1,2}([:.]\d{2})?|\d{1,2}\.\d{1,2}\./g), " ")
-    .replace(aNeu(`\\b(${A_TAGE.map(x => x.join("|")).join("|")}|heute|morgen|übermorgen|und|auch|am|an|dann|bitte|für|den|die|der|das|noch|doch|aber|lieber|nur|so|was ist mit|wie sieht es|aus|mit|ist|uhr|bis|ab|von|um|genauso|ebenfalls|gleiche|dasselbe|ganze[rn]? tag|ganze[rn]? woche|kommt später|geht früher|stunden?|minuten|eine|halbe|zwei|drei|\\-|\\?)\\b`, "g"), " ").trim();
-  const nurAngaben = !restText && !!(hatLeute || tage.length || aHatZeit(zeit) || zeit.dauer !== undefined || teil);
+    .replace(aNeu(`\\b(${A_TAGE.map(x => x.join("|")).join("|")}|heute|morgen|übermorgen|und|auch|am|an|dann|bitte|für|den|die|der|das|noch|doch|aber|lieber|nur|so|ich|meinte|meine|gemeint|eigentlich|was ist mit|wie sieht es|aus|mit|ist|uhr|bis|ab|von|um|genauso|ebenfalls|gleiche|dasselbe|ganze[rn]? tag|ganze[rn]? woche|kommt später|geht früher|stunden?|minuten|eine|halbe|zwei|drei|\\-|\\?)\\b`, "g"), " ").trim();
+  let nurAngaben = !restText && !!(hatLeute || tage.length || aHatZeit(zeit) || zeit.dauer !== undefined || teil);
+  /* Richtigstellungen: „nein, zwei Stunden“, „nicht Eva, Hans“ — das Letzte, mit der neuen Angabe */
+  if (["nein", "nee", "nö"].includes(woerter[0]) && !restText.replace(aNeu("^(nein|nee|nö)\\b"), "").trim()
+      && (tage.length || aHatZeit(zeit) || zeit.dauer !== undefined || hatLeute)){ absicht = null; nurAngaben = true; }
+  if (woerter[0] === "nicht" && leute.orte.length === 2 && leute.orte[0].pos === 1 && restText === "nicht"){
+    personen = [leute.orte[1].name]; absicht = null; nurAngaben = true;
+  }
   if (gruss && !absicht && !nurAngaben) absicht = "gruss";
   if (G(/^(bis (später|dann|morgen|bald)|tschüs+|ciao)$/).test(roh)) absicht = "gruss";
   // Tage in der Reihenfolge des Satzes — „Do statt Mi“ und „Mi auf Do“ unterscheiden sich nur darin
@@ -7520,7 +7629,7 @@ function assistent(text, sl, kurz, eintrag, vorgabe){
   if (v.nurDa) k.nurDa = true;
 
   // ---- Rahmen: neue Absicht, Antwort auf eine Rückfrage oder Fortsetzung des Letzten ----
-  let f = {absicht: v.absicht, personen: v.personen, helfer: v.helfer || [], tage: v.tage, zeit: v.zeit, grund: v.grund, teil: v.teil, notiz: v.notiz, waren: v.waren || [], nurDa: !!v.nurDa};
+  let f = {absicht: v.absicht, personen: v.personen, helfer: v.helfer || [], tage: v.tage, zeit: v.zeit, grund: v.grund, teil: v.teil, notiz: v.notiz, waren: v.waren || [], nurDa: !!v.nurDa, nummer: v.nummer};
   const angaben = alt => ({absicht: alt.absicht, helfer: v.helfer && v.helfer.length ? v.helfer : alt.helfer || [],
     waren: (v.waren || []).length ? v.waren : alt.waren || [],
     personen: v.personen.length ? v.personen : alt.personen || [],
@@ -7545,6 +7654,11 @@ function assistent(text, sl, kurz, eintrag, vorgabe){
   // „sie“, „er“ — oder gar kein Name — meint die Person, um die es gerade ging
   const mitKontextPerson = () => { if (!f.personen.length && k.person && personIndex(k.person) >= 0) f.personen = [k.person]; };
   if (v.pronomen) mitKontextPerson();
+  // „und wer schließt?“, „und die Pausen auch“: ohne Tag gilt der Tag von eben
+  if (!f.tage.length && !fortsetzung && G(/^ *und\b/).test(v.norm)){
+    const lt = (k.letzte && k.letzte.tage) || [];
+    if (lt.length) f.tage = lt.slice(); else if (k.ti !== undefined) f.tage = [k.ti];
+  }
 
   // ---- Bausteine der Antwort ----
   const karte = (a, text) => Object.assign({id: aenderungsId(), aktiv: false, quelle: "assistent", text}, a);
