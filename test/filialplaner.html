@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-18-1-test">
+<meta name="fassung" content="2026-11-18-2-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -409,7 +409,8 @@ input.fehlt, select.fehlt{border-color:var(--bad) !important;box-shadow:0 0 0 3p
 details.aufklapp{margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-2)}
 details.aufklapp summary{cursor:pointer;font-weight:700;font-size:.86rem;color:var(--ton-900)}
 details.aufklapp[open] summary{margin-bottom:10px}
-.abschnitt{font-size:1.02rem;margin:26px 0 10px;padding-left:10px;border-left:3px solid var(--ton-700)}
+/* Abschnitte innerhalb einer Seite: derselbe rote Balken wie die Rubriken (seit 18.11.2026) */
+.abschnitt{font-size:1.02rem;font-weight:800;color:var(--ton-900);margin:26px 0 10px;padding-left:11px;border-left:4px solid var(--marke);line-height:1.25}
 
 /* Gruppen und Kacheln */
 
@@ -1460,11 +1461,13 @@ const REGELN = Object.freeze({
   amStueck: 6,
 
   // Jugendliche (JArbSchG): Pause über 4,5 h Anwesenheit 30 min, über 6,5 h 60 min (§ 11),
-  // höchstens 4,5 h am Stück, nur 6–20 Uhr (§ 14), 5 Tage (§ 15), 12 h Ruhe (§ 13)
+  // höchstens 4,5 h am Stück, nur 6–20 Uhr (§ 14), 5 Tage (§ 15), 40 h in der Woche (§ 8),
+  // 12 h Ruhe (§ 13)
   pauseAbJugend: [[6.5, 1], [4.5, 0.5]],
   amStueckJugend: 4.5,
   jugendVon: 6, jugendBis: 20,
   maxTageJugend: 5,
+  jugendWoche: 40,
   ruhezeitJugend: 12,
 
   // Überstunden: so viele werden je Woche höchstens ab- oder aufgebaut
@@ -1783,7 +1786,30 @@ function zahlEcho(z, einheit){
 // § 14 JArbSchG: Jugendliche nur zwischen 6 und 20 Uhr (bis 12.11.2026 fehlte die 6).
 const JUGEND_VON = REGELN.jugendVon*60, JUGEND_BIS = REGELN.jugendBis*60;
 
-const jugendZeit = (von, bis) => von >= JUGEND_VON && bis <= JUGEND_BIS;
+/* Sondertage (seit 18.11.2026)
+   · Heiligabend: Fällt der 24. Dezember auf einen Werktag, schließen Verkaufsstellen spätestens
+     um 14 Uhr (§ 3 LadSchlG; ebenso die Ladenöffnungsgesetze der Länder, in Baden-Württemberg
+     § 3 Abs. 2 LadÖG). Aufgaben, die sonst am Abend liegen, rücken vor den Ladenschluss
+     (aufgabenFenster).
+   · Jugendliche arbeiten am 24. und 31. Dezember nicht nach 14 Uhr (§ 18 Abs. 1 JArbSchG). */
+const SONDER_SCHLUSS = 14*60;
+const alsDatum = d => d instanceof Date ? d : (d ? new Date(String(d).slice(0, 10) + "T12:00:00") : null);
+// Öffnung an einem Tag: {von, bis, normal (Ladenschluss sonst), sonder (Text oder null)}
+function oeffnungAm(datum){
+  const von = hatZeit(state.von) ? minuten(state.von) : 8*60;
+  const normal = hatZeit(state.bis) ? minuten(state.bis) : 21*60;
+  const d = alsDatum(datum);
+  if (d && d.getMonth() === 11 && d.getDate() === 24 && von < SONDER_SCHLUSS && normal > SONDER_SCHLUSS)
+    return {von, bis: SONDER_SCHLUSS, normal, sonder: "Heiligabend — Ladenschluss 14:00 Uhr"};
+  return {von, bis: normal, normal, sonder: null};
+}
+// Bis wann Jugendliche an einem Tag arbeiten dürfen
+const jugendBisAm = datum => {
+  const d = alsDatum(datum);
+  return d && d.getMonth() === 11 && (d.getDate() === 24 || d.getDate() === 31) ? Math.min(JUGEND_BIS, SONDER_SCHLUSS) : JUGEND_BIS;
+};
+// datum weglassen: an einem gewöhnlichen Tag
+const jugendZeit = (von, bis, datum) => von >= JUGEND_VON && bis <= jugendBisAm(datum);
 
 function pauseGesetz(anwesend, minder){
   // Jugendliche: über der Grenze; Erwachsene: ab der Grenze (Werte in REGELN)
@@ -1821,6 +1847,47 @@ function schicht(m, tag){
   return {von, bis, anwesend, pause:p, arbeit: anwesend - p, minder};
 }
 
+/* Berufsschule (seit 18.11.2026; §§ 8, 9, 15 JArbSchG, § 15 BBiG)
+   · Für Jugendliche ist ein ganzer Berufsschultag ein Arbeitstag (höchstens 5 in der Woche) und
+     zählt mit 8 Stunden auf die 40 der Woche — gesetzlich mit der durchschnittlichen täglichen
+     Arbeitszeit, wenn mehr als 5 Unterrichtsstunden sind; die App rechnet vorsichtig mit 8 h.
+   · Blockwoche (Berufsschule an 5 Tagen): Azubis arbeiten in dieser Woche nicht im Betrieb —
+     auch nicht am Samstag. Ihr Soll der Woche ist 0.
+   abwWoche: state.abwesend[Wochenschlüssel]; i: Platz der Person in state.mitarbeiter. */
+const SCHULTAG_STUNDEN = 8;
+const schulTage = (abwWoche, i) => TAGE.filter(([k]) => (((abwWoche || {})[i] || {})[k]) === "schule").length;
+const blockWoche = (abwWoche, i) => schulTage(abwWoche, i) >= 5 && !!state.mitarbeiter[i]
+  && (istAzubi(state.mitarbeiter[i]) || minderjaehrig(state.mitarbeiter[i]));
+// Was die Schule an Arbeitstagen und Stunden belegt — zählt nur bei Jugendlichen mit
+const schulLast = (abwWoche, i) => {
+  const n = state.mitarbeiter[i] && minderjaehrig(state.mitarbeiter[i]) ? schulTage(abwWoche, i) : 0;
+  return {tage: n, stunden: n * SCHULTAG_STUNDEN};
+};
+
+// Die Standardschicht an einem bestimmten Tag. An Heiligabend gilt sie nur, wenn sie spätestens
+// eine Stunde nach Ladenschluss endet, für Jugendliche am 24./31.12. nur bis 14 Uhr — sonst plant
+// der Planer den Tag neu, statt eine Schicht in den geschlossenen Laden zu legen.
+function standardAm(m, tag, datum){
+  const s = schicht(m, tag);
+  if (!s) return null;
+  const o = oeffnungAm(datum);
+  if (o.sonder && s.bis > o.bis + 60) return null;
+  if (s.minder && s.bis > jugendBisAm(datum)) return null;
+  return s;
+}
+
+// Meldung für einen Sondertag (Heiligabend): Ladenschluss, was danach noch läuft, wessen
+// Standardschicht neu geplant ist. tag: {key, label, datum, aufgaben}; null an anderen Tagen.
+function sonderTagText(tag){
+  const o = oeffnungAm(tag.datum);
+  if (!o.sonder) return null;
+  const nach = (tag.aufgaben || []).filter(a => a.bis > o.bis).map(a => `${a.name} bis ${hhmm(a.bis)}`);
+  const neu = state.mitarbeiter.filter(m => schicht(m, tag.key) && !standardAm(m, tag.key, tag.datum)).map(m => m.name);
+  return `${tag.label}, ${deVon(alsDatum(tag.datum))}: ${o.sonder}.`
+    + (nach.length ? ` Danach noch: ${nach.join(", ")}.` : "")
+    + (neu.length ? ` Standardschicht neu geplant: ${neu.join(", ")}.` : "");
+}
+
 function wochenStunden(m){
   return TAGE.reduce((s,[k]) => { const x = schicht(m,k); return s + (x ? x.arbeit : 0); }, 0);
 }
@@ -1837,7 +1904,7 @@ function pruefeStandard(m){
     if (x.s.arbeit > 8 + 0.001)
       out.push({art: x.s.arbeit > max ? "bad" : "warn",
         text:`${x.l}: ${h1(x.s.arbeit)} h Arbeitszeit` + (minder
-          ? " — über 18 sind 8 h die Grenze, darunter ebenfalls 8 h ohne Ausnahme."
+          ? " — unter 18 höchstens 8 h am Tag (§ 8 JArbSchG)."
           : " — über 8 h nur mit Ausgleich im Schnitt über 24 Wochen.")});
     if (minder && x.s.bis > JUGEND_BIS)
       out.push({art:"bad", text:`${x.l}: Ende um ${String(Math.floor(x.s.bis/60)).padStart(2,"0")}:${String(x.s.bis%60).padStart(2,"0")} Uhr — unter 18 ist um 20:00 Uhr Schluss.`});
@@ -1897,8 +1964,20 @@ function aufgabeAm(a, tag){
    Aufgaben kürzer gerechnet, bei Mehrbedarf kommen Zusatzaufgaben dazu. */
 const AUFGABEN_SPIELRAUM = 120;      // Minuten, die eine Aufgabe mit fester Uhrzeit später beginnen darf
 
-// Fenster einer Aufgabe an einem Tag: [frühester Beginn, spätestens fertig]
-function aufgabenFenster(a, dauer, tagVon, tagBis){
+// Fenster einer Aufgabe an einem Tag: [frühester Beginn, spätestens fertig].
+// normalBis: Ladenschluss an gewöhnlichen Tagen — liegt tagBis davor (Heiligabend), rückt, was
+// erst nach dem früheren Schluss beginnen würde, um so viel vor, wie der Laden früher schließt
+// (das Abendprogramm bleibt vor dem Schluss); alles andere soll bis Ladenschluss fertig sein,
+// wenn die Zeit dafür reicht.
+function aufgabenFenster(a, dauer, tagVon, tagBis, normalBis){
+  let [frueh, spaet] = aufgabenFensterNormal(a, dauer, tagVon, tagBis);
+  if (normalBis && tagBis < normalBis){
+    if (frueh >= tagBis){ const d = normalBis - tagBis; frueh = Math.max(tagVon, frueh - d); spaet = Math.max(frueh + dauer, spaet - d); }
+    else if (spaet > tagBis) spaet = Math.max(frueh + dauer, tagBis);
+  }
+  return [frueh, spaet];
+}
+function aufgabenFensterNormal(a, dauer, tagVon, tagBis){
   // Ohne Frist: vor der Öffnung bis zur Öffnung, sonst höchstens zwei Stunden später beginnen
   const ohneFrist = von => von < tagVon ? tagVon : von + dauer + AUFGABEN_SPIELRAUM;
   if (a.zeitArt === "fest" && hatZeit(a.zeit)){
@@ -1917,6 +1996,7 @@ function aufgabenFenster(a, dauer, tagVon, tagBis){
 function aufgabenAmTag(tag, tagVon, tagBis, vorgabe){
   const SL = 15, liste = [];
   const kuerzer = vorgabe && vorgabe.faktor ? vorgabe.faktor : 1;
+  const normalBis = hatZeit(state.bis) ? minuten(state.bis) : 21*60;
   WAREN.forEach(w => {
     const a0 = state.aufgaben[w.id];
     if (!a0.aktiv || !a0.tage.includes(tag)) return;
@@ -1925,7 +2005,7 @@ function aufgabenAmTag(tag, tagVon, tagBis, vorgabe){
     let dauer = Math.max(SL, Math.round(nz(a.dauer) * 60 / SL) * SL);
     if (kuerzer !== 1) dauer = Math.max(SL, Math.round(dauer * kuerzer / SL) * SL);
     const pers = Math.max(1, Math.round(nz(a.personen)));
-    const [frueh, spaet] = aufgabenFenster(a, dauer, tagVon, tagBis);
+    const [frueh, spaet] = aufgabenFenster(a, dauer, tagVon, tagBis, normalBis);
     liste.push({id:w.id, name:w.name, braucht:w.braucht, dauer, pers, frueh, spaet,
                 flex: !(a.zeitArt === "fest" && hatZeit(a.zeit))});
   });
@@ -2038,6 +2118,8 @@ function auswertung(){
       let start = null;
       if (a.zeitArt === "fest" && hatZeit(a.zeit) && minuten(a.zeit) < von) start = minuten(a.zeit);
       else if (a.zeitArt === "spanne" && hatZeit(a.fVon) && hatZeit(a.fBis) && minuten(a.fBis) <= von) start = minuten(a.fVon);
+      // Zeitspanne ohne „spätestens“, die vor der Öffnung beginnt: wie eine feste Zeit (fertig bis zur Öffnung)
+      else if (a.zeitArt === "spanne" && hatZeit(a.fVon) && !hatZeit(a.fBis) && minuten(a.fVon) < von) start = minuten(a.fVon);
       else if (a.zeitArt !== "fest") flex = true;
       if (start === null) return;
       frueheste[tg] = Math.min(frueheste[tg] === undefined ? von : frueheste[tg], start);
@@ -2105,6 +2187,7 @@ function baueWoche(montagISO, rnd, vorgabe){
   // ({a:"nur"|"ohne", von, bis}) — „nur von–bis“ bzw. „nicht von–bis“.
   const eintrag = (i, tag) => (abw[i] || {})[tag] || null;
   const darfArbeiten = (i, tag, von, bis) => {
+    if (blockWoche(abw, i)) return false;
     const e = eintrag(i, tag);
     if (!e) return true;
     if (typeof e === "string") return false;
@@ -2126,18 +2209,23 @@ function baueWoche(montagISO, rnd, vorgabe){
   // Standardwochen sind gesetzt — ihre Stunden gelten von vornherein als verplant.
   // Nur die, die auch stattfinden: Urlaub und Feiertag stecken schon im Ziel.
   const standardStunden = i => TAGE.reduce((s,[k],ti) => {
-    const x = schicht(ms[i], k);
-    if (!x) return s;
     const d = new Date(mo); d.setDate(mo.getDate() + ti);
+    const x = standardAm(ms[i], k, d);
+    if (!x) return s;
     return istFeiertag(d) || !darfArbeiten(i, k, x.von, x.bis) ? s : s + x.arbeit;
   }, 0);
   const rest = ms.map((m,i) => (soll[i] === null ? 0 : ziel[i]) - standardStunden(i));
-  const tageGearbeitet = ms.map(() => 0);
+  // Jugendliche: Berufsschultage zählen als Arbeitstage und mit 8 h auf die 40 der Woche
+  const schule = ms.map((m, i) => schulLast(abw, i));
+  const tageGearbeitet = ms.map((m, i) => schule[i].tage);
   const letztesEnde = ms.map(() => null);
   // Was Aushilfen in den anderen Wochen der berührten Monate schon haben (Minijob-Grenze)
   const minijobBasis = ms.map(m => istAushilfe(m) ? monatsStunden(m.name, {mo, tage: [], namen: null}).stunden : null);
   const meldungen = [];
   const tage = [];
+  ms.forEach((m, i) => { if (blockWoche(abw, i)) meldungen.push({art:"warn", text:`${m.name}: Blockwoche Berufsschule — diese Woche keine Arbeit im Betrieb.`}); });
+  // Jugendliche: Arbeit der Woche bisher (fertige Tage und heute), für die 40 h
+  const wochenArbeit = i => tage.reduce((s, t) => s + t.schichten.filter(x => x.mi === i).reduce((a, x) => a + x.arbeit, 0), 0);
 
   TAGE.forEach(([key,label], ti) => {
     const d = new Date(mo); d.setDate(mo.getDate() + ti);
@@ -2146,8 +2234,11 @@ function baueWoche(montagISO, rnd, vorgabe){
     tage.push(tag);
     if (feiertag){ meldungen.push({art:"warn", text:`${label}, ${deVon(d)}: ${feiertagName(d)} — die Filiale bleibt geschlossen.`}); return; }
 
+    // Heiligabend schließt der Laden früher (oeffnungAm)
+    const {von: offenVon, bis: offenBis, sonder} = oeffnungAm(d);
     const auf = aufgabenAmTag(key, offenVon, offenBis, vorgabe);
     tag.aufgaben = auf;
+    if (sonder) meldungen.push({art:"warn", text: sonderTagText(tag)});
     const vortagEnde = letztesEnde.slice();     // für die Ruhezeit, wenn Schichten wachsen
     const tagVon = Math.floor(Math.min(offenVon, ...auf.map(a => a.von)) / 30) * 30;
     const tagBis = Math.ceil(Math.max(offenBis, ...auf.map(a => a.bis)) / 30) * 30;
@@ -2215,13 +2306,26 @@ function baueWoche(montagISO, rnd, vorgabe){
       belegt.forEach(b => { if (b.mi === i) summe += (b.bis - b.von)/60 - (b.pVon === null ? 0 : (b.pBis - b.pVon)/60); });
       return summe + mehr <= minijobStunden(+monat.slice(0, 4)) + 0.01;
     };
+    // Ruhezeit auch nach vorn: Steht morgen eine feste Schicht, muss bis dahin genug Ruhe
+    // bleiben (11 h, unter 18: 12 h) — sonst verstößt der Plan, obwohl jede Schicht für sich passt
+    const folgeSchicht = (() => {
+      const k2 = TAGE[ti + 1];
+      if (!k2) return () => null;
+      const d2 = new Date(mo); d2.setDate(mo.getDate() + ti + 1);
+      if (istFeiertag(d2)) return () => null;
+      return i => { const s2 = standardAm(ms[i], k2[0], d2); return s2 && darfArbeiten(i, k2[0], s2.von, s2.bis) ? s2 : null; };
+    })();
+    const ruheBisMorgen = (i, bis) => {
+      const s2 = folgeSchicht(i);
+      return !s2 || (24*60 + s2.von - bis)/60 >= ruhezeitFuer(minderjaehrig(ms[i])) - 0.01;
+    };
     const regelOk = (i, von, bis) => {
       const m = ms[i];
       if (!passtDazu(i, von, bis)) return false;
       if (!minijobOk(i, (bis - von)/60 - pauseFuer(m, (bis - von)/60))) return false;
       if (!darfArbeiten(i, key, von, bis)) return false;
       const minder = minderjaehrig(m);
-      if (minder && !jugendZeit(von, bis)) return false;
+      if (minder && !jugendZeit(von, bis, d)) return false;
       const schonHeute = schichtenVon(i);
       if (!schonHeute.length && tageGearbeitet[i] >= maxTageFuer(minder)) return false;
       const anw = (bis - von)/60;
@@ -2229,6 +2333,9 @@ function baueWoche(montagISO, rnd, vorgabe){
       const heuteSchon = schonHeute.reduce((x,b) => x + (b.bis-b.von)/60 - (b.pBis === null ? 0 : (b.pBis-b.pVon)/60), 0);
       if (heuteSchon + anw - pauseFuer(m, anw) > MAXARBEIT + 0.01 || !schichtLaengeOk(m, anw)) return false;
       if (letztesEnde[i] !== null && (ti*24*60 + von - letztesEnde[i])/60 < ruhezeitFuer(minder) - 0.01) return false;
+      if (!ruheBisMorgen(i, bis)) return false;
+      if (minder && wochenArbeit(i) + belegt.filter(b => b.mi === i).reduce((a, b) => a + arbeitVon(b), 0)
+          + anw - pauseFuer(m, anw) + schule[i].stunden > REGELN.jugendWoche + 0.01) return false;
       // Azubis: nie über die Betriebsstunden
       if (istAzubi(m) && soll[i] !== null && anw - pauseFuer(m, anw) > rest[i] + 0.01) return false;
       return true;
@@ -2286,7 +2393,7 @@ function baueWoche(montagISO, rnd, vorgabe){
       if (b.fest) return false;                         // Standardwochen bleiben, wie sie sind
       if (!darfArbeiten(i, key, von, bis)) return false;
       const minder = minderjaehrig(m);
-      if (minder && !jugendZeit(von, bis)) return false;
+      if (minder && !jugendZeit(von, bis, d)) return false;
       const andere = schichtenVon(i).filter(x => x !== b);
       if (andere.some(x => !(von >= x.bis + 60 || bis + 60 <= x.von))) return false;
       const anw = (bis - von)/60;
@@ -2294,6 +2401,8 @@ function baueWoche(montagISO, rnd, vorgabe){
       if (sonst + anw - pauseFuer(m, anw) > MAXARBEIT + 0.01 || !schichtLaengeOk(m, anw)) return false;
       if (istAzubi(m) && soll[i] !== null && b.zaehlt && anw - pauseFuer(m, anw) - arbeitVon(b) > rest[i] + 0.01) return false;
       if (vortagEnde[i] !== null && (ti*24*60 + von - vortagEnde[i])/60 < ruhezeitFuer(minder) - 0.01) return false;
+      if (!ruheBisMorgen(i, bis)) return false;
+      if (minder && wochenArbeit(i) + sonst + anw - pauseFuer(m, anw) + schule[i].stunden > REGELN.jugendWoche + 0.01) return false;
       return true;
     };
     // Eine Lücke schließen, indem eine angrenzende Schicht wächst — statt für eine
@@ -2404,8 +2513,14 @@ function baueWoche(montagISO, rnd, vorgabe){
 
     // 1) Standardwochen setzen (ihre Stunden sind schon reserviert)
     ms.forEach((m,i) => {
-      const s = schicht(m, key);
-      if (!s) return;
+      const s = standardAm(m, key, d);
+      if (!s){
+        const roh = schicht(m, key);
+        if (roh && roh.minder && !sonder && roh.bis > jugendBisAm(d))
+          meldungen.push({art:"warn", text:`${label}, ${deVon(d)}: ${m.name} ist unter 18 und darf heute nur bis 14:00 Uhr arbeiten (§ 18 JArbSchG) — die Standardschicht ist neu geplant.`});
+        return;
+      }
+      if (blockWoche(abw, i)) return;
       if (!darfArbeiten(i, key, s.von, s.bis)){
         // Den Grund (krank, Urlaub …) nicht in die Meldung: sie landet in der Excel-Datei,
         // und Krankheit ist ein Gesundheitsdatum (Art. 9 DSGVO)
@@ -2415,7 +2530,7 @@ function baueWoche(montagISO, rnd, vorgabe){
       }
       const minder = minderjaehrig(m);
       if (letztesEnde[i] !== null && (ti*24*60 + s.von - letztesEnde[i])/60 < ruhezeitFuer(minder) - 0.01)
-        meldungen.push({art:"bad", text:`${label}: ${m.name} hat nur ${h1((ti*24*60 + s.von - letztesEnde[i])/60)} h Ruhezeit seit dem Vortag — die Standardwoche verstößt gegen die Ruhezeit.`});
+        meldungen.push({art:"bad", text:`${label}: ${m.name} hat nur ${h1((ti*24*60 + s.von - letztesEnde[i])/60)} h Ruhezeit seit dem Vortag — so steht es in der Standardwoche.`});
       setzen(i, s.von, s.bis, "Standard", false);
     });
 
@@ -2607,7 +2722,7 @@ function baueWoche(montagISO, rnd, vorgabe){
   const mehr = meldungen.filter(x => x.text.includes("über die Vertragsstunden hinaus"));
   if (mehr.length > 3){
     const rest2 = meldungen.filter(x => !x.text.includes("über die Vertragsstunden hinaus"));
-    rest2.unshift({art:"bad", text:`An ${mehr.length} Stellen musste über die Vertragsstunden hinaus geplant werden. Die Besetzungsregeln verlangen mehr Stunden, als die Verträge hergeben — siehe Schritt 7.`});
+    rest2.unshift({art:"bad", text:`An ${mehr.length} Stellen musste über die Vertragsstunden hinaus geplant werden. Die Besetzungsregeln verlangen mehr Stunden, als die Verträge hergeben.`});
     meldungen.length = 0; meldungen.push(...rest2);
   }
 
@@ -2632,9 +2747,8 @@ function tagesMaengel(plan, ti){
   const t = plan.tage[ti];
   if (!t || t.feiertag) return 0;
   const ms = state.mitarbeiter;
-  const offenVon = hatZeit(state.von) ? minuten(state.von) : 8*60;
-  const offenBis = hatZeit(state.bis) ? minuten(state.bis) : 21*60;
-  const wechsel  = hatZeit(state.wechsel) ? minuten(state.wechsel) : Math.round((offenVon + offenBis)/2);
+  const {von: offenVon, bis: offenBis, normal} = oeffnungAm(t.datum);
+  const wechsel  = hatZeit(state.wechsel) ? minuten(state.wechsel) : Math.round((offenVon + normal)/2);
   const aussen   = state.allein ? 1 : MIN_BESETZUNG;
   const auf = t.aufgaben || [];
   const tagVon = Math.floor(Math.min(offenVon, ...auf.map(a => a.von)) / 30) * 30;
@@ -2762,6 +2876,7 @@ function ausgleichen(plan){
   const ms = state.mitarbeiter;
   const abw = (state.abwesend || {})[wochenSchluessel(plan.mo)] || {};
   const darf = (i, tag, von, bis) => {
+    if (blockWoche(abw, i)) return false;
     const e = (abw[i] || {})[tag];
     if (!e) return true;
     if (typeof e === "string") return false;
@@ -2770,6 +2885,10 @@ function ausgleichen(plan){
     return e.a === "nur" ? (von >= a && bis <= b) : (bis <= a || von >= b);
   };
   const minderj = i => minderjaehrig(ms[i]);
+  // Jugendliche: höchstens 40 h — Berufsschultage zählen mit 8 h (schulLast)
+  const jungOk = (i, mehr) => !minderj(i)
+    || plan.tage.reduce((s, t) => s + t.schichten.filter(x => x.mi === i).reduce((a, x) => a + x.arbeit, 0), 0)
+       + mehr + schulLast(abw, i).stunden <= REGELN.jugendWoche + 0.01;
 
   const fest = sch => (sch.rollen || []).includes("Standard");
   // Ruhezeit zu Vor- und Folgetag, wenn i am Tag ti von–bis arbeitet
@@ -2787,11 +2906,12 @@ function ausgleichen(plan){
     if (fest(sch)) return false;
     if (!kannRollen(i, sch.rollen)) return false;
     if (!darf(i, tag, sch.von, sch.bis)) return false;
-    if (minderj(i) && !jugendZeit(sch.von, sch.bis)) return false;
+    if (minderj(i) && !jugendZeit(sch.von, sch.bis, plan.tage[ti].datum)) return false;
     if (plan.tage[ti].schichten.some(x => x.mi === i)) return false;   // nicht doppelt am Tag
-    const tage = plan.tage.filter((t,k) => t.schichten.some(x => x.mi === i)).length;
+    const tage = plan.tage.filter((t,k) => t.schichten.some(x => x.mi === i)).length + schulLast(abw, i).tage;
     if (tage >= maxTageFuer(minderj(i))) return false;
     if (!schichtLaengeOk(ms[i], (sch.bis - sch.von)/60)) return false;
+    if (!jungOk(i, (sch.bis - sch.von)/60 - pauseFuer(ms[i], (sch.bis - sch.von)/60))) return false;
     if (!minijobPasst(plan, i, ti, sch.von, sch.bis)) return false;       // Aushilfen: Monatsgrenze
     return ruheOk(i, ti, sch.von, sch.bis);
   };
@@ -2851,8 +2971,10 @@ function ausgleichen(plan){
           if (!schichtLaengeOk(ms[b], (sch.bis - sch.von)/60) || !schichtLaengeOk(ms[a], (zwei.bis - zwei.von)/60)) return;
         }
         if (!darf(b, TAGE[ti][0], sch.von, sch.bis) || !darf(a, TAGE[ti][0], zwei.von, zwei.bis)) return;
-        if (minderj(b) && !jugendZeit(sch.von, sch.bis)) return;
-        if (minderj(a) && !jugendZeit(zwei.von, zwei.bis)) return;
+        if (minderj(b) && !jugendZeit(sch.von, sch.bis, t.datum)) return;
+        if (minderj(a) && !jugendZeit(zwei.von, zwei.bis, t.datum)) return;
+        const arbeitFuer = (i, s) => (s.bis - s.von)/60 - pauseFuer(ms[i], (s.bis - s.von)/60);
+        if (!jungOk(b, arbeitFuer(b, sch) - zwei.arbeit) || !jungOk(a, arbeitFuer(a, zwei) - sch.arbeit)) return;
         const sich2 = {mi:zwei.mi, pause:zwei.pause, arbeit:zwei.arbeit,
                        pauseVon:zwei.pauseVon, pauseBis:zwei.pauseBis};
         const vorA = istStunden(plan, a), vorB = istStunden(plan, b);
@@ -2891,13 +3013,13 @@ function nachrechnen(plan){
     plan.konto.push({i, ist, soll, ziel, saldoAlt:start[i], saldoNeu:viertel(start[i] + ist - soll)});
     if (ist < ziel - 2) plan.meldungen.push({art:"warn", text:`${m.name}: ${h1(ist)} h verplant, Ziel ${h1(ziel)} h — es fehlen ${h1(ziel-ist)} h.`});
     // Überstunden über 50 % der Vertragsstunden: erlaubt, aber ein Hinweis (Regel vom 17.11.2026)
-    if (soll > 0 && ist > soll * (1 + UEBERSTUNDEN_ANTEIL) + 0.01)
+    if (soll > 0 && hatKonto(m) && ist > soll * (1 + UEBERSTUNDEN_ANTEIL) + 0.01)
       plan.meldungen.push({art:"warn", text:`${m.name}: ${h1(ist)} h geplant — mehr als 50 % über dem Vertrag (${h1(soll)} h).`});
     if (!darfUeberstunden(m) && ist > Math.max(ziel, soll) + 0.25)
       plan.meldungen.push({art:"bad", text:`${m.name} kann keine Überstunden machen, ist aber mit ${h1(ist)} h eingeplant (Soll ${h1(soll)} h) — anders war die Besetzung nicht zu schaffen.`});
     else if (ist > ziel + 2){ mehr++; plan.meldungen.push({art:"warn", text:`${m.name}: ${h1(ist)} h verplant, Ziel ${h1(ziel)} h — ${h1(ist-ziel)} h darüber.`}); }
-    if (m.typ === "Aushilfe (Minijob)" && ist > soll * 1.3 && soll > 0)
-      plan.meldungen.push({art:"bad", text:`${m.name} ist Minijob mit ${h1(soll)} h und hier mit ${h1(ist)} h eingeplant — das sprengt auf den Monat gerechnet die 603-€-Grenze.`});
+    // Aushilfen: Die Wochenstunden sind nur Orientierung — fest ist die Minijob-Grenze im Monat,
+    // die minijobVerstoesse prüft (bis 17.11.2026 stand hier eine Meldung mit fester 603-€-Grenze)
   });
   if (mehr >= 3){
     // Ehrlich unterscheiden: Verlangen schon die Regeln mehr Stunden, als die
@@ -2906,12 +3028,8 @@ function nachrechnen(plan){
     const geplant = plan.konto.reduce((x,k) => x + k.ist, 0);
     const mindest = auswertung().bedarf;
     const text = mindest !== null && mindest > vertraglich
-      ? `${mehr} Personen liegen über ihren Vertragsstunden. Schon der Mindestbedarf der Woche liegt bei `
-        + `${h1(mindest)} h, die Verträge geben ${h1(vertraglich)} h her — es fehlen rund `
-        + `${h1(mindest - vertraglich)} h Personal. Geplant sind ${h1(geplant)} h; der Unterschied zum `
-        + `Mindestbedarf entsteht, weil Schichten nicht beliebig kurz und nicht beliebig zerstückelt sein können.`
-      : `${mehr} Personen liegen über ihren Vertragsstunden: geplant ${h1(geplant)} h bei `
-        + `${h1(vertraglich)} h laut Vertrag${mindest !== null ? " und einem Mindestbedarf von " + h1(mindest) + " h" : ""}.`;
+      ? `${mehr} Personen über Vertrag: Mindestbedarf ${h1(mindest)} h, Verträge ${h1(vertraglich)} h — rund ${h1(mindest - vertraglich)} h Personal fehlen.`
+      : `${mehr} Personen über Vertrag: geplant ${h1(geplant)} h, laut Vertrag ${h1(vertraglich)} h${mindest !== null ? ", Mindestbedarf " + h1(mindest) + " h" : ""}.`;
     plan.meldungen.unshift({art:"bad", text});
   }
 
@@ -2984,7 +3102,7 @@ function erzeugePlan(montagISO, phase, nurNoetig){
 // Oben in den Hinweisen: was die Art der Woche gegenüber der Standardwoche gebracht hat
 function phasenMeldung(plan, ph, normal){
   const jetzt = planSummen(plan).bezahlt, d = jetzt - normal;
-  const vergleich = `${h1(jetzt)} h geplant, als Standardwoche wären es ${h1(normal)} h — `
+  const vergleich = `${h1(jetzt)} h geplant, als normale Woche wären es ${h1(normal)} h — `
     + (Math.abs(d) < 0.05 ? "kein Unterschied" : d < 0 ? h1(-d) + " h weniger" : h1(d) + " h mehr");
   const gewollt = ph.art === "mehr" ? nz(ph.mehr) : ph.sparArt === "stunden" ? nz(ph.stunden) : null;
   const verfehlt = gewollt !== null && Math.abs(Math.abs(d) - gewollt) > 2;
@@ -3022,15 +3140,23 @@ function schichtWerkzeug(plan){
   };
   // Darf i am Tag ti von–bis arbeiten? Abwesenheit, Jugendschutz, Ruhezeit, übliche Schichtlänge
   const erlaubt = (i, ti, von, bis) => {
+    if (blockWoche(abw, i)) return false;
     const e = (abw[i] || {})[TAGE[ti][0]];
     if (e){
       if (typeof e === "string") return false;
       const a = hatZeit(e.von) ? minuten(e.von) : null, b = hatZeit(e.bis) ? minuten(e.bis) : null;
       if (a !== null && b !== null && b > a && !(e.a === "nur" ? (von >= a && bis <= b) : (bis <= a || von >= b))) return false;
     }
-    if (minderj(i) && !jugendZeit(von, bis)) return false;
+    if (minderj(i) && !jugendZeit(von, bis, plan.tage[ti].datum)) return false;
     if (!schichtLaengeOk(ms[i], (bis - von)/60)) return false;
     if (!minijobPasst(plan, i, ti, von, bis, plan.tage[ti].schichten.find(x => x.mi === i))) return false;
+    // Jugendliche: höchstens 40 h, Berufsschultage zählen mit 8 h
+    if (minderj(i)){
+      const alt = plan.tage[ti].schichten.find(x => x.mi === i);
+      const woche = plan.tage.reduce((s, t) => s + t.schichten.filter(x => x.mi === i).reduce((a, x) => a + x.arbeit, 0), 0) - (alt ? alt.arbeit : 0);
+      const anw = (bis - von)/60;
+      if (woche + anw - pauseFuer(ms[i], anw) + schulLast(abw, i).stunden > REGELN.jugendWoche + 0.01) return false;
+    }
     const noetig = ruhezeitFuer(minderj(i)) * 60;
     const vor = ti > 0 ? plan.tage[ti-1].schichten.filter(x => x.mi === i) : [];
     const nach = ti < plan.tage.length-1 ? plan.tage[ti+1].schichten.filter(x => x.mi === i) : [];
@@ -3041,8 +3167,7 @@ function schichtWerkzeug(plan){
   // Zeitraum, in dem an einem Tag überhaupt jemand gebraucht wird
   const rahmen = ti => {
     const auf = plan.tage[ti].aufgaben || [];
-    const offenVon = hatZeit(state.von) ? minuten(state.von) : 8*60;
-    const offenBis = hatZeit(state.bis) ? minuten(state.bis) : 21*60;
+    const {von: offenVon, bis: offenBis} = oeffnungAm(plan.tage[ti].datum);
     return [Math.floor(Math.min(offenVon, ...auf.map(a => a.von)) / 30) * 30, Math.ceil(Math.max(offenBis, ...auf.map(a => a.bis)) / 30) * 30];
   };
   // Schichten, die man anfassen darf: keine Standardschicht, kein geteilter Tag
@@ -3194,7 +3319,7 @@ function phasenText(ph){
   if (ph.art === "sparen") return ph.sparArt === "stunden" ? `${h1(nz(ph.stunden))} h weniger`
                                                            : `Aufgaben ${nz(ph.prozent)} % kürzer`;
   if (ph.art === "mehr") return `+${h1(nz(ph.mehr))} h${ph.was ? " für " + ph.was : ""}`;
-  return "Standardwoche";
+  return "Normale Woche";
 }
 
 // Auf die nächste halbe Stunde aufrunden (22,4 → 22,5; 22,5 bleibt)
@@ -3285,6 +3410,8 @@ function sollWoche(m, i, mo){
   if (!hatVertrag(m)) return null;
   const soll = stunden(m);
   const abw = ((state.abwesend || {})[wochenSchluessel(mo)] || {})[i] || {};
+  // Blockwoche Berufsschule: in dieser Woche keine Arbeit im Betrieb
+  if (istAzubi(m) && TAGE.filter(([k]) => abw[k] === "schule").length >= 5) return 0;
   const std = TAGE.filter(([k]) => schicht(m, k)).map(([k]) => k);
   const tageProWoche = std.length || 5;
   let bezahlt = 0;
@@ -3417,6 +3544,7 @@ function planLaden(kurz){
     namen: kurz.namen || null,
     phase: phaseNormal(kurz.phase),
     berechnung: kurz.berechnung || null,
+    einteilung: kurz.einteilung,            // Stand der festgehaltenen Einteilung (aufgabe.wer)
     tage: (kurz.tage || []).map(tg => Object.assign({}, tg, {datum: new Date(tg.datum + "T12:00:00")}))
   };
 }
@@ -3435,7 +3563,7 @@ function planLaden(kurz){
 
 // Was eine Änderung von Hand verletzt — wird unter dem Plan angezeigt, verhindert
 // aber nichts: Am Ende entscheidet die Filialleitung.
-function handPruefung(plan){
+function handPruefung(plan, ohneLuecken){
   const ms = state.mitarbeiter, raus = [];
   plan.tage.forEach((t, ti) => {
     if (t.feiertag) return;
@@ -3455,21 +3583,45 @@ function handPruefung(plan){
         raus.push(`${t.label}: ${m.name} arbeitet ${h1(heute)} h — über 8 h am Tag nur, wenn die Woche bei höchstens ${REGELN.langWoche} h bleibt (hier ${h1(woche)} h).`);
       if (s.pause + 0.01 < pauseFuer(m, anw))
         raus.push(`${t.label}: ${m.name} hat ${h1(s.pause*60/60)} h Pause, nötig sind ${h1(pauseFuer(m, anw))} h.`);
-      if (minder && s.bis > JUGEND_BIS)
-        raus.push(`${t.label}: ${m.name} ist unter 18 und arbeitet bis ${hhmm(s.bis)} Uhr.`);
+      if (minder && s.bis > jugendBisAm(t.datum))
+        raus.push(`${t.label}: ${m.name} ist unter 18 und arbeitet bis ${hhmm(s.bis)} Uhr`
+          + (jugendBisAm(t.datum) < JUGEND_BIS ? " — am 24. und 31.12. nur bis 14:00 Uhr (§ 18 JArbSchG)." : "."));
       if (minder && s.von < JUGEND_VON)
         raus.push(`${t.label}: ${m.name} ist unter 18 und fängt um ${hhmm(s.von)} Uhr an — erlaubt ab 6:00 Uhr.`);
       if (ti > 0) plan.tage[ti-1].schichten.filter(x => x.mi === s.mi).forEach(x => {
         const ruhe = (24*60 - x.bis + s.von)/60;
+        // Stehen beide Schichten so in der Standardwoche, liegt der Fehler dort
+        const wie = (a, k) => { const st = schicht(m, k); return st && st.von === a.von && st.bis === a.bis; };
         if (ruhe < ruhezeitFuer(minder) - 0.01)
-          raus.push(`${t.label}: ${m.name} hat nur ${h1(ruhe)} h Ruhezeit seit dem Vortag.`);
+          raus.push(`${t.label}: ${m.name} hat nur ${h1(ruhe)} h Ruhezeit seit dem Vortag`
+            + (wie(x, plan.tage[ti-1].key) && wie(s, t.key) ? " — so steht es in der Standardwoche." : "."));
       });
     });
-    const luecken = tagesMaengel(plan, ti);
+    const luecken = ohneLuecken ? 0 : tagesMaengel(plan, ti);
     if (luecken) raus.push(`${t.label}: ${luecken} halbe Stunde(n) nicht richtig besetzt.`);
+  });
+  // Woche: Jugendliche höchstens 5 Tage und 40 h — Berufsschultage zählen mit (schulLast);
+  // in einer Blockwoche arbeiten Azubis gar nicht
+  const sl = wochenSchluessel(plan.mo instanceof Date ? plan.mo : montagDer(plan.mo));
+  const abw = (state.abwesend || {})[sl] || {};
+  ms.forEach((m, i) => {
+    const j = plan.namen ? plan.namen.indexOf(m.name) : i;
+    if (j < 0) return;
+    const eigene = plan.tage.filter(t => !t.feiertag).map(t => t.schichten.filter(x => x.mi === j));
+    const tage = eigene.filter(x => x.length).length;
+    if (!tage) return;
+    if (blockWoche(abw, i)){ raus.push(`${m.name}: Blockwoche Berufsschule — diese Woche keine Arbeit im Betrieb.`); return; }
+    if (!minderjaehrig(m)) return;
+    const schule = schulLast(abw, i), stunden = eigene.reduce((s, x) => s + x.reduce((a, y) => a + y.arbeit, 0), 0);
+    if (tage + schule.tage > REGELN.maxTageJugend)
+      raus.push(`${m.name}: ${tage} Arbeitstage${schule.tage ? ` und ${schule.tage} Tag${schule.tage > 1 ? "e" : ""} Berufsschule` : ""} — unter 18 höchstens 5 Tage (§ 15 JArbSchG).`);
+    if (stunden + schule.stunden > REGELN.jugendWoche + 0.01)
+      raus.push(`${m.name}: ${h1(stunden)} h${schule.tage ? ` und ${h1(schule.stunden)} h Berufsschule` : ""} — unter 18 höchstens 40 h (§ 8 JArbSchG).`);
   });
   return raus;
 }
+// Was gegen Gesetz oder Hausregel verstößt — ohne Lücken in der Besetzung
+const rechtsVerstoesse = plan => handPruefung(plan, true);
 
 // ==== kern/10-termine.js ====
 /* Terminliste: lesen, prüfen, übernehmen, zurücknehmen */
@@ -3851,8 +4003,7 @@ async function highsLaden(){
 
 // Alle Zeitpunkte eines Tages, an denen die Besetzung geprüft wird — wie in tagesMaengel
 function tagesRaster(tag){
-  const offenVon = hatZeit(state.von) ? minuten(state.von) : 8*60;
-  const offenBis = hatZeit(state.bis) ? minuten(state.bis) : 21*60;
+  const {von: offenVon, bis: offenBis} = oeffnungAm(tag.datum);
   const auf = tag.aufgaben || [];
   const tagVon = Math.floor(Math.min(offenVon, ...auf.map(a => a.von)) / 30) * 30;
   const tagBis = Math.ceil(Math.max(offenBis, ...auf.map(a => a.bis)) / 30) * 30;
@@ -3880,6 +4031,7 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
   const kann = (i, q) => !q || (ms[i].qual || []).includes(q);
   const hatStandard = i => TAGE.some(([k]) => schicht(ms[i], k));
   const darf = (i, k, von, bis) => {
+    if (blockWoche(abw, i)) return false;            // Blockwoche Berufsschule
     const e = (abw[i] || {})[k];
     if (!e) return true;
     if (typeof e === "string") return false;
@@ -3892,7 +4044,8 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
     const d = new Date(mo); d.setDate(mo.getDate() + ti);
     const feiertag = istFeiertag(d);
     const tag = {key, label, datum: d, feiertag, schichten: [], aufgaben: []};
-    if (!feiertag) tag.aufgaben = aufgabenAmTag(key, offenVon, offenBis, vorgabe);
+    const o = oeffnungAm(d);
+    if (!feiertag) tag.aufgaben = aufgabenAmTag(key, o.von, o.bis, vorgabe);
     return tag;
   });
 
@@ -3900,6 +4053,11 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
   const kand = [];                 // {i, ti, von, bis, arbeit, pause, fest, freiStd}
   const fest = {};                 // "i/ti" → Kandidat der Standardschicht
   const meldungen = [];
+  ms.forEach((m, i) => { if (blockWoche(abw, i)) meldungen.push({art:"warn", text:`${m.name}: Blockwoche Berufsschule — diese Woche keine Arbeit im Betrieb.`}); });
+  tage.forEach(tag => {
+    const o = oeffnungAm(tag.datum);
+    if (!tag.feiertag && o.sonder) meldungen.push({art:"warn", text: sonderTagText(tag)});
+  });
   tage.forEach((tag, ti) => {
     if (tag.feiertag) return;
     const r = tagesRaster(tag);
@@ -3915,7 +4073,7 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
         });
         return;
       }
-      const std = schicht(m, tag.key);
+      const std = standardAm(m, tag.key, tag.datum);
       if (std){
         if (darf(i, tag.key, std.von, std.bis)){
           const k = {i, ti, von: std.von, bis: std.bis, arbeit: std.arbeit, pause: std.pause, fest: true, freiStd: false};
@@ -3923,7 +4081,8 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
           return;
         }
         const e = (abw[i] || {})[tag.key];
-        meldungen.push({art:"warn", text:`${tag.label}: ${m.name} ${typeof e === "string" ? "fällt aus" : "ist nur eingeschränkt da"} — die Standardschicht entfällt und wird anders besetzt.`});
+        if (!blockWoche(abw, i))
+          meldungen.push({art:"warn", text:`${tag.label}: ${m.name} ${typeof e === "string" ? "fällt aus" : "ist nur eingeschränkt da"} — die Standardschicht entfällt und wird anders besetzt.`});
       }
       const freiStd = hatStandard(i) && !std;
       for (let von = r.tagVon; von + MINSCHICHT*60 <= r.tagBis; von += 30){
@@ -3931,7 +4090,7 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
         for (let l = MINSCHICHT*60; l <= REGELN.maxAnwesenheit*60; l += 30) enden.add(Math.min(von + l, r.tagBis));
         enden.forEach(bis => {
           if (bis - von < MINSCHICHT*60) return;
-          if (minder && !jugendZeit(von, bis)) return;
+          if (minder && !jugendZeit(von, bis, tag.datum)) return;
           if (!darf(i, tag.key, von, bis)) return;
           const anw = (bis - von)/60, p = pauseFuer(m, anw);
           if (anw - p > MAXARBEIT + 0.001) return;
@@ -4010,8 +4169,10 @@ function wochenModell(mo, vorgabe, modus, summe, extra){
       const heute = eigene.filter(([k]) => k.ti === ti);
       if (heute.length > 1) nb.push({name: `ein${i}_${ti}`, terme: heute.map(([, n]) => [1, v(n)]), op: "<=", rechts: 1});
     });
-    if (eigene.length) nb.push({name: `tage${i}`, terme: eigene.map(([, n]) => [1, v(n)]), op: "<=", rechts: maxTageFuer(minder)});
-    if (minder && eigene.length) nb.push({name: `jung${i}`, terme: eigene.map(([k, n]) => [k.arbeit, v(n)]), op: "<=", rechts: 40});
+    // Jugendliche: Berufsschultage zählen als Arbeitstage und mit 8 h (schulLast)
+    const schule = schulLast(abw, i);
+    if (eigene.length) nb.push({name: `tage${i}`, terme: eigene.map(([, n]) => [1, v(n)]), op: "<=", rechts: Math.max(0, maxTageFuer(minder) - schule.tage)});
+    if (minder && eigene.length) nb.push({name: `jung${i}`, terme: eigene.map(([k, n]) => [k.arbeit, v(n)]), op: "<=", rechts: Math.max(0, REGELN.jugendWoche - schule.stunden)});
     const ruhe = ruhezeitFuer(minder) * 60;
     for (let ti = 1; ti < 6; ti++){
       if (fest[i + "/" + ti] && fest[i + "/" + (ti-1)]) continue;      // beides fest: so gewollt
@@ -4125,7 +4286,10 @@ function einteilungsUnruhe(plan, ti){
   const ms = state.mitarbeiter;
   const leitung = e.kasse.filter(k => istLeitung(ms.find(m => m.name === k.name))).reduce((s, k) => s + (k.bis - k.von), 0) / 15;
   const geteilt = e.aufgaben.reduce((s, a) => s + 2 * Math.max(0, a.wer.length - a.pers) + Math.max(0, a.teile.length - a.wer.length), 0);
-  return 3 * Math.max(0, e.kasse.length - 1) + 2 * new Set(e.kasse.map(k => k.name)).size + leitung + geteilt;
+  // Aufgabenzeit ohne Person (fehlt) oder nur nebenher wiegt schwer: so wird keine Pause dorthin gelegt
+  const ohne = e.aufgaben.reduce((s, a) => s + a.fehlt.reduce((x, [v, b]) => x + (b - v) / 15, 0) * 2
+    + a.nebenher.reduce((x, n) => x + n.spannen.reduce((y, [v, b]) => y + (b - v) / 15, 0), 0), 0);
+  return 3 * Math.max(0, e.kasse.length - 1) + 2 * new Set(e.kasse.map(k => k.name)).size + leitung + geteilt + ohne;
 }
 
 /* Die Pausen eines Tages. Erlaubt ist jede Lage ab einer Stunde nach Beginn bis eine Stunde
@@ -4253,9 +4417,9 @@ async function mindestStunden(montagISO, phase){
    Entwurf selbst auf (kern/19-planentwurf.js). */
 async function erzeugePlanBest(montagISO, phase, fortschritt, nurNoetig){
   const melde = t => { if (fortschritt) fortschritt(t); };
-  melde("Planer rechnet …");
+  melde("Wird gerechnet …");
   const planer = erzeugePlan(montagISO, phase, nurNoetig);
-  melde("Optimierer rechnet …");
+  melde("Wird verfeinert …");
   const ph = phaseNormal(phase);
   let opt = null;
   try {
@@ -4271,13 +4435,16 @@ async function erzeugePlanBest(montagISO, phase, fortschritt, nurNoetig){
       }
     }
   } catch(e){ opt = null; }
-  melde("Messlatte …");
+  melde("Fast fertig …");
   const mindest = await mindestStunden(montagISO, ph);
   // Wer gewinnt? Erst zählen Lücken. Dann in einer Sparwoche die Stunden — darum geht
   // es dort —, sonst die Gütezahl (Ziele, Konten, Zahl der Schichten).
   let plan = planer, verfahren = "Planer";
   const besser = () => {
-    // Lücken zählen zuerst — gleich danach, ob eine Aushilfe über der Monatsgrenze läge
+    // Ein Plan mit Verstoß gegen das Gesetz gewinnt nie gegen einen ohne
+    const ro = rechtsVerstoesse(opt).length, rp = rechtsVerstoesse(planer).length;
+    if (ro !== rp) return ro < rp;
+    // Lücken zählen danach — gleich danach, ob eine Aushilfe über der Monatsgrenze läge
     const lo = planMaengel(opt) + 5 * minijobVerstoesse(opt).length, lp = planMaengel(planer) + 5 * minijobVerstoesse(planer).length;
     if (lo !== lp) return lo < lp;
     // … dann, wie oft außer der Filialleitung niemand kassieren könnte
@@ -4288,6 +4455,12 @@ async function erzeugePlanBest(montagISO, phase, fortschritt, nurNoetig){
     return guete(opt) <= guete(planer);
   };
   if (opt && besser()){ plan = opt; verfahren = "Optimierer"; }
+  // Bleibt trotzdem ein Verstoß (etwa weil die Standardwoche selbst gegen das Gesetz verstößt),
+  // steht er unter dem Plan — nicht nur im Entwurf
+  rechtsVerstoesse(plan).forEach(text => {
+    const kern = text.replace(/\.$/, "");
+    if (!plan.meldungen.some(x => x.text.startsWith(kern))) plan.meldungen.push({art: "bad", text});
+  });
   plan.berechnung = {verfahren, optimiererVerfuegbar: !!(await highsLaden()),
     stunden: planSummen(plan).bezahlt, mindest: mindest ? mindest.stunden : null,
     vergleich: {planer: planSummen(planer).bezahlt, optimierer: opt ? planSummen(opt).bezahlt : null}};
@@ -4357,7 +4530,10 @@ function pausenLuecken(plan){
     const p = tagKopie(plan, ti);
     pausenLegenTag(p, ti, true);
     const nachher = fehlzeiten(p, ti);
-    if (nachher.length < vorher.length) raus.push({ti, vorher, nachher, kasse: kasseLeer(plan, ti)});
+    // Nur die Kassenlücken nennen, die an den Pausen liegen — die nach dem Verschieben besetzt sind
+    const bleibt = new Set(kasseLeer(p, ti).flatMap(([v, b]) => Array.from({length: (b - v) / 15}, (_, n) => v + n * 15)));
+    const kasse = zuSpannen(kasseLeer(plan, ti).flatMap(([v, b]) => Array.from({length: (b - v) / 15}, (_, n) => v + n * 15)).filter(q => !bleibt.has(q)), 15);
+    if (nachher.length < vorher.length) raus.push({ti, vorher, nachher, kasse});
   });
   return raus;
 }
@@ -4370,13 +4546,13 @@ const pausenLueckeText = (plan, x) => `${tagName(x.ti)}: ${x.kasse.length ? "Kas
    „spätestens“ bis Ladenschluss gelegt werden durften (Frischfleisch am Abend).
    → [{ti, aufgaben: [{name, von, bis, frueh, spaet}]}] */
 function aufgabenAusserhalb(plan){
-  const offenVon = hatZeit(state.von) ? minuten(state.von) : 8*60, offenBis = hatZeit(state.bis) ? minuten(state.bis) : 21*60;
   const raus = [];
   (plan.tage || []).forEach((t, ti) => {
     if (t.feiertag) return;
+    const o = oeffnungAm(t.datum);
     const falsch = (t.aufgaben || []).filter(a => a.id !== "zusatz" && state.aufgaben[a.id] && state.aufgaben[a.id].aktiv).map(a => {
       const z = aufgabeAm(state.aufgaben[a.id], t.key);
-      const [frueh, spaet] = aufgabenFenster(z, a.bis - a.von, offenVon, offenBis);
+      const [frueh, spaet] = aufgabenFenster(z, a.bis - a.von, o.von, o.bis, o.normal);
       const eingetragen = (z.zeitArt === "fest" && hatZeit(z.fertig)) || (z.zeitArt === "spanne" && hatZeit(z.fBis));
       return {id: a.id, name: a.name, von: a.von, bis: a.bis, frueh, spaet,
               ab: !eingetragen ? (z.zeitArt === "fest" ? z.zeit : z.fVon) : null};
@@ -4385,10 +4561,13 @@ function aufgabenAusserhalb(plan){
   });
   return raus;
 }
-// „Fr: Frischfleisch 16:45–18:00 — fertig sein muss es bis 09:15“
-const aufgabenAusserhalbText = x => `${tagName(x.ti)}: ` + x.aufgaben.map(a => `${a.name} liegt ${hhmm(a.von)}–${hhmm(a.bis)}, `
-  + (a.bis > a.spaet ? `muss aber bis ${hhmm(a.spaet)} fertig sein${a.ab ? ` (ohne eingetragene Frist: höchstens 2 h nach ${a.ab} beginnen)` : ""}`
-                     : `darf aber erst ab ${hhmm(a.frueh)} beginnen`)).join("; ") + ".";
+// „Freitag: Frischfleisch 16:45–18:00 — muss bis 10:15 fertig sein.“ (kurz; der Grund steht hinter dem „i“)
+const aufgabenAusserhalbText = x => `${tagName(x.ti)}: ` + x.aufgaben.map(a => `${a.name} ${hhmm(a.von)}–${hhmm(a.bis)} — `
+  + (a.bis > a.spaet ? `muss bis ${hhmm(a.spaet)} fertig sein` : `darf erst ab ${hhmm(a.frueh)} beginnen`)).join("; ") + ".";
+// Woher die Frist kommt: eingetragen oder die Regel ohne Frist
+const aufgabenAusserhalbGrund = x => x.aufgaben.map(a => !a.ab ? `${a.name}: Frist aus den Wochenaufgaben.`
+  : hatZeit(state.von) && a.ab < state.von ? `${a.name}: keine Frist eingetragen — vor der Öffnung heißt das: fertig bis zur Öffnung.`
+  : `${a.name}: keine Frist eingetragen — dann höchstens 2 Stunden nach ${a.ab} beginnen.`).join(" ") + " Unter Wochenaufgaben lässt sich die Frist ändern.";
 
 /* Aufgaben eines Tages, die außerhalb ihres Fensters liegen, hineinlegen — die übrigen Aufgaben und
    alle Schichten bleiben. Gewählt wird die Lage, bei der am wenigsten fehlt, bei Gleichstand die früheste. */
@@ -4448,7 +4627,7 @@ function ausfallErlaubt(plan, j, ti, von, bis, ausser, lang, ohneAzubiGrenze){
   const {i, m} = planPerson(plan, j);
   if (!m) return false;
   const minder = minderjaehrig(m);
-  if (minder && !jugendZeit(von, bis)) return false;
+  if (minder && !jugendZeit(von, bis, (plan.tage[ti] || {}).datum)) return false;
   const anw = (bis - von)/60;
   if (!schichtLaengeOk(m, anw, lang)) return false;
   const e = (((state.abwesend || {})[wochenSchluessel(plan.mo instanceof Date ? plan.mo : montagDer(plan.mo))] || {})[i] || {})[TAGE[ti][0]];
@@ -4462,12 +4641,16 @@ function ausfallErlaubt(plan, j, ti, von, bis, ausser, lang, ohneAzubiGrenze){
   const nach = ti < plan.tage.length - 1 ? plan.tage[ti+1].schichten.filter(x => x.mi === j && x !== ausser) : [];
   if (vor.some(x => 24*60 - x.bis + von < ruhe - 0.5)) return false;
   if (nach.some(x => 24*60 - bis + x.von < ruhe - 0.5)) return false;
+  // Jugendliche: Berufsschultage zählen als Arbeitstage und mit 8 h (schulLast); Blockwoche: gar nicht
+  const abwWoche = (state.abwesend || {})[wochenSchluessel(plan.mo instanceof Date ? plan.mo : montagDer(plan.mo))] || {};
+  if (i >= 0 && blockWoche(abwWoche, i)) return false;
+  const schule = i >= 0 ? schulLast(abwWoche, i) : {tage: 0, stunden: 0};
   const tage = new Set(plan.tage.map((t, k) => t.schichten.some(x => x.mi === j && x !== ausser) || k === ti ? k : -1).filter(k => k >= 0));
-  if (tage.size > maxTageFuer(minder)) return false;
+  if (tage.size + schule.tage > maxTageFuer(minder)) return false;
   const arbeit = anw - pauseFuer(m, anw);
   if (minder || istLang(arbeit)){
     const woche = plan.tage.reduce((s, t, k) => s + t.schichten.filter(x => x.mi === j && x !== ausser && k !== ti).reduce((a, x) => a + x.arbeit, 0), 0);
-    if (minder && woche + arbeit > 40 + 0.01) return false;
+    if (minder && woche + arbeit + schule.stunden > REGELN.jugendWoche + 0.01) return false;
     // über 8 h am Tag nur, wenn die Woche bei höchstens 48 h bleibt (§ 3 ArbZG)
     if (istLang(arbeit) && woche + arbeit > REGELN.langWoche + 0.01) return false;
   }
@@ -4992,8 +5175,8 @@ function ereignisseAufraeumen(){
   state.ereignisse = (state.ereignisse || []).filter(e => e.bis >= isoVon(grenze));
   return vorher - state.ereignisse.length;
 }
-// Hinweise zum Plan ohne Über- und Minusstunden — die stehen im Plan selbst
-const STUNDEN_HINWEIS = /h verplant, Ziel|über ihren Vertragsstunden|über die Vertragsstunden hinaus/;
+// Hinweise zum Plan ohne Über- und Minusstunden — die stehen im Plan selbst (und gehören nicht an den Aushang)
+const STUNDEN_HINWEIS = /h verplant, Ziel|über ihren Vertragsstunden|über die Vertragsstunden hinaus|über dem Vertrag|Personen über Vertrag/;
 const hinweiseOhneStunden = meldungen => (meldungen || []).filter(m => !STUNDEN_HINWEIS.test(m.text));
 
 /* ---- Eine Abwesenheitsliste je Woche ------------------------------------------------
@@ -5380,7 +5563,7 @@ function entwurfPruefen(sl, kurz, eintrag){
   // Lücken im gültigen Plan, die nur an überlappenden Pausen liegen — mit „Pausen verschieben“ behoben
   pausenLuecken(plan).forEach(x => offen.push({art: "pausen", ti: x.ti, text: pausenLueckeText(plan, x)}));
   // Aufgaben außerhalb ihrer Frist (Wochenaufgaben geändert oder alte Regel) — mit „Aufgaben neu legen“ behoben
-  aufgabenAusserhalb(plan).forEach(x => offen.push({art: "aufgaben", ti: x.ti, text: aufgabenAusserhalbText(x)}));
+  aufgabenAusserhalb(plan).forEach(x => offen.push({art: "aufgaben", ti: x.ti, text: aufgabenAusserhalbText(x), info: aufgabenAusserhalbGrund(x)}));
   // Gesetz und Hausregeln: nur, was durch die Änderungen neu dazukam
   const vorher = new Set(handPruefung(planLaden(kurz)));
   const recht = handPruefung(planLaden(plan)).filter(x => !vorher.has(x) && !/nicht richtig besetzt/.test(x));
@@ -5567,9 +5750,12 @@ function wegErklaerung(w, platz, alle){
 /* Gruppen für die Anzeige: je eingeschaltetem Ausfall {fuer, schicht, luecke, fehlt, wege}.
    abTag: Tage davor sind vorbei — sie bekommen trotzdem Wege (zum Nachtragen), aber
    den Hinweis, dass sie vorbei sind. */
-function entwurfVorschlaege(sl, kurz, eintrag, abTag){
+/* o.nur: nur für diesen Ausfall rechnen (schneller); o.gesperrt: Namen, die für die Wege nicht in Frage
+   kommen („keiner von denen kann“) — ihre Schichten bleiben im Plan */
+function entwurfVorschlaege(sl, kurz, eintrag, abTag, o){
+  o = o || {};
   const raus = [];
-  eintrag.aenderungen.filter(a => a.aktiv && a.typ === "abwesend").forEach(c => {
+  eintrag.aenderungen.filter(a => a.aktiv && a.typ === "abwesend" && (!o.nur || a.id === o.nur)).forEach(c => {
     const andere = eintrag.aenderungen.filter(x => x !== c && x.fuer !== c.id);
     const ohne = entwurfAnwenden(kurz, andere).plan;
     const s = schichtenVon(ohne, c.name, c.ti);
@@ -5581,7 +5767,8 @@ function entwurfVorschlaege(sl, kurz, eintrag, abTag){
     const luecke = fehlzeiten(mit, c.ti).filter(m => !ziel.punkte.includes(m));
     const gruppe = {fuer: c, schicht: {von: s[0].von, bis: s[s.length - 1].bis}, luecke, vergangen: c.ti < (abTag || 0),
                     fehlt: luecke.length ? fehltText(mit, c.ti, luecke) : "", gruende: fehltGruende(mit, c.ti, luecke), wege: []};
-    if (luecke.length) gruppe.wege = mitEntwurfsAbwesenheiten(sl, Object.assign({}, eintrag, {aenderungen: andere.concat(c)}),
+    const sperre = (o.gesperrt || []).map(name => ({aktiv: true, typ: "abwesend", name, ti: c.ti, grund: "nicht"}));
+    if (luecke.length) gruppe.wege = mitEntwurfsAbwesenheiten(sl, Object.assign({}, eintrag, {aenderungen: andere.concat(c, sperre)}),
       () => wegeFuerTag(mit, c.ti, {von: s[0].von, bis: s[s.length - 1].bis}, ziel, c.name));
     raus.push(gruppe);
   });
@@ -5682,6 +5869,18 @@ const AUSFALL_QUOTE = AUSFALL.urlaub + AUSFALL.krank;
 // über 48 h in der Woche (§ 3 ArbZG im Schnitt). Azubis und Aushilfen zählen nicht: Azubis machen
 // keine, Aushilfen stecken schon im Minijob.
 const UEBERSTUNDEN_ANTEIL = 0.50;
+// Wer in einem Plan mehr als 50 % über dem Vertrag liegt → [{name, ist, soll}] (nur in der App, nie im Aushang)
+function ueberFuenfzig(plan){
+  const mo = plan.mo instanceof Date ? plan.mo : montagDer(plan.mo);
+  return state.mitarbeiter.map((m, i) => {
+    const j = platzImPlan(plan, m.name);
+    if (j < 0 || !hatKonto(m)) return null;
+    const soll = sollWoche(m, i, mo), ist = plan.tage.reduce((s, t) => s + t.schichten.filter(x => x.mi === j).reduce((a, x) => a + x.arbeit, 0), 0);
+    return soll > 0 && ist > soll * (1 + UEBERSTUNDEN_ANTEIL) + 0.01 ? {name: m.name, ist, soll} : null;
+  }).filter(Boolean);
+}
+const ueberFuenfzigText = x => `${x.name}: ${h1(x.ist)} h geplant — mehr als 50 % über dem Vertrag (${h1(x.soll)} h).`;
+
 // Wie viele Überstunden eine Person in der Woche höchstens machen kann
 const ueberstundenRaum = m => festesGehalt(m) && darfUeberstunden(m) && hatVertrag(m)
   ? Math.max(0, Math.min(stunden(m) * UEBERSTUNDEN_ANTEIL, REGELN.langWoche - stunden(m))) : 0;
@@ -5795,7 +5994,7 @@ function wochenBedarf(){
   const letzte = Object.keys(state.plaene || {}).sort().slice(-8).map(sl => state.plaene[sl].berechnung)
     .filter(b => b && b.mindest !== null && b.mindest !== undefined).map(b => b.mindest);
   if (letzte.length) return {stunden: letzte.reduce((s, x) => s + x, 0) / letzte.length,
-    quelle: letzte.length === 1 ? "Messlatte des letzten Plans" : `Messlatte der letzten ${letzte.length} Pläne`};
+    quelle: letzte.length === 1 ? "Aus dem letzten Plan" : `Schnitt der letzten ${letzte.length} Pläne`};
   return {stunden: a.bedarf, quelle: "aus der Einrichtung gerechnet"};
 }
 
@@ -5856,7 +6055,10 @@ function personalEmpfehlung(x){
     if (h <= 0.5) return null;
     if (h <= mj) return {titel: `Aushilfe mit ${h1(Math.max(4, halbe(h)))} h`, h: Math.max(4, halbe(h)), art: "aushilfe"};
     if (h <= 32) return {titel: `Teilzeitkraft mit ${stufe(h)} h`, h: stufe(h), art: "teil"};
-    const voll = Math.max(1, Math.floor(h / 38.5)), zus = h - voll * 38.5 > 2 ? einstellung(h - voll * 38.5) : null;
+    // Ganze Vollzeitstellen; bleibt mehr als eine Teilzeit (über 32 h), eine Vollzeit mehr
+    let voll = Math.max(1, Math.floor(h / 38.5)), rest = h - voll * 38.5;
+    if (rest > 32){ voll++; rest = 0; }
+    const zus = rest > 2 ? einstellung(rest) : null;
     return {titel: (voll === 1 ? "Vollzeitkraft" : `${voll} Vollzeitkräfte`) + (zus ? ` und ${zus.titel}` : ""), h: voll * 38.5 + (zus ? zus.h : 0), art: "voll"};
   };
   const PLUS = {aushilfe: "günstig, flexibel einsetzbar (Minijob-Grenze im Monat)",
@@ -5884,11 +6086,11 @@ function personalEmpfehlung(x){
   optionen.forEach(o => { o.empfohlen = o === empfohlen; });
   optionen.sort((p, q) => q.empfohlen - p.empfohlen);
   const warum = H <= 0.5
-    ? `Es fehlen nur Ausfälle (${h1(G)} h je Woche) — das tragen Überstunden mit wenig Last (${je(G)} h je Person). Wächst ein Konto dauerhaft, doch einstellen.`
+    ? `Es fehlen nur Stunden für Urlaub und Krankheit (${h1(G)} h je Woche) — Überstunden reichen (${je(G)} h je Person). Wächst ein Konto dauerhaft: einstellen.`
     : (S > 2 ? `Schon ohne Urlaub und Krankheit fehlen ${h1(S)} h — das ist dauerhaft und gehört fest besetzt.`
-             : `Die Ausfälle ganz über Überstunden wären ${je(G)} h je Person und Woche — auf Dauer zu viel.`)
+             : `Alle Ausfälle über Überstunden wären ${je(G)} h je Person und Woche — auf Dauer zu viel.`)
       + (A > 0.5 ? ` Von den Ausfällen (${h1(A)} h) tragen Überstunden ${h1(Math.min(A, ruhig))} h, das hält die Last gering.` : "")
-      + (G > U ? ` Selbst mit Überstunden bis 50 % (${h1(U)} h) reichte es nicht.` : "");
+      + (G > U ? ` Selbst mit Überstunden bis 50 % (${h1(U)} h) reicht es nicht.` : "");
   return {kennung: "fehlt-" + Math.round(G / 5) * 5, art: H <= 0.5 ? "gelb" : "rot",
     titel: `Es fehlen rund ${h1(G)} h pro Woche — ${empfohlen.titel}`,
     text: `${warum} Bedarf mit Urlaub und Krankheit ${h1(x.brutto)} h, vorhanden ${h1(x.vorhanden)} h (Verträge und Aushilfen).`,
@@ -5901,36 +6103,66 @@ function analyseEmpfehlungen(){
   if (!state.mitarbeiter.length) return [];
   const x = personalAnalyse(), raus = [];
   const stufe = n => Math.round(n / 5) * 5;
+  // Eine Möglichkeit: Titel, Vorteil, Nachteil — die empfohlene steht vorn
+  const wahl = (liste, nr) => liste.map((o, n) => Object.assign({deckt: null, empfohlen: n === nr}, o)).sort((p, q) => q.empfohlen - p.empfohlen);
+  const knapp = x.diff !== null && x.diff < -2;              // fehlen Stunden, gibt es Arbeit für mehr
   if (x.diff !== null){
     const fehlt = -x.diff;
     if (fehlt > 2) raus.push(personalEmpfehlung(x));
     else if (x.diff > Math.max(5, x.brutto * 0.08)){
+      const aushilfen = x.aushilfen > 0 && x.diff <= x.flexibel;
       raus.push({kennung: "zuviel-" + stufe(x.diff), art: "gelb", titel: `Etwa ${h1(x.diff)} h pro Woche mehr Stunden als nötig`,
-        text: `Vorhanden ${h1(x.vorhanden)} h, nötig ${h1(x.brutto)} h. Bei der nächsten Kündigung nicht voll nachbesetzen — sonst entstehen Minusstunden.`});
+        text: `Vorhanden ${h1(x.vorhanden)} h, nötig ${h1(x.brutto)} h je Woche. Sonst entstehen Minusstunden.`,
+        // Reichen die Aushilfen, sie zuerst; sonst bei der nächsten Kündigung nicht nachbesetzen
+        optionen: wahl([
+          x.aushilfen > 0 ? {titel: "Aushilfen weniger einplanen", plus: "wirkt sofort, ohne Vertragsänderung", minus: "die Aushilfen verdienen weniger"} : null,
+          {titel: "Bei der nächsten Kündigung nicht nachbesetzen", plus: "kein Eingriff in bestehende Verträge", minus: "wirkt erst, wenn jemand geht"},
+          {titel: "Vertragsstunden senken", plus: "wirkt sofort und dauerhaft", minus: "nur im Gespräch und mit Zustimmung; weniger Lohn"}
+        ].filter(Boolean), aushilfen ? 0 : x.aushilfen > 0 ? 1 : 0)});
     } else raus.push({kennung: "passt", art: "gruen", titel: "Die Besetzung passt zum Bedarf",
       text: `Vorhanden ${h1(x.vorhanden)} h, nötig ${h1(x.brutto)} h je Woche.`});
   }
-  if (x.a.fruehOk < 2) raus.push({kennung: "frueh-" + x.a.fruehOk, art: "rot", titel: "Eine weitere Person für die Frühschicht (Schlüssel)",
-    text: `Nur ${x.a.fruehOk} ${x.a.fruehOk === 1 ? "Person kann" : "Personen können"} die Frühschicht führen. Fällt sie aus, geht der Laden nicht auf.`});
-  if (x.a.spaetOk < 2) raus.push({kennung: "spaet-" + x.a.spaetOk, art: "rot", titel: "Eine weitere Person für die Spätschicht",
-    text: `Nur ${x.a.spaetOk} ${x.a.spaetOk === 1 ? "Person kann" : "Personen können"} die Spätschicht führen.`});
+  // Schichtführung: hängt an zu wenigen — erst schauen, wer es werden könnte
+  [["frueh", "Frühschicht", x.a.fruehOk], ["spaet", "Spätschicht", x.a.spaetOk]].forEach(([q, name, n]) => {
+    if (n >= 2) return;
+    const kand = state.mitarbeiter.filter(m => !istLeitung(m) && !istAushilfe(m) && !minderjaehrig(m) && !(m.qual || []).includes(q))
+      .sort((p, r) => stunden(r) - stunden(p) || (r.qual || []).length - (p.qual || []).length)[0];
+    raus.push({kennung: q + "-" + n, art: "rot", titel: `Eine weitere Person für die ${name}${q === "frueh" ? " (Schlüssel)" : ""}`,
+      text: `Nur ${n} ${n === 1 ? "Person kann" : "Personen können"} die ${name} führen.${q === "frueh" ? " Fällt sie aus, geht der Laden nicht auf." : ""}`,
+      optionen: wahl([
+        kand ? {titel: `${kand.name} zur ${name}vertretung machen`, plus: "schnell, kostet nur die Einarbeitung", minus: "mehr Verantwortung für die Person (Schlüssel, Kasse abrechnen)"} : null,
+        {titel: "Eine Stellvertretung einstellen", plus: "zusätzliche Führungskraft, auch für Urlaub", minus: "feste Kosten; dauert"}
+      ].filter(Boolean), 0)});
+  });
   // Konten: Überstunden der Gehaltsempfänger, Minusstunden, Übertrag der Aushilfen
   // Hohe Überstunden: mehr als 50 % der Wochenstunden auf dem Konto (Regel vom 17.11.2026)
   const plus = x.konten.filter(k => festesGehalt(k.m) && k.stand !== null && hatVertrag(k.m) && k.stand > stunden(k.m) * UEBERSTUNDEN_ANTEIL);
   if (plus.length) raus.push({kennung: "plus-" + plus.map(k => k.m.name).join(","), art: "gelb",
     titel: `Hohe Überstunden: ${plus.map(k => k.m.name).join(", ")}`,
-    text: "Mehr als die Hälfte einer Wochenarbeitszeit auf dem Konto. Abbauen (in ruhigen Wochen weniger einplanen): kostet nichts, "
-      + "braucht aber Wochen mit Luft. Auszahlen: sofort erledigt, kostet Lohn. Empfehlung: abbauen, wenn die nächsten Wochen Luft haben — sonst auszahlen."});
+    text: "Mehr als die Hälfte einer Wochenarbeitszeit auf dem Konto." + (knapp ? " Die Filiale hat gerade keine Luft für Abbau." : ""),
+    optionen: wahl([
+      {titel: "Abbauen", plus: "kostet nichts", minus: "braucht Wochen mit Luft — sonst fehlt die Person an anderer Stelle"},
+      {titel: "Auszahlen", plus: "sofort erledigt, die Person bleibt eingeplant", minus: "kostet Lohn"}
+    ], knapp ? 1 : 0)});
   const minus = x.konten.filter(k => festesGehalt(k.m) && k.stand !== null && k.stand < -10);
   if (minus.length) raus.push({kennung: "minus-" + minus.map(k => k.m.name).join(","), art: "rot",
     titel: `Minusstunden ausgleichen: ${minus.map(k => k.m.name).join(", ")}`,
-    text: "Mehr als 10 Minusstunden: in den nächsten Plänen mehr einplanen."});
+    text: "Mehr als 10 Minusstunden auf dem Konto.",
+    optionen: wahl([
+      {titel: "In den nächsten Plänen mehr einplanen", plus: "das Konto gleicht sich aus",
+        minus: knapp ? "kaum einer, solange in der Filiale Stunden fehlen" : "geht nur, wo es Arbeit gibt — sonst entstehen unnötige Stunden"},
+      {titel: "Vertragsstunden senken", plus: "Vertrag passt dann zum Bedarf", minus: "nur im Gespräch und mit Zustimmung; weniger Lohn"}
+    ], knapp || x.diff === null || x.diff < 5 ? 0 : 1)});
   state.mitarbeiter.filter(istAushilfe).forEach(m => {
     const k = aushilfenKonto(m.name).filter(z => z.vollstaendig);
     const l = k[k.length - 1];
     if (l && l.uebertrag > l.grenze * 0.25) raus.push({kennung: "uebertrag-" + m.name + "-" + stufe(l.uebertrag), art: "gelb",
       titel: `${m.name} baut Stunden auf, die nicht ausgezahlt werden`,
-      text: `${h1(l.uebertrag)} h über der Minijob-Grenze werden mitgenommen. Weniger einplanen oder mehr Stunden anbieten.`});
+      text: `${h1(l.uebertrag)} h über der Minijob-Grenze werden mitgenommen.`,
+      optionen: wahl([
+        {titel: "Weniger einplanen", plus: "bleibt unter der Grenze", minus: "die Stunden fehlen an anderer Stelle"},
+        {titel: "Mehr Stunden anbieten (Teilzeit statt Minijob)", plus: "die Arbeit wird bezahlt, die Person bleibt", minus: "Sozialversicherung, höhere Kosten"}
+      ], knapp ? 1 : 0)});
   });
   return raus;
 }
@@ -6185,11 +6417,15 @@ function tagesEinteilung(plan, ti, optionen){
       // zurückkommt, behält sie — sein Platz ruht so lange
       const eigen = besitzer.get(a).filter(n => daAm(n, m));
       besitzer.set(a, eigen);
-      const ruhen = eigen.filter(n => inPause(schichten[n], m) && schichten[n].pauseBis < a.bis).length;
+      const faehigFrei = [...frei].some(n => kann(schichten[n], braucht(a)));
+      // ruhen: in der eigenen Pause — oder solange man an der Kasse ablöst (die Hauptkasse ist noch weg)
+      const ruhen = !faehigFrei ? 0 : eigen.filter(n => (inPause(schichten[n], m) && schichten[n].pauseBis < a.bis)
+        || (n === kassierer && n !== haupt && haupt !== null && frei.has(n) && !frei.has(haupt))).length;
       const schon = bisher.get(a) || [];
       const kosten = n => !kann(schichten[n], braucht(a)) ? Infinity
         : (eigen.includes(n) ? 0 : 5 + (schichten[n].bis < a.bis ? 3 : 0) + (besitztGerade(n, m) ? 4 : 0))
-          + (festgelegt(a, n, m) ? 0 : 2) + (schon.includes(n) ? 0 : 1) + ((schichten[n].rollen || []).includes(a.name) ? 0 : 1)
+          + (festgelegt(a, n, m) ? 0 : festAktuell && (a.wer || []).some(x => x.von <= m && x.bis > m) ? 20 : 6)
+          + (schon.includes(n) ? 0 : 1) + ((schichten[n].rollen || []).includes(a.name) ? 0 : 1)
           + (leitung(n) ? 4 : 0) + (offen && n === haupt ? 3 : 0);
       for (let k = 0; k < Math.max(0, a.pers - ruhen); k++) plaetze.push({a, kosten, offen: 1000});
     });
@@ -6203,6 +6439,9 @@ function tagesEinteilung(plan, ti, optionen){
       if (pl.kasse){ k = n; return; }
       was[n][m] = {art: taetigkeitVon(pl.a), ref: pl.a}; frei.delete(n); jetzt.get(pl.a).push(n);
     });
+    // Löst ein Besitzer gerade an der Kasse ab, ruht seine Aufgabe — der Platz ist nicht „offen“
+    if (k !== null && haupt !== null && k !== haupt)
+      for (let x = offenePlaetze.length - 1; x >= 0; x--) if (besitzer.get(offenePlaetze[x].a).includes(k)) offenePlaetze.splice(x, 1);
     // Bleibt ein Platz offen, rechnet der Planer trotzdem nicht mit einem Mangel, solange
     // jemand mit dem Können im Laden ist — die Aufgabe läuft dann neben einer anderen her.
     // Erst wenn es niemand kann, fehlt wirklich jemand.
@@ -6212,10 +6451,13 @@ function tagesEinteilung(plan, ti, optionen){
       if (n === undefined) b.fehlt.push(m);
       else (b.nebenher[nameVon(schichten[n])] = b.nebenher[nameVon(schichten[n])] || []).push(m);
     });
-    // Besitz nachführen: Wer eine Aufgabe jetzt macht, besitzt sie; wer anderswo eingeteilt wurde, gibt sie ab
+    // Besitz nachführen: Wer eine Aufgabe jetzt macht, besitzt sie; wer anderswo eingeteilt wurde, gibt sie ab —
+    // außer in der Pause oder beim Ablösen an der Kasse (danach geht es mit der Aufgabe weiter)
+    const besitzVorher = new Set(laufend.flatMap(a => besitzer.get(a)));
     laufend.forEach(a => {
       const jetztDran = jetzt.get(a);
-      const eigen = besitzer.get(a).filter(n => jetztDran.includes(n) || (inPause(schichten[n], m) && schichten[n].pauseBis < a.bis));
+      const eigen = besitzer.get(a).filter(n => jetztDran.includes(n) || (inPause(schichten[n], m) && schichten[n].pauseBis < a.bis)
+        || (n === k && n !== haupt && haupt !== null));
       jetztDran.forEach(n => { if (!eigen.includes(n) && eigen.length < a.pers) eigen.push(n); });
       besitzer.set(a, eigen);
     });
@@ -6228,7 +6470,7 @@ function tagesEinteilung(plan, ti, optionen){
       const inDerPause = haupt !== null && (was[haupt][m] || {}).art === "pause";
       const pauseVorbei = n => schichten[n].pauseVon === null || schichten[n].pauseVon === undefined || schichten[n].pauseBis <= m;
       if (!leitung(k) && (haupt === null || (haupt !== k && (was[haupt][m] || {}).ref)
-          || (inDerPause && haupt !== k && schichten[k].bis >= schichten[haupt].bis && pauseVorbei(k) && !besitztGerade(k, m)))) haupt = k;
+          || (inDerPause && haupt !== k && schichten[k].bis >= schichten[haupt].bis && pauseVorbei(k) && !besitzVorher.has(k)))) haupt = k;
     }
     kassierer = k;
     frei.forEach(n => was[n][m] = {art: "laden"});
@@ -6659,9 +6901,11 @@ function assistentVerstehen(text, mo){
   if (G(/\b(keiner|keine|niemand|nein|nö|nee)\b|leider nicht|\bgeht nicht\b|klappt nicht|können (?:\S+ ){0,2}nicht|\bauch nicht\b|will nicht|wollen nicht|hat abgesagt|haben abgesagt/).test(t))
     plus("nein", G(/\bauch nicht\b/).test(t) ? 9 : hatLeute && grund && !G(/\bkeiner\b|\bniemand\b/).test(t) ? 3 : 7);
   // „Über mehrere Tage umplanen“ — der Optimierer verteilt die Woche neu
-  if (G(/\bumplan|mehrere(n)? tage|über die (ganze )?woche (verteil|neu)/).test(t)) plus("umplanen", 8);
+  if (G(/\bumplan|neu verteil/).test(t) && !grund) plus("umplanen", 8);
   // „Vorschläge für Mittwoch“, „Weiter: Dienstag“, „Was ist mit Freitag?“ — Schritt für Schritt durch einen Ausfall
-  if (G(/\bvorschl|\blösung(en)?\b|^ ?weiter\b|\bwas (ist|machen wir|tun wir) mit\b|\bnächste[nrs]? (tag|schicht)\b/).test(t) && !G(/\bandere/).test(t)) plus("vorschlag", 6.5);
+  const vorschlagWort = G(/\bvorschl|\blösung(en)?\b|^ ?weiter\b|\bnächste[nrs]? (tag|schicht)\b/).test(t);
+  const wasIstMit = G(/\bwas (ist|machen wir|tun wir) mit\b/).test(t);
+  if ((vorschlagWort || wasIstMit) && !G(/\bandere/).test(t)) plus("vorschlag", 6.5);
   if (G(/\bsonst\b|andere[nrs]? (möglichkeit|lösung|weg|idee|vorschl)|\balternativ|jemand anders|jemand anderes|\bwer noch\b|\bwer sonst\b|\bnoch (jemand|wer|was|eine|einen)\b|\bweitere\b|was (geht|ginge) noch|wie (geht|ginge) es|anders lösen|\banders\b/).test(t)) plus("sonst", 7);
   if (grund) plus("ausfall", hatLeute ? 8 : 6);
   if (G(/\bfrei\b|freigeben|soll nicht arbeiten|nicht einplanen|rausnehmen|aus dem plan/).test(t) && zeit.von === undefined && grund !== "urlaub") plus("frei", 7);
@@ -6680,7 +6924,8 @@ function assistentVerstehen(text, mo){
     .replace(aNeu(`\\b(${A_TAGE.map(x => x.join("|")).join("|")}|heute|morgen|übermorgen|und|auch|am|an|dann|bitte|für|den|die|der|das|noch|was ist mit|wie sieht es|aus|mit|ist|uhr|bis|ab|von|um|genauso|ebenfalls|gleiche|dasselbe|ganze[rn]? tag|ganze[rn]? woche|kommt später|geht früher|stunden?|minuten|eine|halbe|zwei|drei|\\-|\\?)\\b`, "g"), " ").trim();
   const nurAngaben = !restText && !!(hatLeute || tage.length || aHatZeit(zeit) || zeit.dauer !== undefined || teil);
   if (gruss && !absicht && !nurAngaben) absicht = "gruss";
-  return {absicht, punkte, personen: leute.personen, mehrdeutig: leute.mehrdeutig, tage, tagInfo, zeit, grund, teil, pronomen, nurAngaben, notiz, norm};
+  return {absicht, punkte, personen: leute.personen, mehrdeutig: leute.mehrdeutig, tage, tagInfo, zeit, grund, teil, pronomen, nurAngaben, notiz, norm,
+          nurWasIstMit: wasIstMit && !vorschlagWort};
 }
 
 /* ---- Lösungsarten: welche Art von Lösung in dieser Filiale meist gewählt wird ----
@@ -6740,10 +6985,8 @@ const wegKurz = w => ({zeilen: w.zeilen, voll: w.voll, offen: w.offen, luecke: w
   passt: `${w.voll ? "Lücke zu" : spannenText(w.offen) + " bleibt offen"} · ${w.mehr > 0.01 ? `+${h1(w.mehr)} h`
     : w.mehr < -0.01 ? `−${h1(-w.mehr)} h` : "±0 h"}${w.gelernt ? " · wählst du meist" : ""}`});
 
-const ASSISTENT_HILFE = "Schreib, wie du es sagen würdest. Zum Beispiel: „Eva ist morgen krank“, „Vorschläge für Mittwoch“, „Wer kann für sie einspringen?“, "
-  + "„Hans hat Mi bis Fr Urlaub“, „Bernd Mittwoch 8–14“, „Carla geht Freitag eine Stunde früher“, „Tausche Eva und Hans am Mittwoch“, "
-  + "„Wer arbeitet Samstag?“, „Warum ist Dirk am Dienstag eingeplant?“, „Was fehlt noch?“ — und nachfragen: „Keiner von denen kann“, "
-  + "„Und am Freitag?“, „Doch nicht“.";
+const ASSISTENT_HILFE = "Schreib, wie du es sagst, z. B. „Eva ist morgen krank“, „Hans hat Mi–Fr Urlaub“, „Bernd Mittwoch 8–14“, "
+  + "„Vorschläge für Freitag“, „Was fehlt noch?“ — und „Doch nicht“, wenn etwas zurück soll.";
 const ASSISTENT_START = ["Jemand fällt aus", "Wer kann einspringen?", "Was fehlt noch?", "Was kannst du?"];
 
 function assistent(text, sl, kurz, eintrag){
@@ -6751,6 +6994,8 @@ function assistent(text, sl, kurz, eintrag){
   const pr = entwurfPruefen(sl, kurz, eintrag), plan = pr.plan;
   const k = eintrag.kontext = eintrag.kontext || {};
   const v = assistentVerstehen(text, mo);
+  // „Was ist mit Freitag?“ heißt nur mitten im Schritt-für-Schritt „Vorschläge für Freitag“ — sonst Nachfrage zum Letzten
+  if (v.absicht === "vorschlag" && v.nurWasIstMit && !(k.schritte || []).length) v.absicht = null;
   const vor = name => name.split(G(/\s+/))[0];
   const heuteTi = (() => { const h = new Date(); h.setHours(12, 0, 0, 0); return Math.round((h - mo) / 864e5); })();
 
@@ -6811,17 +7056,17 @@ function assistent(text, sl, kurz, eintrag){
   const tageText = tage => tage.length > 2 && tage.every((ti, n) => !n || ti === tage[n - 1] + 1)
     ? `${tagName(tage[0])} bis ${tagName(tage[tage.length - 1])}` : tage.map(tagName).join(", ");
   // Karten für die Wege einer Lücke (gleiche Rechnung wie bei den Lösungen)
-  const wegKarten = (wege, fuer) => wege.map(w => karte({typ: "loesung", fuer: fuer || null, ti: w.ti, schritte: w.schritte,
-    titel: w.titel, art: w.art, weg: wegKurz(w)}, wegTitel(w)));
+  // fuer: die Änderung, an der die Lösung hängt; mit: alle, die mit eingeschaltet werden (Tausch = zwei)
+  const wegKarten = (wege, fuer, mit) => wege.map(w => karte({typ: "loesung", fuer: fuer || null, mit: mit || (fuer ? [fuer] : []), ti: w.ti,
+    schritte: w.schritte, titel: w.titel, art: w.art, weg: wegKurz(w)}, wegTitel(w)));
   const lueckenWege = (ti, ausschluss) => {
     const extra = (ausschluss || []).map(name => ({aktiv: true, typ: "abwesend", name, ti, grund: "nicht"}));
     return mitEntwurfsAbwesenheiten(sl, {aenderungen: eintrag.aenderungen.concat(extra)}, () =>
       wegeFuerTag(plan, ti, null, {maengel: tagesMaengel(kurz, ti), punkte: fehlzeiten(kurz, ti)}, null));
   };
-  const keinWeg = ti => `Mit dem vorhandenen Personal lässt sich die Lücke am ${tagName(ti)}${
-      (pr.luecken[ti] || k.luecke || []).length ? " (" + spannenText(pr.luecken[ti] || k.luecke) + ")" : ""} ohne Regelverstoß nicht schließen. `
-    + "Was bleibt: unter „Lösungen“ über mehrere Tage umplanen lassen, jemanden fragen, der eine Ausnahme machen kann "
-    + "(z. B. Filialleitung bleibt länger — dann Mehrarbeit mit Ausgleich), oder die Bereichsleitung um Unterstützung aus einer Nachbarfiliale bitten.";
+  // Lässt sich eine Lücke am Tag nicht schließen: kurz, was bleibt (Umplanen nur bei einem Ausfall)
+  const keinWeg = (ti, mitUmplanen) => `${tagName(ti)}${(pr.luecken[ti] || k.luecke || []).length ? " " + spannenText(pr.luecken[ti] || k.luecke) : ""}: `
+    + `ohne Regelverstoß nicht lösbar. Möglich: ${mitUmplanen ? "über mehrere Tage umplanen, " : ""}eine Ausnahme (Leitung bleibt länger) oder Hilfe aus der Nachbarfiliale.`;
   // Was die Karten im Plan auslösen würden: neue Lücken, verletzte Regeln
   const folgen = karten => {
     const probe = Object.assign({}, eintrag, {aenderungen: eintrag.aenderungen.concat(karten.map(a => Object.assign({}, a, {aktiv: true})))});
@@ -6846,10 +7091,10 @@ function assistent(text, sl, kurz, eintrag){
   /* Wege für einen Ausfall — auch für einen, der erst vorgeschlagen und noch nicht im Plan ist.
      ohne: Personen, die dafür nicht in Frage kommen („keiner von denen kann“). */
   const ausfallGruppe = (aus, ohne) => {
-    const extra = (ohne || []).map(name => ({id: "x" + name, aktiv: true, typ: "abwesend", name, ti: aus.ti, grund: "nicht", quelle: "assistent"}));
+    // Wer „nicht kann“, wird nur für die Wege gesperrt — seine Schicht bleibt im Plan
     const probe = Object.assign({}, eintrag, {aenderungen: eintrag.aenderungen.filter(a => a.id !== aus.id)
-      .concat(Object.assign({}, aus, {aktiv: true}), extra)});
-    return entwurfVorschlaege(sl, kurz, probe, 0).find(x => x.fuer.id === aus.id) || null;
+      .concat(Object.assign({}, aus, {aktiv: true}))});
+    return entwurfVorschlaege(sl, kurz, probe, 0, {nur: aus.id, gesperrt: ohne || []}).find(x => x.fuer.id === aus.id) || null;
   };
 
   // ---- Schritt für Schritt: erst die Änderung zeigen, dann Vorschläge je betroffener Schicht ----
@@ -6858,29 +7103,34 @@ function assistent(text, sl, kurz, eintrag){
   const schrittName = s => `${mehrere() ? vor(s.name) + ", " : ""}${tagName(s.ti)}`;
   const weiterKnopf = nr => { const s = (k.schritte || [])[nr + 1]; return s ? `Weiter: ${schrittName(s)}` : null; };
   // Was fehlt, wenn die Änderungen eingeschaltet wären — und die Wege, die es schließen
-  const probeWege = (ti, aktiv, ohne) => {
-    const extra = (ohne || []).map(name => ({id: "x" + name, aktiv: true, typ: "abwesend", name, ti, grund: "nicht", quelle: "assistent"}));
+  // nurLuecke: nur wissen, ob etwas fehlt — ohne die (teuren) Wege zu rechnen
+  const probeWege = (ti, aktiv, ohne, nurLuecke) => {
     const ids = new Set(aktiv.map(a => a.id));
     const probe = Object.assign({}, eintrag, {aenderungen: eintrag.aenderungen.filter(a => !ids.has(a.id))
-      .concat(aktiv.map(a => Object.assign({}, a, {aktiv: true})), extra)});
+      .concat(aktiv.map(a => Object.assign({}, a, {aktiv: true})))});
     const p2 = entwurfPruefen(sl, kurz, probe), luecke = p2.luecken[ti] || [];
-    if (!luecke.length) return {luecke, wege: [], fehlt: "", gruende: []};
-    // Wer die Änderung selbst ist, wird nicht als Lösung vorgeschlagen (Bernd geht früher — nicht: Bernd bleibt doch)
+    if (!luecke.length || nurLuecke) return {luecke, wege: [], fehlt: "", gruende: []};
+    // Wer die Änderung selbst ist, wird nicht als Lösung vorgeschlagen (Bernd geht früher — nicht: Bernd bleibt doch);
+    // wer „nicht kann“, ist für die Wege gesperrt, behält aber seine Schicht
     const selbst = aktiv.map(a => a.name).filter(Boolean);
-    const wege = mitEntwurfsAbwesenheiten(sl, probe, () => wegeFuerTag(p2.plan, ti, null, {maengel: tagesMaengel(kurz, ti), punkte: fehlzeiten(kurz, ti)}, null))
+    const sperre = (ohne || []).map(name => ({aktiv: true, typ: "abwesend", name, ti, grund: "nicht"}));
+    const wege = mitEntwurfsAbwesenheiten(sl, Object.assign({}, probe, {aenderungen: probe.aenderungen.concat(sperre)}),
+      () => wegeFuerTag(p2.plan, ti, null, {maengel: tagesMaengel(kurz, ti), punkte: fehlzeiten(kurz, ti)}, null))
       .filter(w => !w.zeilen.some(z => selbst.includes(z.name)));
     return {luecke, wege, fehlt: fehltText(p2.plan, ti, luecke), gruende: fehltGruende(p2.plan, ti, luecke)};
   };
   /* Vorschläge für einen Schritt: was fehlt (ein Satz), bis zu drei Wege als Karten, dann weiter
      zum nächsten Schritt. still: Änderungen, die mit dieser Antwort erst entstehen (Ausfall).
-     o.versatz: die nächsten drei Wege („Wie geht es sonst?“), o.vorweg: Satz davor. */
+     o.versatz: die nächsten drei Wege („Andere Vorschläge“), o.vorweg: Satz davor. */
   const vorschlagAntwort = (nr, still, o) => {
     o = o || {};
     const s = k.schritte[nr];
     if (k.schrittNr !== nr){ k.ausgeschlossen = []; k.versatz = 0; }
     k.schrittNr = nr; k.ti = s.ti;
     const versatz = o.versatz || 0, vorweg = o.vorweg ? o.vorweg + " " : "";
-    const kopf = `${tagName(s.ti)} ${s.zeit}`;
+    // Bei einem Ausfall die ausfallende Schicht, sonst wessen Zeit sich ändert
+    const kopf = s.aus || !s.name ? `${tagName(s.ti)} ${s.zeit}`
+      : (s.namen || []).length > 1 ? `${tagName(s.ti)} (${s.namen.map(vor).join(" und ")})` : `${tagName(s.ti)} (${vor(s.name)} ${s.zeit})`;
     const fuer = s.aus || (s.aend || [])[0] || null;
     let g;
     if (s.aus){
@@ -6899,9 +7149,9 @@ function assistent(text, sl, kurz, eintrag){
     k.kandidaten = [...new Set(wege.flatMap(w => w.zeilen.map(z => z.name)))];
     // Ohne vollständige Lösung am Tag: über mehrere Tage umplanen anbieten (nur bei einem Ausfall)
     const umplanen = s.aus && !g.wege.some(w => w.voll) ? "Über mehrere Tage umplanen" : null;
-    if (!wege.length) return antwort(`${vorweg}${versatz ? `Mehr Wege gibt es für ${tagName(s.ti)} nicht. ` : lage + " "}${keinWeg(s.ti)}`, [], [umplanen, weiter], still);
-    return antwort(`${vorweg}${lage} ${versatz ? "Weitere Vorschläge" : "Vorschläge"} — antippen zeigt sie im Plan:`, wegKarten(wege, fuer),
-      [weiter, "Keiner davon passt", g.wege.length > versatz + 3 ? "Wie geht es sonst?" : null, umplanen], still);
+    if (!wege.length) return antwort(`${vorweg}${versatz ? `Keine weiteren Vorschläge für ${tagName(s.ti)}. ` : lage + " "}${keinWeg(s.ti, !!s.aus)}`, [], [umplanen, weiter], still);
+    return antwort(`${vorweg}${lage} ${versatz ? "Weitere Vorschläge" : "Vorschläge"}:`, wegKarten(wege, fuer, s.aus ? [s.aus] : s.aend),
+      [weiter, "Keiner davon passt", g.wege.length > versatz + 3 ? "Andere Vorschläge" : null, umplanen], still);
   };
 
   /* Ein Ausfall: die Person fehlt an den Tagen. Erste Option: im Plan anzeigen. Zweite: Vorschläge
@@ -6928,7 +7178,8 @@ function assistent(text, sl, kurz, eintrag){
     if (alsErsatz && schritte.length) return vorschlagAntwort(0, still);
     const wer = namen.length > 1 ? namen.map(vor).join(" und ") : namen[0];
     const offeneTage = tage.filter(ti => !plan.tage[ti].feiertag);
-    const text = `${wer}: ${GRUND_NAME[grund]} ${offeneTage.length > 2 ? "von " : "am "}${tageText(offeneTage)}. `
+    const amStueck = offeneTage.length > 2 && offeneTage.every((ti, n) => !n || ti === offeneTage[n - 1] + 1);
+    const text = `${wer}: ${GRUND_TEXT[grund] || "fällt aus"} ${amStueck ? "von " : "am "}${tageText(offeneTage)}. `
       + (schritte.length ? `Betroffen: ${schritte.map(s => `${mehrere() ? vor(s.name) + " " : ""}${TAGE[s.ti][1]} ${s.zeit}`).join(" · ")}.`
                          : `${namen.length > 1 ? "Sie sind" : vor(namen[0]) + " ist"} dann nicht eingeplant — eintragen geht trotzdem.`);
     return antwort(text, [], [zeigen(still), schritte.length ? `Vorschläge für ${schrittName(schritte[0])}` : null], still);
@@ -6940,7 +7191,8 @@ function assistent(text, sl, kurz, eintrag){
     const schritte = [];
     [...new Set(karten.map(c => c.ti))].sort((x, y) => x - y).forEach(ti => {
       const hier = karten.filter(c => c.ti === ti);
-      if (probeWege(ti, hier).luecke.length) schritte.push({name: hier[0].name || "", ti, aend: hier.map(c => c.id),
+      if (probeWege(ti, hier, null, true).luecke.length) schritte.push({name: hier[0].name || "", ti, aend: hier.map(c => c.id),
+        namen: [...new Set(hier.map(c => c.name).filter(Boolean))],
         zeit: hier.filter(c => c.von !== undefined).map(c => `${hhmm(c.von)}–${hhmm(c.bis)}`).join(" + ") || "frei"});
     });
     k.schritte = schritte; k.schrittNr = -1; k.ausgeschlossen = [];
@@ -6967,7 +7219,7 @@ function assistent(text, sl, kurz, eintrag){
       : "Im Entwurf steht nichts von mir, das ich zurücknehmen könnte.");
     const fest = ziele.filter(a => a.quelle === "abwesenheit");
     const erg = antwort(`Zurückgenommen: ${ziele.map(a => a.text).join("; ")}.`
-      + (fest.length ? " Der Eintrag unter „Urlaub & Krankheit“ bleibt bestehen — dort lässt er sich löschen. Bis dahin steht die Schicht als „noch zu tun“ im Entwurf." : ""));
+      + (fest.length ? " Der Eintrag unter „Urlaub & Krankheit“ bleibt — dort löschen." : ""));
     erg.aus = ziele.map(a => a.id);
     return erg;
   }
@@ -7021,6 +7273,11 @@ function assistent(text, sl, kurz, eintrag){
         const a = aushilfeMonat(name, planMonat(plan), plan);
         return `${name} ist Aushilfe: im ${a.monatsname} ${h1(a.ist)} von höchstens ${hGenau(a.grenze)} h geplant.`;
       }
+      // Azubis: kein Konto — genau die Betriebsstunden
+      if (!x && m && istAzubi(m)){
+        const s = stundenNach(plan, platzImPlan(plan, name));
+        if (s) return `${name} hat im Entwurf ${h1(s.ist)} h in dieser Woche (Betriebsstunden ${h1(s.soll)} h). Azubis haben kein Konto.`;
+      }
       if (!x) return `${name}: keine Vertragsstunden hinterlegt.`;
       return `${name} hat im Entwurf ${h1(x.ist)} h in dieser Woche (Soll ${h1(x.soll)} h). Konto danach: ${ueText(x.ende) || "0,0"} h`
         + (darfUeberstunden(m) ? "." : " — macht keine Überstunden.");
@@ -7063,12 +7320,12 @@ function assistent(text, sl, kurz, eintrag){
         const vermerk = raus.map(name => karte({typ: "abwesend", name, ti, grund: "nicht"}, `${name} ${tagName(ti)}: kann nicht`));
         const wege = rechne();
         if (!wege.length) return antwort(`Verstanden — ${raus.map(vor).join(", ")} ${raus.length > 1 ? "können" : "kann"} ${tagName(ti)} nicht. ` + keinWeg(ti), vermerk);
-        return antwort(`Verstanden — ohne ${raus.map(vor).join(", ")}. So ginge es trotzdem:`, wegKarten(wege.slice(0, 3), aus && aus.id).concat(vermerk), ["Die können auch nicht", "Wie geht es sonst?"]);
+        return antwort(`Verstanden — ohne ${raus.map(vor).join(", ")}. So ginge es trotzdem:`, wegKarten(wege.slice(0, 3), aus && aus.id).concat(vermerk), ["Keiner davon passt", "Andere Vorschläge"]);
       }
     }
     const wege = rechne();
     if (!wege.length) return antwort(keinWeg(ti));
-    return antwort(`${f.absicht === "sonst" ? "Andere Wege" : "Diese Wege gibt es"} für ${tagName(ti)}:`, wegKarten(wege.slice(0, 3), aus && aus.id), ["Keiner von denen kann"]);
+    return antwort(`${f.absicht === "sonst" ? "Andere Vorschläge" : "Vorschläge"} für ${tagName(ti)}:`, wegKarten(wege.slice(0, 3), aus && aus.id), ["Keiner davon passt"]);
   }
 
   case "umplanen": {
@@ -7076,7 +7333,7 @@ function assistent(text, sl, kurz, eintrag){
     const id = (s && s.aus) || (k.problem && k.problem.aus);
     if (!id) return antwort("Erst schreiben, wer ausfällt — dann lässt sich die Woche um den Ausfall herum neu verteilen.");
     k.umplanen = id;
-    return antwort("Der Optimierer verteilt die Woche neu, so wenig wie möglich anders. Das Ergebnis steht gleich unter „Lösungen“ — dort antippen zeigt es im Plan.");
+    return antwort("Ich verteile die Woche neu — so wenig wie möglich anders. Das Ergebnis steht gleich unter „Lösungen“.");
   }
 
   case "vorschlag": {
@@ -7094,7 +7351,7 @@ function assistent(text, sl, kurz, eintrag){
       k.problem = null; k.luecke = pr.luecken[ti]; k.ausgeschlossen = []; k.ti = ti;
       k.kandidaten = [...new Set(wege.slice(0, 3).flatMap(w => w.zeilen.map(z => z.name)))];
       if (!wege.length) return antwort(keinWeg(ti));
-      return antwort(`${tagName(ti)}: ${spannenText(pr.luecken[ti])} ${fehltText(plan, ti, pr.luecken[ti])}. Vorschläge — antippen zeigt sie im Plan:`,
+      return antwort(`${tagName(ti)}: ${spannenText(pr.luecken[ti])} ${fehltText(plan, ti, pr.luecken[ti])}. Vorschläge:`,
         wegKarten(wege.slice(0, 3)), ["Keiner davon passt"]);
     }
     // Mit Namen: wie „Wer kann für Eva einspringen?“ — weiter im nächsten Fall
@@ -7118,8 +7375,8 @@ function assistent(text, sl, kurz, eintrag){
       k.problem = null; k.luecke = pr.luecken[ti]; k.ausgeschlossen = [];
       const wege = lueckenWege(ti, []);
       k.kandidaten = [...new Set(wege.flatMap(w => w.zeilen.map(z => z.name)))];
-      if (wege.length) return antwort(`${tagName(ti)}: ${spannenText(pr.luecken[ti])} ${fehltText(plan, ti, pr.luecken[ti])}. Vorschläge — antippen zeigt sie im Plan:`,
-        wegKarten(wege.slice(0, 3)), ["Keiner von denen kann"]);
+      if (wege.length) return antwort(`${tagName(ti)}: ${spannenText(pr.luecken[ti])} ${fehltText(plan, ti, pr.luecken[ti])}. Vorschläge:`,
+        wegKarten(wege.slice(0, 3)), ["Keiner davon passt"]);
     }
     // „Wer kann Eva ersetzen?“ — der Ausfall dieser Person, mit allen Wegen
     const fehlt = f.personen.find(name => schichtenVon(plan, name, ti).length);
@@ -7140,14 +7397,14 @@ function assistent(text, sl, kurz, eintrag){
     if (!frei.length){
       const wege = von === null ? [] : lueckenWege(ti, ausgeschlossen);
       if (!wege.length) return antwort(`${tagName(ti)}${von !== null ? " " + hhmm(von) + "–" + hhmm(bis) : ""} kann niemand zusätzlich kommen. ` + keinWeg(ti));
-      return antwort(`${tagName(ti)} kann niemand zusätzlich kommen — aber so ginge es:`, wegKarten(wege.slice(0, 3)), ["Keiner von denen kann"]);
+      return antwort(`${tagName(ti)} kann niemand zusätzlich kommen — aber so ginge es:`, wegKarten(wege.slice(0, 3)), ["Keiner davon passt"]);
     }
     const lang = von === null ? null : Math.max(bis, von + MINSCHICHT * 60);
-    const karten = von === null ? [] : frei.slice(0, 4).map(m =>
+    const karten = von === null ? [] : frei.slice(0, 3).map(m =>
       karte({typ: "schicht", name: m.name, ti, von, bis: lang}, `${m.name} ${tagName(ti)} ${hhmm(von)}–${hhmm(lang)}`));
-    return antwort(`${tagName(ti)}${von !== null ? " " + hhmm(von) + "–" + hhmm(bis) : ""} haben frei und dürften kommen: ${frei.map(m => m.name).join(", ")}`
-      + (von !== null && lang > bis ? ` (mindestens ${MINSCHICHT} Stunden, also bis ${hhmm(lang)})` : "") + ". Ob sie wirklich können, weiß nur die Person selbst.",
-      karten, ["Keiner von denen kann"]);
+    return antwort(`${tagName(ti)}${von !== null ? " " + hhmm(von) + "–" + hhmm(bis) : ""}: frei und dürften kommen: ${frei.map(m => vor(m.name)).join(", ")}`
+      + (von !== null && lang > bis ? ` (mindestens ${MINSCHICHT} h, also bis ${hhmm(lang)})` : "") + ". Vorher fragen.",
+      karten, ["Keiner davon passt"]);
   }
 
   case "tausch": {
@@ -7404,9 +7661,8 @@ function azubiFehlstunden(plan){
     const gruende = [];
     if (schule) gruende.push(`${schule} ${schule === 1 ? "Tag" : "Tage"} Berufsschule`);
     if (weg) gruende.push(`${weg} ${weg === 1 ? "Tag" : "Tage"} abwesend`);
-    gruende.push(minderjaehrig(m) ? "an den übrigen Tagen lässt der Jugendschutz nicht mehr zu (höchstens 8 h am Tag, 5 Tage, 6 bis 20 Uhr)"
-      : "an den übrigen Tagen lassen Ruhezeit, Höchstarbeitszeit und Mindestschicht nicht mehr zu");
-    raus.push({name: m.name, fehlt, text: `${m.name}: Bis zu den Betriebsstunden fehlen ${h1(fehlt)} h — ${gruende.join("; ")}.`});
+    gruende.push(minderjaehrig(m) ? "Jugendschutz lässt nicht mehr zu" : "Ruhezeit und Höchstarbeitszeit lassen nicht mehr zu");
+    raus.push({name: m.name, fehlt, text: `${m.name}: ${h1(fehlt)} h unter den Betriebsstunden — ${gruende.join(", ")}.`});
   });
   return raus;
 }
@@ -8120,7 +8376,7 @@ if (typeof window.addEventListener === "function"){
 const NEUIGKEITEN = [
   {ziel: "personal", id: "neu:funktionsnamen", text: "Funktionen heißen jetzt „Kassieren“, „Ware verräumen“ und „Bestellen“."},
   {ziel: "personal", id: "neu:ereignisse-beim-mitarbeiter", text: "Urlaub und Krankheit trägst du jetzt direkt beim Mitarbeiter ein."},
-  {ziel: "personal", id: "neu:funktionen-pae-konto", text: "Neue Funktionen „Preisänderungen (PÄ)“ und „Kontoauszug“ — bei Leitung und Vertretung angehakt, weitere bitte selbst anhaken."}
+  {ziel: "personal", id: "neu:funktionen-pae-konto", text: "Neue Funktionen „PÄ“ und „Kontoauszug“ — bei Leitung und Vertretung angehakt."}
 ];
 
 function markierungen(){
@@ -8147,7 +8403,7 @@ function markierungen(){
   // Pläne: Wer steht im Plan, obwohl er inzwischen fehlt? (laufende und kommende Wochen)
   const jetzt = wochenSchluessel(aktuellerMontag());
   Object.keys(state.plaene || {}).filter(sl => sl >= jetzt).forEach(sl =>
-    planKonflikte(sl).forEach(k => add("aendern", `konflikt:${sl}:${k.name}:${k.ti}`, "anpassen", k.text)));
+    planKonflikte(sl).forEach(k => add("aendern", `konflikt:${sl}:${k.name}:${k.ti}`, "anpassen", `KW ${kwVon(montagAusSchluessel(sl))}, ${k.text}`)));
   // … und wo sich Pausen überschneiden, sodass kurz niemand kassiert
   Object.keys(state.plaene || {}).filter(sl => sl >= jetzt).forEach(sl => pausenLuecken(state.plaene[sl]).forEach(x =>
     add("aendern", `pausen:${sl}:${x.ti}`, "anpassen", `KW ${kwVon(montagAusSchluessel(sl))}, ${pausenLueckeText(state.plaene[sl], x)}`)));
@@ -8699,13 +8955,13 @@ function sicherungsKnoepfe(){
     });
     const name = "Filialplaner-Sicherung-" + new Date().toISOString().slice(0,10) + ".json";
     anbieten(new Blob([JSON.stringify(paket, null, 2)], {type:"application/json"}), name);
-    sagen(Object.keys(paket.filialen).length + " Filialen gespeichert.");
+    sagen((n => n + (n === 1 ? " Filiale" : " Filialen") + " gespeichert.")(Object.keys(paket.filialen).length));
   };
 
   k.querySelector("#sichEin").onclick = async () => {
     if (inApp){
       const zahl = await appRuf("sicherungEinlesen", {});
-      if (zahl > 0){ sagen(zahl + " Filialen eingelesen."); k.closest("#liste").innerHTML = ""; render(); }
+      if (zahl > 0){ sagen(zahl + (zahl === 1 ? " Filiale" : " Filialen") + " eingelesen."); k.closest("#liste").innerHTML = ""; render(); }
       else if (zahl === 0) sagen("Nichts übernommen — die Sicherung war nicht neuer.");
       return;
     }
@@ -8727,7 +8983,7 @@ function sicherungsKnoepfe(){
           merkeZugang(inhalt.nr || id.slice(1), inhalt.ort || "", inhalt.pw || "");
           n++;
         }
-        sagen(n ? n + " Filialen eingelesen." : "Nichts übernommen — die Sicherung war nicht neuer.");
+        sagen(n ? n + (n === 1 ? " Filiale" : " Filialen") + " eingelesen." : "Nichts übernommen — die Sicherung war nicht neuer.");
         if (n) render();
       } catch(e){ sagen("Die Datei ließ sich nicht lesen."); }
     };
@@ -8816,7 +9072,7 @@ function warentage(){
         Eine feste Uhrzeit ist der <b>früheste Beginn</b>; liegen mehrere Aufgaben zur selben Zeit, legt der Planer sie nacheinander.
         Was schwankt, bleibt leer. Abschalten nur, wenn ohne die Aufgabe geplant werden soll.`, "Wochenaufgaben")}</h1></div>
     <div id="tasks" class="task-liste"></div>
-    <h2 style="margin:28px 0 12px">Bestellungen${infoHtml("Je Bestellung Tage und Frist. Die Frist steht im Plan in der Zeile „Bestellung“; mit einer Dauer wird die Bestellung auch eingeplant.", "Bestellungen")}</h2>
+    <h2 class="abschnitt" style="margin:28px 0 12px">Bestellungen${infoHtml("Je Bestellung Tage und Frist. Die Frist steht im Plan in der Zeile „Bestellung“; mit einer Dauer wird die Bestellung auch eingeplant.", "Bestellungen")}</h2>
     <div id="bestellungen" class="task-liste"></div>
     <div class="tile" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
       <span class="eyebrow">Personenstunden pro Woche, soweit angegeben</span>
@@ -8872,7 +9128,12 @@ function ohneFristText(z){
   const ab = z.zeitArt === "fest" && hatZeit(z.zeit) && !hatZeit(z.fertig) ? z.zeit
            : z.zeitArt === "spanne" && hatZeit(z.fVon) && !hatZeit(z.fBis) ? z.fVon : null;
   if (!ab) return "";
-  if (hatZeit(state.von) && ab < state.von) return `ohne Frist: fertig bis zur Öffnung (${state.von})`;
+  // dieselbe Rechnung wie der Planer (aufgabenFenster): vor der Öffnung fertig bis zur Öffnung — dauert
+  // die Aufgabe länger, so lange sie eben dauert
+  if (hatZeit(state.von) && ab < state.von){
+    const ende = Math.max(minuten(ab) + Math.round(nz(z.dauer) * 4) * 15, minuten(state.von));
+    return `ohne Frist: fertig bis ${hhmm(ende)}${hhmm(ende) === state.von ? " (Öffnung)" : ""}`;
+  }
   return `ohne Frist: beginnt spätestens ${hhmm(minuten(ab) + AUFGABEN_SPIELRAUM)}`;
 }
 
@@ -9247,7 +9508,7 @@ function personSeite(){
   // Urlaub und Krankheit dieser Person — hier ist der Hauptweg, sie einzutragen
   if (!neuM){
     const ue = el(rubrikHtml("Urlaub & Krankheit", `<div data-form></div><div data-liste></div>`, 'class="rubrik person-ereignisse"',
-      "Gespeichert wird nur Art und Zeitraum. Steht für die Tage schon ein Plan, ist die Person dort unter „Plan ändern“ rot markiert."));
+      "Gespeichert werden nur Art und Zeitraum. Steht für die Tage schon ein Plan, ist die Person dort unter „Plan ändern“ rot markiert."));
     const zeichne = () => {
       const l = ue.querySelector("[data-liste]");
       l.innerHTML = ""; l.appendChild(ereignisListe(m.name, zeichne));
@@ -9268,7 +9529,7 @@ function standardwoche(){
 
   const box = p.querySelector("#wochen");
   if (!state.mitarbeiter.length){
-    box.appendChild(el(`<p class="empty">Noch niemand erfasst — bitte erst Schritt 4 ausfüllen.</p>`));
+    box.appendChild(el(`<p class="empty">Noch niemand erfasst — erst unter „Personal“ anlegen.</p>`));
     p.appendChild(navLeiste(3));
     return p;
   }
@@ -9410,10 +9671,10 @@ function stundenliste(){
           `<td class="n" data-l="${k}">–</td>`).join("")}<td class="n" id="sumL">–</td></tr>
       </tbody></table></div>
 
-    <h3 style="margin:22px 0 8px">Liste des Bereichsleiters einlesen${infoHtml("Excel (.xlsx) und CSV werden direkt ausgewertet. PDF und Fotos werden der Woche beigelegt — die Zahlen dann von Hand eintragen.", "Liste einlesen")}</h3>
+    <h3 class="abschnitt" style="margin:22px 0 8px">Liste des Bereichsleiters einlesen${infoHtml("Excel (.xlsx) und CSV werden direkt ausgewertet. PDF und Fotos werden der Woche beigelegt — die Zahlen dann von Hand eintragen.", "Liste einlesen")}</h3>
     <div class="ablage" id="ablage" tabindex="0" role="button">
       <b>Datei hierher ziehen</b>
-      <span>oder klicken zum Auswählen</span>
+      <span>oder antippen zum Auswählen</span>
     </div>
     <input type="file" id="datei" accept=".xlsx,.xls,.csv,.pdf,image/*" hidden>
     <p class="err" id="lesefehler"></p>
@@ -9444,7 +9705,7 @@ function stundenliste(){
     const box = p.querySelector("#anhang");
     box.innerHTML = "";
     if (!liste.anhang) return;
-    const z = el(`<div class="note info" style="margin-top:12px"><span class="ic">i</span>
+    const z = el(`<div class="note info" style="margin-top:12px"><span class="ic">•</span>
       <span>Beigelegt: <b>${esc(liste.anhang.name)}</b> — aus Scans und Fotos lassen sich die
       Zahlen nicht automatisch lesen, sie müssen oben eingetragen werden.
       <button class="btn ghost small" id="wegDamit" style="margin-left:8px">entfernen</button></span></div>`);
@@ -9612,13 +9873,13 @@ function pruefen(){
     const fest = state.mitarbeiter.filter(m => !istAushilfe(m)).length;
     bedarf.appendChild(el(`<div class="balken">
       ${balken("Mindestbedarf", x.bedarf.stunden, "b1", esc(x.bedarf.quelle) + ".")}
-      ${balken("mit Urlaub und Krankheit", x.brutto, "b2", `Mindestbedarf plus ${Math.round(AUSFALL_QUOTE * 100)} % (${h1(AUSFALL.urlaub * 100)} % Urlaub, ${h1(AUSFALL.krank * 100)} % Krankheit).`)}
+      ${balken("Mit Urlaub und Krankheit", x.brutto, "b2", `${Math.round(AUSFALL_QUOTE * 100)} % der Zeit fallen aus (${h1(AUSFALL.urlaub * 100)} % Urlaub, ${h1(AUSFALL.krank * 100)} % Krankheit) — dafür rund ${Math.round((1 / (1 - AUSFALL_QUOTE) - 1) * 100)} % mehr als der Mindestbedarf.`)}
       ${balken("Vertragsstunden", x.vertrag, x.diff < -2 ? "b3 knapp" : "b3", `${fest} ${fest === 1 ? "Person" : "Personen"} mit Vertrag (Festangestellte und Azubis)${
         a.ohneStunden.length ? `, davon ${a.ohneStunden.length} ohne Stundenangabe` : ""}.`)}
       ${balken("Aushilfestunden", x.flexibel, "b4", `${x.aushilfen} ${x.aushilfen === 1 ? "Aushilfe" : "Aushilfen"} × bis ${h1(x.aushilfeWoche)} h je Woche —
         so viel lässt die Minijob-Grenze (${hGenau(minijobStunden(x.jahr))} h im Monat) zu. Flexibel einsetzbar.`)}
-      ${x.ueberPuffer > 0.5 ? balken("Überstunden für Ausfälle", x.ueberstunden, "b5", `Bis ${Math.round(UEBERSTUNDEN_ANTEIL * 100)} % der Vertragsstunden je Person, die Überstunden machen darf `
-        + `(höchstens ${h1(x.ueberPuffer)} h je Woche) — so viel lässt sich von Urlaub und Krankheit abfangen und später abbauen oder auszahlen.`) : ""}
+      ${x.ueberPuffer > 0.5 ? balken("Überstunden möglich", x.ueberPuffer, "b5", `Bis ${Math.round(UEBERSTUNDEN_ANTEIL * 100)} % der Vertragsstunden je Person, die Überstunden machen darf, `
+        + `nie über 48 h in der Woche. Die Empfehlung plant davon nur rund ein Drittel ein — mehr wäre auf Dauer zu viel.`) : ""}
     </div>`));
   }
 
@@ -9630,7 +9891,8 @@ function pruefen(){
       <i class="empf-punkt" aria-hidden="true"></i><span class="empf-titel">${esc(e.titel)}</span>
       <span class="rolle-pfeil" aria-hidden="true">${symbol("weiter")}</span></summary><p>${esc(e.text)}</p>${e.optionen ? `
       <div class="empf-optionen">${e.optionen.map(o => `<div class="empf-option${o.empfohlen ? " empfohlen" : ""}">
-        <div class="eo-kopf"><b>${esc(o.titel)}</b>${o.empfohlen ? `<span class="tag">empfohlen</span>` : ""}<span class="num">deckt ${h1(o.deckt)} h</span></div>
+        <div class="eo-kopf"><b>${esc(o.titel)}</b>${o.empfohlen ? `<span class="tag">empfohlen</span>` : ""}${
+          o.deckt === null || o.deckt === undefined ? "" : `<span class="num">deckt ${h1(o.deckt)} h</span>`}</div>
         <div class="eo-zeile"><b class="eo-plus" aria-label="Vorteil">+</b><span>${esc(o.plus)}</span></div>
         <div class="eo-zeile"><b class="eo-minus" aria-label="Nachteil">−</b><span>${esc(o.minus)}</span></div></div>`).join("")}</div>` : ""}</details>`).join("")}</div>`));
 
@@ -9641,8 +9903,8 @@ function pruefen(){
         : "2 Personen × " + h1(a.offenH) + " h Öffnung × 6 Tage"}</td><td class="n">${a.grund === null ? "?" : h1(a.grund)}</td></tr>
       <tr><td>Vorlauf vor Öffnung</td><td class="hint">Termine, die zwingend vorher liegen</td><td class="n">${a.grund === null ? "?" : h1(a.vorlauf)}</td></tr>
       <tr><td>Nachlauf nach Ladenschluss</td><td class="hint">Abendprogramm, Abrechnung</td><td class="n">${a.grund === null ? "?" : h1(a.nachlauf)}</td></tr>
-      <tr><td>Zusätzliche Kräfte für Warentermine</td><td class="hint">${a.offeneAufgaben.length
-        ? "ohne " + a.offeneAufgaben.length + " Aufgabe(n) ohne vollständige Angabe" : "jede Person über die erste hinaus"}</td><td class="n">${h1(a.zusatz)}</td></tr>
+      <tr><td>Zusätzliche Kräfte für Aufgaben</td><td class="hint">${a.offeneAufgaben.length
+        ? `${a.offeneAufgaben.length} ${a.offeneAufgaben.length === 1 ? "Aufgabe" : "Aufgaben"} ohne Angaben nicht mitgerechnet` : "jede Person über die erste hinaus"}</td><td class="n">${h1(a.zusatz)}</td></tr>
       <tr><td><b>Zusammen</b></td><td class="hint">ohne Krankheit und Urlaub</td><td class="n"><b>${a.bedarf === null ? "?" : h1(a.bedarf)}</b></td></tr>
     </tbody></table></div>`));
 
@@ -9809,7 +10071,7 @@ function tagesAnalyse(beiWochenwechsel){
     // Was auffällt: Aufgaben, die neben einer anderen herlaufen — und solche, die niemand kann
     const nebenher = e.aufgaben.filter(a => a.nebenher.length);
     const notizen = [];
-    if (nebenher.length) notizen.push(`<div class="note info"><span class="ic">i</span><span><b>Läuft nebenher:</b>
+    if (nebenher.length) notizen.push(`<div class="note info"><span class="ic">•</span><span><b>Läuft nebenher:</b>
       ${nebenher.map(a => `${esc(a.name)} (${a.nebenher.map(n => `${esc(vor(n.name))} ${n.spannen.map(spanneText).join(", ")}`).join("; ")})`).join(" · ")}
       ${infoHtml("Zu diesen Zeiten ist niemand mit dem nötigen Können frei — wer es kann, ist schon eingeteilt.", "Läuft nebenher")}</span></div>`);
     e.aufgaben.filter(a => a.fehlt.length).forEach(a => notizen.push(`<div class="note warn"><span class="ic">!</span><span>
@@ -10158,7 +10420,7 @@ function heuteKarte(){
    Wer, was, von wann bis wann. Steht die Person an den Tagen im Plan, führt der Knopf
    darunter direkt zu „Plan ändern“ mit den Lösungen. */
 function ausfallDialog(){
-  const inhalt = el(`<div class="ausfalldialog"><h2>Ausfall eintragen${infoHtml("Jemand ist krank oder fehlt kurzfristig. Steht die Person an den Tagen schon im Plan, geht es von hier direkt zu den Lösungen.", "Ausfall eintragen")}</h2></div>`);
+  const inhalt = el(`<div class="ausfalldialog"><h2>Ausfall eintragen${infoHtml("Kurzfristiger Ausfall. Steht die Person an den Tagen schon im Plan, geht es danach zu „Plan ändern“ — dort hilft der Assistent.", "Ausfall eintragen")}</h2></div>`);
   let d = null;
   inhalt.appendChild(ereignisFormular(null, () => render(), "krank"));      // kurzfristig ist es fast immer das
   inhalt.querySelector("[data-eintragen]").classList.add("haupt");
@@ -10193,13 +10455,14 @@ function planTagesansicht(plan, sl, ti, neu){
   const r = planRaster(plan), infos = [];
   const lief = r.lieferungen.map(x => x.tage[ti]).filter(Boolean);
   if (lief.length) infos.push(["Lieferung", lief.join(" · ")]);
-  if (r.mitBestellung && r.bestellung[ti].length) infos.push(["Bestellung", r.bestellung[ti].join(" · ")]);
+  // ausgeschrieben — die Kürzel des Aushangs stünden sonst neben den Kürzeln der Legende
+  if (r.mitBestellung && r.bestellungVoll[ti].length) infos.push(["Bestellung", r.bestellungVoll[ti].map(([frist, namen]) => namen.join(", ") + (frist ? " " + frist : "")).join(" · ")]);
   const notiz = (plan.notizen || {})[plan.tage[ti].key];
   if (notiz) infos.push(["Notiz", notiz]);
   if (infos.length) box.appendChild(el(`<div class="tag-infos">${infos.map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join("")}</div>`));
   // Liegt eine Aufgabe außerhalb ihrer Frist, oder steht die Kasse kurz leer: gleich dazu, wo es sich beheben lässt
   aufgabenAusserhalb(plan).filter(x => x.ti === ti).forEach(x => {
-    const n = el(`<div class="note bad"><span class="ic">×</span><span>${esc(aufgabenAusserhalbText(x))}
+    const n = el(`<div class="note bad"><span class="ic">×</span><span>${esc(aufgabenAusserhalbText(x))}${infoHtml(esc(aufgabenAusserhalbGrund(x)), "Frist")}
       <span class="knopfreihe"><button class="btn small" type="button">In „Plan ändern“ neu legen</button></span></span></div>`);
     n.querySelector("button").onclick = () => planAendernOeffnen(sl);
     box.appendChild(n);
@@ -10254,6 +10517,8 @@ function planKarte(mo, pdfIstHaupt){
     inhalt.appendChild(planAnzeige(plan, {klickbar: true, zellen: geaendert}));
     if (Object.keys(geaendert).length) inhalt.appendChild(el(`<div class="legende"><span><i class="geaendert"></i> nach dem Erstellen geändert
       — darunter klein die ursprüngliche Zeit</span></div>`));
+    // Überstunden über 50 % des Vertrags: erlaubt, aber ein Hinweis — nur hier, nicht im Aushang
+    ueberFuenfzig(gespeichert).forEach(x => inhalt.appendChild(el(`<div class="note warn"><span class="ic">!</span><span>${esc(ueberFuenfzigText(x))}</span></div>`)));
   }
   if (plan){
     // Drucken, in die Gruppe schicken, aushängen — in der App über „Teilen“
@@ -10379,9 +10644,9 @@ function planenAnsicht(){
       <div class="phasenwahl" role="radiogroup" aria-label="Art der Woche" id="phasenwahl"></div>
       <div id="phasenDetail"></div>
     </div>
-    <h3 style="margin:18px 0 10px">Abwesenheiten in KW ${kwVon(mo)}${infoHtml("Alles, was für die Woche eingetragen ist — mit Herkunft: Urlaub & Krankheit, Abgabe, Terminliste oder von Hand.", "Abwesenheiten")}</h3>
+    <h3 class="abschnitt" style="margin:18px 0 10px">Abwesenheiten in KW ${kwVon(mo)}${infoHtml("Alles, was für die Woche eingetragen ist — mit Herkunft: Urlaub & Krankheit, Abgabe, Terminliste oder von Hand.", "Abwesenheiten")}</h3>
     <div id="abwListe"></div>
-    <h3 style="margin:16px 0 8px;font-size:.95rem">Eintragen oder ändern${infoHtml("„nur …“ und „nicht …“ brauchen beide Uhrzeiten — fehlt eine, wird das Feld rot und der Plan wartet.", "Eintragen")}</h3>
+    <h3 class="abschnitt" style="margin:16px 0 8px;font-size:.95rem">Eintragen oder ändern${infoHtml("„nur …“ und „nicht …“ brauchen beide Uhrzeiten — fehlt eine, wird das Feld rot und der Plan wartet.", "Eintragen")}</h3>
     <div class="tablewrap"><table class="abwtabelle"><thead><tr><th>Mitarbeiter</th>${
       TAGE.map(([,l]) => `<th>${l}</th>`).join("")}</tr></thead><tbody id="abwBody"></tbody></table></div>
     <div class="bereit" id="bereit"></div>
@@ -10457,7 +10722,7 @@ function planenAnsicht(){
   // Art der Woche — wird je Woche gemerkt, auch wenn noch kein Plan entsteht
   const ph = state.phasen[sl] = phaseNormal(state.phasen[sl] || (state.plaene[sl] && state.plaene[sl].phase));
   const wahlBox = p.querySelector("#phasenwahl"), detail = p.querySelector("#phasenDetail");
-  [["normal","Standardwoche","Alles wie hinterlegt: Aufgaben, Personal, Überstunden, Stundenliste, Standardwoche."],
+  [["normal","Normale Woche","Alles wie hinterlegt: Aufgaben, Personal, Überstunden, Stundenliste, Standardwoche."],
    ["sparen","Stunden sparen","Auf das Nötigste — Mindestbesetzung und Regeln bleiben."],
    ["mehr","Mehr Stunden","Für kurzfristige Zusatzaufgaben."]].forEach(([v, titel, text]) => {
     const k = el(`<label class="phasenkarte"><input type="radio" name="phase" value="${v}"${ph.art === v ? " checked" : ""}>
@@ -10470,10 +10735,10 @@ function planenAnsicht(){
     if (ph.art === "sparen"){
       const box = el(`<div class="phasendetail">
         <label class="switch"><input type="radio" name="sparArt" value="prozent"${ph.sparArt !== "stunden" ? " checked" : ""}>
-          alle Aufgaben ${zahlFeld('data-prozent aria-label="Prozent"', ph.prozent, "%", {min: 1, max: 50, klasse: "kurzzahl", echo: false})} % schneller rechnen</label>
+          alle Aufgaben ${zahlFeld('data-prozent aria-label="Prozent"', ph.prozent, "%", {min: 1, max: 50, klasse: "kurzzahl", echo: false})} % kürzer</label>
         <label class="switch"><input type="radio" name="sparArt" value="stunden"${ph.sparArt === "stunden" ? " checked" : ""}>
           in der Woche ${zahlFeld('data-stunden placeholder="?" aria-label="Stunden"', ph.stunden, "h", {min: 0, klasse: "kurzzahl", echo: false})} Stunden einsparen</label>
-        ${infoHtml("Gespart wird zuerst bei denen, die Überstunden haben. Zum Vergleich rechnet der Planer die Standardwoche mit und sagt, wie viel es gebracht hat.", "Stunden sparen")}</div>`);
+        ${infoHtml("Gespart wird zuerst bei denen, die Überstunden haben. Zum Vergleich rechnet der Planer die normale Woche mit und sagt, wie viel es gebracht hat.", "Stunden sparen")}</div>`);
       box.querySelectorAll("[name=sparArt]").forEach(r => r.onchange = () => { ph.sparArt = r.value; sichern(); });
       box.querySelector("[data-prozent]").oninput = e => { ph.prozent = zahlWert(e.target); ph.sparArt = "prozent";
         box.querySelector("[name=sparArt][value=prozent]").checked = true; sichern(); };
@@ -10565,8 +10830,9 @@ function planenAnsicht(){
       if (antwort){
         const offen = abgabenOffen(antwort);
         if (offen.length){
-          if (confirm(`${offen.length} ${offen.length === 1 ? "Abgabe ist" : "Abgaben sind"} noch nicht übernommen (${offen.map(a => a.name).join(", ")}). `
-              + `Jetzt ansehen und übernehmen? (Abbrechen = Plan ohne sie erstellen)`)){ ansicht = "termine"; render(); return; }
+          // OK erstellt den Plan, Abbrechen führt zu den Abgaben — so tut der übliche Knopf das Erwartete
+          if (!confirm(`${offen.length} ${offen.length === 1 ? "Abgabe ist" : "Abgaben sind"} noch nicht übernommen (${offen.map(a => a.name).join(", ")}). `
+              + `Plan trotzdem ohne sie erstellen? (Abbrechen = erst die Abgaben ansehen)`)){ ansicht = "termine"; render(); return; }
         } else if (!antwort.vorbei && antwort.fehlen.length){
           if (!confirm(`Die Abgabe läuft noch bis ${fristText(antwort.frist)} — ${antwort.fehlen.length} haben noch nicht abgegeben `
               + `(${antwort.fehlen.join(", ")}). Plan trotzdem jetzt erstellen?`)) return;
@@ -10586,8 +10852,8 @@ function planenAnsicht(){
     if (alt && alt.aenderungen.some(a => a.aktiv) && !confirm(`Für KW ${kwVon(mo)} gibt es schon einen Entwurf mit eigenen Änderungen. Neu rechnen und die Änderungen verwerfen?`)) return;
     // Rechnen dauert ein paar Sekunden — so lange zeigen, was passiert
     const schleier = el(`<div class="rechnet"><div class="rechnet-k"><div class="kreisel"></div>
-      <b>Plan wird berechnet</b><span id="rechnetText">Planer rechnet …</span>
-      <span class="hint">Der Optimierer prüft alle erlaubten Schichten — das dauert einige Sekunden.</span></div></div>`);
+      <b>Plan wird berechnet</b><span id="rechnetText">Wird gerechnet …</span>
+      <span class="hint">Dauert ein paar Sekunden.</span></div></div>`);
     document.body.appendChild(schleier);
     const atmen = () => new Promise(ok => setTimeout(ok, 40));
     await atmen();
@@ -10600,7 +10866,7 @@ function planenAnsicht(){
   };
   // Liegt für die Woche schon ein Entwurf, führt der kürzeste Weg dorthin zurück
   if (planEntwurfVon(sl)){
-    const n = el(`<div class="note info" style="margin-bottom:14px"><span class="ic">i</span><span>Für KW ${kwVon(mo)} liegt ein Entwurf, der noch nicht freigegeben ist.
+    const n = el(`<div class="note info" style="margin-bottom:14px"><span class="ic">•</span><span>Für KW ${kwVon(mo)} liegt ein Entwurf, der noch nicht freigegeben ist.
       <span class="knopfreihe"><button class="btn small" type="button">Entwurf öffnen</button></span></span></div>`);
     n.querySelector("button").onclick = () => { ansicht = "entwurf"; render(); };
     p.querySelector("#entwurfDa").appendChild(n);
@@ -10751,7 +11017,7 @@ function termineAnsicht(){
     <div class="termin-wege">
       <div class="ablage" id="ablage" tabindex="0" role="button">
         <b>Datei hierher ziehen</b>
-        <span>oder klicken zum Auswählen</span></div>
+        <span>oder antippen zum Auswählen</span></div>
       <div class="termin-text">
         <label class="f">oder Nachrichten hier einfügen
           <textarea id="text" rows="6" placeholder="Name: Petra Naumann&#10;Di 17.11.2026: kann nicht&#10;Mi 18.11.2026: nur 08:00–14:00"></textarea></label>
@@ -10986,8 +11252,8 @@ function termineAnsicht(){
       vorschau(); letzter(); online();
       p.querySelector("#letzter").prepend(el(`<div class="note ok" style="margin-top:14px"><span class="ic">✓</span><span>
         <b>${wahl.length} ${wahl.length === 1 ? "Tag" : "Tage"} übernommen.</b>${plaeneDa.length
-          ? ` Für ${plaeneDa.map(sl => "KW " + sl.slice(-2)).join(", ")} gibt es schon einen Plan — damit die Termine
-             darin stehen, die Woche neu erstellen.` : " Sie stehen beim nächsten Plan drin."}</span></div>`));
+          ? ` ${plaeneDa.map(sl => "KW " + sl.slice(-2)).join(", ")} ${plaeneDa.length === 1 ? "hat" : "haben"} schon einen Plan — betroffene Schichten stehen unter „Plan ändern“.`
+          : " Sie stehen beim nächsten Plan drin."}</span></div>`));
     };
   }
 
@@ -11055,16 +11321,15 @@ function archivHinweis(){
   if (!bald.length && !weg.length) return null;
   const box = el(`<div class="note warn" style="margin-bottom:14px"><span class="ic">!</span>
     <span><b>Das Archiv wird aufgeräumt.</b>
-    ${weg.length ? `Älter als ${ARCHIV_WOCHEN} Wochen: ${[...new Set(weg.map(x => "KW " + x.sl.slice(-2)))].join(", ")}
-       — wird gelöscht, sobald du „verstanden" tippst. ` : ""}
-    ${bald.length ? `Demnächst fällig: ${[...new Set(bald.map(x => "KW " + x.sl.slice(-2)))].join(", ")}
-       — in ${Math.min(...bald.map(x => x.wochen))} Woche(n). ` : ""}
-    Was du behalten willst, sicherst du vorher.
+    ${weg.length ? `${[...new Set(weg.map(x => "KW " + x.sl.slice(-2)))].join(", ")} ${weg.length === 1 ? "ist" : "sind"} älter als ${ARCHIV_WOCHEN} Wochen und
+       ${weg.length === 1 ? "wird" : "werden"} mit „Jetzt löschen“ gelöscht. ` : ""}
+    ${bald.length ? (n => `${[...new Set(bald.map(x => "KW " + x.sl.slice(-2)))].join(", ")} in ${n} ${n === 1 ? "Woche" : "Wochen"}. `)(Math.min(...bald.map(x => x.wochen))) : ""}
+    Vorher sichern, was du behalten willst.
     <span class="knopfreihe"></span></span></div>`);
   const reihe = box.querySelector(".knopfreihe");
   const sichern = el(`<button class="btn ghost small">Archiv sichern</button>`);
   sichern.onclick = () => archivSichern();
-  const ok = el(`<button class="btn ghost small">verstanden</button>`);
+  const ok = el(`<button class="btn ghost small">${weg.length ? "Jetzt löschen" : "Verstanden"}</button>`);
   ok.onclick = async () => {
     state.archivGewarnt = state.archivGewarnt || {};
     bald.concat(weg).forEach(x => state.archivGewarnt[x.art + ":" + x.sl] = true);
@@ -11092,9 +11357,9 @@ function archivAnsicht(){
       <h1 style="margin-top:4px">Abgelaufene Wochen${infoHtml(`Pläne und Stundenlisten nach Kalenderwoche. Nach ${ARCHIV_WOCHEN} Wochen wird gelöscht — vorher steht ein Hinweis im Dashboard.`, "Archiv")}</h1></div>
     <div class="actions" style="margin-top:0;border-top:0;padding-top:0">
       <button class="btn ghost small" id="sichern">Ganzes Archiv sichern</button></div>
-    <h3 style="margin:20px 0 8px">Arbeitspläne</h3>
+    <h3 class="abschnitt" style="margin:20px 0 8px">Arbeitspläne</h3>
     <div id="plaene"></div>
-    <h3 style="margin:24px 0 8px">Stundenlisten</h3>
+    <h3 class="abschnitt" style="margin:24px 0 8px">Stundenlisten</h3>
     <div id="listen"></div>
     <div id="detail"></div>
     <div class="actions"><button class="btn ghost" id="zurueck">Zurück</button></div>
@@ -11282,9 +11547,10 @@ function planEntwurfAnsicht(){
     notizKlick: ti => notizBearbeiten(pe, ti, pr.plan, neuZeichnen)}));
   haupt.appendChild(planKarte);
   // Was der Planer zum gerechneten Plan anmerkt (Lücken, die niemand füllen kann, Stundenliste …)
-  const wichtig = (pe.kurz.meldungen || []).filter(m => m.art === "bad");
+  const wichtig = (pe.kurz.meldungen || []).filter(m => m.art === "bad").map(m => ({art: "bad", text: m.text}))
+    .concat(ueberFuenfzig(pr.plan).map(x => ({art: "warn", text: ueberFuenfzigText(x)})));
   if (wichtig.length) haupt.appendChild(el(`<div class="ta-hinweise">${wichtig.map(m =>
-    `<div class="note bad"><span class="ic">×</span><span>${esc(m.text)}</span></div>`).join("")}</div>`));
+    `<div class="note ${m.art}"><span class="ic">${m.art === "bad" ? "×" : "!"}</span><span>${esc(m.text)}</span></div>`).join("")}</div>`));
 
   // ---- Vertragsstunden ----
   const vk = el(`<section class="karte"><h3>${symbol("uhr")} Vertragsstunden</h3><div class="pe-liste"></div></section>`);
@@ -11388,7 +11654,7 @@ function ereignisFormular(name, nachher, art){
         state.mitarbeiter.map(m => `<option>${esc(m.name)}</option>`).join("")}</select>`)}
       ${feldHtml("Was?", `<select data-art>${EREIGNIS_ARTEN.map(([v, l]) => `<option value="${v}"${v === art ? " selected" : ""}>${l}</option>`).join("")}</select>`)}
       ${feldHtml("von", `<input type="date" data-von value="${heute}">`)}
-      ${feldHtml("bis", `<input type="date" data-bis value="${heute}">`, "Gezählt werden nur Arbeitstage — Sonn- und Feiertage nicht.")}
+      ${feldHtml("bis", `<input type="date" data-bis value="${heute}">`, "Sonn- und Feiertage zählen nicht mit.")}
     </div>
     <div class="ereignisform-knopf"><button class="btn" data-eintragen type="button">Eintragen</button></div>
     <p class="err" data-fehler></p><div data-folgen></div></div>`);
@@ -11414,10 +11680,10 @@ function ereignisFormular(name, nachher, art){
 // Was ein Eintrag für schon erstellte Pläne bedeutet — mit dem Weg zu „Plan ändern“
 function ereignisFolgen(e){
   const betroffen = ereignisBetroffen(e);
-  if (!betroffen.length) return el(`<div class="note ok"><span class="ic">✓</span><span>${esc(artText(e.art))} für
-    ${esc(e.name)} eingetragen. Kein bestehender Plan ist betroffen — der nächste Plan berücksichtigt es.</span></div>`);
-  const n = el(`<div class="note warn"><span class="ic">!</span><span>${esc(artText(e.art))} für ${esc(e.name)} eingetragen.
-    In schon erstellten Plänen stehen an diesen Tagen Schichten — sie sind unter „Plan ändern“ rot markiert.
+  if (!betroffen.length) return el(`<div class="note ok"><span class="ic">✓</span><span>Eingetragen: ${esc(e.name)}, ${esc(artText(e.art))}.
+    Kein Plan betroffen.</span></div>`);
+  const n = el(`<div class="note warn"><span class="ic">!</span><span>Eingetragen: ${esc(e.name)}, ${esc(artText(e.art))}.
+    ${betroffen.length === 1 ? "Ein Plan ist" : "Pläne sind"} betroffen — in „Plan ändern“ lösen.
     <span class="knopfreihe"></span></span></div>`);
   betroffen.forEach(b => {
     const k = el(`<button class="btn small" type="button">KW ${+b.sl.slice(-2)}: ${tageText(b.tage)} — Plan ändern</button>`);
@@ -11454,7 +11720,7 @@ function ereignisListe(name, nachher){
   };
   box.appendChild(tabelle(kommend, "Nichts eingetragen."));
   if (vorbei.length){
-    const d = el(`<details class="vorbei"><summary class="hint">${vorbei.length} vergangene ${vorbei.length === 1 ? "Eintrag" : "Einträge"}${
+    const d = el(`<details class="vorbei"><summary class="hint">${vorbei.length} ${vorbei.length === 1 ? "vergangener Eintrag" : "vergangene Einträge"}${
       infoHtml(`Werden nach ${ARCHIV_WOCHEN} Wochen gelöscht.`, "vergangene Einträge")}</summary></details>`);
     d.appendChild(tabelle(vorbei, ""));
     box.appendChild(d);
@@ -11485,7 +11751,7 @@ function ereignisUeberblick(){
 function ereignisAnsicht(){
   const p = el(`<div class="panel"></div>`);
   p.appendChild(seitenKopf({eyebrow: "Planung", titel: "Urlaub & Krankheit",
-    lede: `Wer wann fehlt — die nächsten acht Wochen. Gespeichert wird nur Art und Zeitraum.`}));
+    lede: `Wer wann fehlt — die nächsten acht Wochen. Gespeichert werden nur Art und Zeitraum.`}));
   const neu = () => { const y = window.scrollY; render(); window.scrollTo(0, y); };
   p.appendChild(el(`<div class="legende"><span><i class="urlaub"></i> Urlaub</span><span><i class="krank"></i> Krank</span>
     <span><i></i> verfügbar</span></div>`));
@@ -11742,10 +12008,10 @@ function aendernAnsicht(){
   if (pr.offen.length){
     const k = el(`<section class="karte rot"><h3>Noch zu tun</h3><div></div></section>`);
     pr.offen.forEach(o => {
-      const z = el(`<div class="todo"><span>${esc(o.text)}</span></div>`);
+      const z = el(`<div class="todo"><span>${esc(o.text)}${o.info ? infoHtml(esc(o.info), "Frist") : ""}</span></div>`);
       if (o.art === "konflikt"){
         // eine Abwesenheit, deren Ausfall im Entwurf abgeschaltet wurde
-        const b = el(`<button class="btn small" type="button">Austragen</button>`);
+        const b = el(`<button class="btn small" type="button">Aus dem Plan nehmen</button>`);
         b.onclick = () => { const a = eintrag.aenderungen.find(x => x.id === `abw:${o.name}:${o.ti}`); if (a) a.aktiv = true; neuZeichnen(); };
         z.appendChild(b);
       }
@@ -11793,7 +12059,7 @@ function aendernAnsicht(){
   planBlock.appendChild(planKarte);
 
   // ---- Lösungen je Ausfall ----
-  const vk = el(`<section class="karte loesungen"><h3>${symbol("funke")} Lösungen${infoHtml("Fällt jemand aus — über Urlaub & Krankheit, eine Zelle im Plan oder den Assistenten —, steht hier, was fehlt und wie es sich lösen lässt.", "Lösungen")}</h3><div></div></section>`);
+  const vk = el(`<section class="karte loesungen"><h3>${symbol("funke")} Lösungen${infoHtml("Ausführlich, was du beim Assistenten angefragt oder ausgewählt hast — mit Tagesbalken und Konto.", "Lösungen")}</h3><div></div></section>`);
   const vBox = vk.querySelector("div");
   // Nur, was über den Assistenten verlangt (seine letzte Antwort) oder ausgewählt wurde (eingeschaltet)
   const kontext = eintrag.kontext || {};
@@ -11809,9 +12075,30 @@ function aendernAnsicht(){
     const probe = aus.aktiv ? eintrag : Object.assign({}, eintrag, {aenderungen: eintrag.aenderungen.map(a => a === aus ? Object.assign({}, a, {aktiv: true}) : a)});
     return entwurfVorschlaege(sl, kurz, probe, heuteImPlan(kurz)).find(g => g.fuer.id === id) || null;
   }).filter(Boolean);
-  if (!gruppen.length) vBox.appendChild(el(`<p class="empty">Noch nichts angefragt. Schreib dem Assistenten, was sich ändert — seine Vorschläge stehen dann hier ausführlich.</p>`));
+  // Vorschläge zu einer anderen Änderung (früher gehen, frei, Tausch): kurz je Karte
+  const andere = relevant.filter(a => a.typ === "loesung" && !eintrag.aenderungen.some(x => x.id === a.fuer && x.typ === "abwesend"));
+  if (!gruppen.length && !andere.length) vBox.appendChild(el(`<p class="empty">Noch nichts angefragt.</p>`));
   gruppen.forEach(g => vBox.appendChild(loesungsGruppe(g, sl, kurz, eintrag, neuZeichnen,
     w => titel.has(w.titel), kontext.umplanen === g.fuer.id || relevant.some(a => a.typ === "tage" && a.fuer === g.fuer.id))));
+  if (andere.length){
+    const box = el(`<div class="lgruppe"><div class="problem"><b>Vorschläge zu einer Änderung</b></div></div>`);
+    andere.forEach(a => {
+      const zu = eintrag.aenderungen.find(x => x.id === a.fuer);
+      const k = el(`<div class="lkarte${a.aktiv ? " an" : ""}"><div class="lk-kopf"><span class="lk-nr">${esc(tagName(a.ti))}</span>
+          <b>${esc(a.text)}</b>${a.weg ? `<span class="tag">${esc(a.weg.passt.split(" · ").slice(1).join(" · ") || "")}</span>` : ""}</div>
+        ${zu ? `<p class="hint">zu: ${esc(zu.text)}</p>` : ""}
+        ${a.weg ? `<ul class="lk-zeilen">${a.weg.zeilen.map(z => `<li><b>${esc(z.name)}</b>: ${z.vorher ? `<s>${esc(z.vorher)}</s> → ` : ""}${esc(z.nachher || "frei")}</li>`).join("")}</ul>
+        <p class="lk-ergebnis ${a.weg.voll ? "ok" : "teil"}">${a.weg.voll ? "✓ Lücke geschlossen" : "◐ teilweise — " + esc(spannenText(a.weg.offen)) + " bleibt offen"}</p>` : ""}
+        <div class="lk-unten"><button class="btn ${a.aktiv ? "" : "ghost "}small lk-knopf" type="button">${a.aktiv ? "✓ Im Plan · zurücknehmen" : "Im Plan anzeigen"}</button></div></div>`);
+      k.querySelector(".lk-knopf").onclick = () => {
+        if (a.aktiv) aenderungAus(eintrag, a.id);
+        else { a.aktiv = true; (a.mit || (a.fuer ? [a.fuer] : [])).forEach(id => { const f = eintrag.aenderungen.find(x => x.id === id); if (f) f.aktiv = true; }); }
+        neuZeichnen();
+      };
+      box.appendChild(k);
+    });
+    vBox.appendChild(box);
+  }
   haupt.appendChild(vk);
 
   // ---- Assistent ----
@@ -11847,9 +12134,8 @@ function loesungsGruppe(g, sl, kurz, eintrag, fertig, zeigeWeg, mitUmplanen){
       ${g.vergangen ? `<p class="hint">Der Tag ist vorbei — eine Lösung hier hält nur fest, wie es tatsächlich war.</p>` : ""}</div></div>`);
   if (!g.luecke.length) return box;
   const aktivL = eintrag.aenderungen.find(a => a.aktiv && a.fuer === c.id);
-  if (!g.wege.length) box.appendChild(el(`<div class="note warn"><span class="ic">!</span><span>Am selben Tag lässt sich die Lücke
-    mit dem vorhandenen Personal nicht schließen, ohne eine Regel zu verletzen. Unten über mehrere Tage umplanen — oder jemanden fragen,
-    der eine Ausnahme machen kann.</span></div>`));
+  if (!g.wege.length) box.appendChild(el(`<div class="note warn"><span class="ic">!</span><span>Am Tag ohne Regelverstoß nicht lösbar —
+    über mehrere Tage umplanen oder eine Ausnahme klären.</span></div>`));
   g.wege.forEach((w, n) => {
     if (zeigeWeg && !zeigeWeg(w)) return;
     const an = aktivL && aktivL.typ === "loesung" && aktivL.titel === w.titel;
@@ -11871,7 +12157,7 @@ function loesungsGruppe(g, sl, kurz, eintrag, fertig, zeigeWeg, mitUmplanen){
     const k = el(`<div class="lkarte${an ? " an" : ""}"><div class="lk-kopf"><span class="lk-nr">Umplanung</span>
       <b>Mehrere Tage werden neu verteilt</b><span class="tag">${v.mehr > 0.01 ? "+" + h1(v.mehr) + " h" : v.mehr < -0.01 ? h1(v.mehr) + " h" : "±0 h"}</span></div>
       <ul class="lk-zeilen">${v.zeilen.map(z => `<li>${esc(z)}</li>`).join("")}</ul>
-      <div class="lk-unten"><button class="btn ${an ? "" : "ghost "}small lk-knopf" type="button">${an ? "✓ Im Plan — antippen nimmt es heraus" : "Im Plan zeigen"}</button></div></div>`);
+      <div class="lk-unten"><button class="btn ${an ? "" : "ghost "}small lk-knopf" type="button">${an ? "✓ Im Plan · zurücknehmen" : "Im Plan anzeigen"}</button></div></div>`);
     k.querySelector(".lk-knopf").onclick = () => {
       eintrag.aenderungen = eintrag.aenderungen.filter(a => a.fuer !== c.id);
       if (!an){
@@ -11885,7 +12171,7 @@ function loesungsGruppe(g, sl, kurz, eintrag, fertig, zeigeWeg, mitUmplanen){
     umplanen.replaceWith(k);
   };
   umplanen.onclick = async () => {
-    umplanen.disabled = true; umplanen.textContent = "Optimierer rechnet …";
+    umplanen.disabled = true; umplanen.textContent = "Wird gerechnet …";
     const andere = eintrag.aenderungen.filter(x => x !== c && x.fuer !== c.id);
     const ohne = entwurfAnwenden(kurz, andere).plan;
     const v = await mitEntwurfsAbwesenheitenAsync(sl, andere, () =>
@@ -11927,7 +12213,7 @@ function wegKarte(w, n, an, g){
     <p class="lk-ergebnis ${w.voll ? "ok" : "teil"}">${w.voll ? `✓ Lücke ${spannenText(w.luecke)} geschlossen`
       : `◐ teilweise — ${spannenText(w.offen)} bleibt offen`}</p>
     ${w.konto.length ? `<p class="lk-konto">Konto nach der Woche: ${w.konto.map(x => `${esc(x.name.split(" ")[0])} ${ueText(x.ende) || "0,0"} h`).join(" · ")}</p>` : ""}
-    <div class="lk-unten"><button class="btn ${an ? "" : "ghost "}small lk-knopf" type="button">${an ? "✓ Im Plan — antippen nimmt es heraus" : "Im Plan zeigen"}</button>
+    <div class="lk-unten"><button class="btn ${an ? "" : "ghost "}small lk-knopf" type="button">${an ? "✓ Im Plan · zurücknehmen" : "Im Plan anzeigen"}</button>
       <details><summary>Warum?</summary><p>${esc(w.warum || "")}</p></details></div></div>`);
   k.querySelector(".lk-balken").appendChild(tagesBalken(w, g));
   return k;
@@ -11969,7 +12255,8 @@ function aenderungAus(eintrag, id){
   if (a.quelle === "assistent" || a.quelle === "abwesenheit") a.aktiv = false;   // bleibt zum erneuten Einschalten
   else eintrag.aenderungen = eintrag.aenderungen.filter(x => x.id !== id);
   eintrag.aenderungen = eintrag.aenderungen.filter(x => x.fuer !== id || x.quelle === "assistent");
-  eintrag.aenderungen.forEach(x => { if (x.fuer === id) x.aktiv = false; });
+  // Lösungen, die an dieser Änderung hängen (auch als eine von mehreren, z. B. beim Tausch), gehen mit
+  eintrag.aenderungen.forEach(x => { if (x.fuer === id || (x.mit || []).includes(id)) x.aktiv = false; });
 }
 
 // Dialog über dem Plan
@@ -11995,7 +12282,7 @@ function zelleBearbeiten(sl, eintrag, i, ti, plan, fertig){
     <p class="err" data-fehler></p>
     <div class="dialog-knoepfe">
       <button class="btn" data-speichern type="button">Zeiten übernehmen</button>
-      <button class="btn ghost" data-frei type="button">frei geben</button></div>
+      <button class="btn ghost" data-frei type="button">Hat frei</button></div>
     <div class="dialog-ausfall"><span class="hint">Fällt aus:</span>
       ${["krank", "urlaub", "nicht"].map(g => `<button class="btn ghost small" data-grund="${g}" type="button">${GRUND_NAME[g]}</button>`).join("")}</div>
     <div class="dialog-knoepfe unten">
@@ -12078,13 +12365,13 @@ function assistentKarte(sl, kurz, eintrag, fertig){
     // Kurz: wer was anders macht in einer Zeile (der Kartentext), darunter Ergebnis und Stunden
     const kn = el(`<button class="chatkarte${a.aktiv ? " an" : ""}" type="button" aria-pressed="${a.aktiv}">${esc(a.text)}
       ${a.weg && a.weg.passt ? `<span class="chat-weg">${esc(a.weg.passt)}</span>` : ""}
-      <span>${a.aktiv ? "✓ im Plan · antippen entfernt" : "antippen zeigt es im Plan"}</span></button>`);
+      <span>${a.aktiv ? "✓ Im Plan · zurücknehmen" : "Im Plan anzeigen"}</span></button>`);
     kn.onclick = () => {
       if (a.aktiv) aenderungAus(eintrag, a.id);
       else {
         a.aktiv = true;
-        // gehört die Lösung zu einem Ausfall aus demselben Gespräch, kommt der mit
-        if (a.fuer){ const f = eintrag.aenderungen.find(x => x.id === a.fuer); if (f) f.aktiv = true; }
+        // gehört die Lösung zu einer Änderung aus demselben Gespräch (Ausfall, Tausch …), kommt sie mit — alle Teile
+        (a.mit || (a.fuer ? [a.fuer] : [])).forEach(id => { const f = eintrag.aenderungen.find(x => x.id === id); if (f) f.aktiv = true; });
         // je Zelle bzw. je Ausfall nur eine Karte des Assistenten
         eintrag.aenderungen.forEach(x => { if (x !== a && x.quelle === "assistent" && x.aktiv
           && ((x.name && x.name === a.name && x.ti === a.ti && x.typ !== "abwesend" && a.typ !== "abwesend")
@@ -12400,7 +12687,7 @@ async function planExcel(plan){
       ws.mergeCells(hz,1,hz,P); hz++;
     });
   }
-  ws.getCell(hz+1,1).value = `Entwurf, erzeugt am ${new Date().toLocaleDateString("de-DE")} — vor dem Aushang prüfen.`;
+  ws.getCell(hz+1,1).value = `Stand ${new Date().toLocaleDateString("de-DE")} · ${r.filiale}`;
   ws.getCell(hz+1,1).font = {size:9, italic:true};
 
   const buf = await wb.xlsx.writeBuffer();
