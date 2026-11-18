@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="fassung" content="2026-11-18-4-test">
+<meta name="fassung" content="2026-11-18-5-test">
 <title>Filialplaner</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
@@ -1023,6 +1023,35 @@ table.kompakt th,table.kompakt td{overflow-wrap:break-word;hyphens:auto;-webkit-
 .as-verlauf .as-paar{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2)}
 .as-verlauf .as-paar:first-of-type{border-top:0;padding-top:0}
 .as-verlauf .as-text{color:var(--ink-2)}
+/* ---- Training des Assistenten (18.11.2026): Thema, „Falsch verstanden?“, Auswahl, Trainingsseite ---- */
+.assistent .karte-kopf{margin-bottom:10px}
+.assistent .karte-kopf .btn{margin-left:auto}
+.as-thema{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;padding:7px 10px;border-radius:9px;background:var(--ton-50);
+  font-size:.78rem;font-weight:700;color:var(--ink-2)}
+.as-thema span{flex:1;min-width:0}
+.as-falsch{align-self:flex-end;margin-top:8px;padding:2px 0;border:0;background:none;font:inherit;font-size:.74rem;font-weight:700;
+  color:var(--muted);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.as-falsch:hover{color:var(--link)}
+.korrektur h3{margin:0 0 4px}
+.ko-wahl,.ko-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.ko-chip{border-radius:999px}
+.ko-chip.an{background:var(--ton-900);border-color:var(--ton-900);color:var(--surface)}
+.ko-angaben:empty{display:none}
+.ko-angaben{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.ko-reihe .ko-chips{margin-top:6px}
+.ko-titel{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:var(--ton-700)}
+.ko-angaben textarea{width:100%;resize:vertical}
+.training .chat-eingabe input{min-height:44px}
+.tr-karte{margin-top:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.tr-karte p{margin:0 0 6px}
+.tr-stand{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tr-zeile{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid var(--line-2)}
+.tr-zeile > div{flex:1;min-width:0}
+.tr-zeile p{margin:0}
+.tr-satz{font-size:.88rem;overflow-wrap:anywhere}
+.tr-kann{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px 16px}
+.tr-kann li{display:flex;flex-direction:column;font-size:.84rem}
+.tr-kann span{color:var(--muted);font-size:.8rem}
 
 /* ---- Leistungswirksame Stunden, Aushilfen im Monat, Azubis im Entwurf (16.11.2026) ---- */
 table.plan tr.summe.wirksam td,table.plan tr.summe.wirksam th{border-top:1px solid var(--formlinie-2);font-weight:600;color:var(--ink-2)}
@@ -5979,12 +6008,18 @@ function entwurfUebernehmen(sl){
    deutlich weniger Wechsel oder die Leitung (Filialleitung, Stellvertretung) mindestens eine halbe
    Stunde weniger an der Kasse ergeben — ohne neue Lücke? → {ti, vorher, nachher} oder null.
    Nur die Pausen wandern; Schichten und Aufgaben bleiben. */
+// Die Kasse eines Tages in Zahlen: Wechsel, Personen, Minuten von Leitung und Vertretung, Kosten der Einteilung
+function kasseZahlen(plan, ti, e){
+  e = e || tagesEinteilung(plan, ti);
+  if (!e) return null;
+  const leitend = name => { const m = state.mitarbeiter.find(x => x.name === name); return !!m && (istLeitung(m) || m.typ === "Stellvertretung"); };
+  return {wechsel: Math.max(0, e.kasse.length - 1), personen: new Set(e.kasse.map(k => k.name)).size, kosten: e.kasseKosten,
+    leitung: e.kasse.filter(k => leitend(k.name)).reduce((s, k) => s + k.bis - k.von, 0)};
+}
 function kasseRuhiger(plan, ti){
   const t = plan.tage[ti];
   if (!t || t.feiertag) return null;
-  const leitend = name => { const m = state.mitarbeiter.find(x => x.name === name); return !!m && (istLeitung(m) || m.typ === "Stellvertretung"); };
-  const zahl = e => ({wechsel: Math.max(0, e.kasse.length - 1), personen: new Set(e.kasse.map(k => k.name)).size, kosten: e.kasseKosten,
-    leitung: e.kasse.filter(k => leitend(k.name)).reduce((s, k) => s + k.bis - k.von, 0)});
+  const zahl = e => kasseZahlen(plan, ti, e);
   const e0 = tagesEinteilung(plan, ti);
   if (!e0) return null;
   const probe = kopie(plan);
@@ -6870,7 +6905,19 @@ const A_STOPP = new Set(("der die das den dem des ein eine einen einem einer und
   + "für mit von bis ab um am an im in auf aus bei nach vor zu zum zur wer was wie wo wann sie er es wir ich du ihr ihn ihm man "
   + "nicht auch noch nur mal doch dann wenn weil dass so da ja nein nö nee bitte danke ok okay "
   + "soll sollen muss müssen will wollen wird werden würde mehr weniger alle alles uhr std statt denn schon erst mir dir uns "
-  + "geben gibt mach mache machen macht ganz sehr gut dich mich sich ihre seine dieser diese dieses heute hier dort").split(" "));
+  + "geben gibt mach mache machen macht ganz sehr gut dich mich sich ihre seine dieser diese dieses heute hier dort "
+  // häufige Wörter, die einem Namen ähneln können („leider“ ist nicht „Leiter“)
+  + "leider lieber gerne gern eventuell vielleicht wohl gerade beide beiden etwas etwa jetzt nochmal bevor ob nachsehen nachschauen "
+  + "sagen weißt wäre hätte hätten möglich kollegin kolleginnen kollege kollegen vorgeschlagenen vorgeschlagene dafür davon darauf "
+  + "lieb liebe danach vorher eigentlich wieder").split(" "));
+/* Mundart, Umgangssprache und Kurzformen, wie sie am Telefon getippt werden (Training vom 18.11.2026:
+   „dirk kann sa ned“, „hans heit krank“, „wer kan morgn“). Ganze Wörter, vor allem anderen. */
+const A_MUNDART = new Map(Object.entries({ned: "nicht", net: "nicht", nich: "nicht", heit: "heute", heut: "heute", morge: "morgen", morgn: "morgen",
+  isch: "ist", is: "ist", koi: "kein", koin: "keinen", koiner: "keiner", koine: "keine", kan: "kann", nix: "nichts", grad: "gerade",
+  ne: "eine", nen: "einen", nem: "einem", bissle: "etwas", bissl: "etwas", gell: "", halt: ""}));
+const A_TAGWORT = "montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|sonnabend|mo|di|mi|do|fr|sa";
+const A_ORDNUNG = {eins: 1, erste: 1, ersten: 1, erster: 1, erstes: 1, zwei: 2, zweite: 2, zweiten: 2, zweiter: 2, zweites: 2,
+  drei: 3, dritte: 3, dritten: 3, dritter: 3, drittes: 3, 1: 1, 2: 2, 3: 3};
 
 /* JavaScript hält ä, ö, ü und ß nicht für Buchstaben: \\b fände in „früher“ das Wort „fr“
    und vor „übermorgen“ gar keine Grenze. G() ersetzt \\b deshalb durch eine Grenze, die
@@ -6928,6 +6975,13 @@ function aPersonen(woerter){
     // Vorname immer; Nachname nur, wenn er kein Wort des Assistenten ist („Aushilfe“, „Jung“ bleibt möglich)
     const anrede = pos > 0 && (woerter[pos - 1] === "frau" || woerter[pos - 1] === "herr");       // „Frau Jung“ meint den Nachnamen
     let k = alle.filter(i => teile[i][0] === w || ((!bekannt || anrede) && teile[i].slice(1).includes(w)));
+    // Genitiv: „Evas Schicht“, „Bernds Stunden“ — die Form ohne s ist genau ein Name
+    let gen = false;
+    if (!k.length && !bekannt && w.length >= 4 && w.endsWith("s")){
+      const s = w.slice(0, -1);
+      k = alle.filter(i => teile[i][0] === s || teile[i].slice(1).includes(s));
+      gen = k.length > 0;
+    }
     if (!k.length && !bekannt){
       const stamm = w.replace(G(/(chen|lein|le|i|y)$/), "");
       const kurz = (vor, s) => s.length >= 3 && vor.startsWith(s) && (s.length >= 4 || vor.length - s.length <= 3);
@@ -6945,7 +6999,7 @@ function aPersonen(woerter){
         if (best > grenze) k = [];
       }
     }
-    if (k.length) treffer.push({pos, k});
+    if (k.length) treffer.push({pos, k, gen});
   });
   // Vor- und Nachname hintereinander meinen dieselbe Person
   for (let n = treffer.length - 1; n > 0; n--){
@@ -6953,13 +7007,16 @@ function aPersonen(woerter){
     const beide = a.k.filter(i => b.k.includes(i));
     if (b.pos === a.pos + 1 && beide.length){ a.k = beide; a.bis = b.pos; treffer.splice(n, 1); }
   }
-  const personen = [], mehrdeutig = [], stellen = new Set();
+  const personen = [], mehrdeutig = [], stellen = new Set(), orte = [];
   treffer.forEach(t => {
     stellen.add(t.pos); if (t.bis) stellen.add(t.bis);
-    if (t.k.length === 1){ if (!personen.includes(ms[t.k[0]].name)) personen.push(ms[t.k[0]].name); }
+    if (t.k.length === 1){
+      if (!personen.includes(ms[t.k[0]].name)) personen.push(ms[t.k[0]].name);
+      orte.push({pos: t.pos, name: ms[t.k[0]].name, gen: t.gen});
+    }
     else mehrdeutig.push(t.k.map(i => ms[i].name));
   });
-  return {personen, mehrdeutig, stellen};
+  return {personen, mehrdeutig, stellen, orte};
 }
 
 /* Tage im Text → {tage: [0–5], sonntag, andereWoche, ausserhalb} */
@@ -6979,22 +7036,23 @@ function aTage(t, mo){
   while ((r = bereich.exec(t))){ const a = index(r[1]), b = index(r[2]); for (let k = Math.min(a, b); k <= Math.max(a, b); k++) tage.add(k); }
   t = t.replace(bereich, " ");
   const ab = aNeu(`\\b(?:ab|seit) (${wort}|heute|morgen|übermorgen)\\b`).exec(t);
-  const bis = aNeu(`\\bbis (${wort})\\b`).exec(t);
+  const bis = aNeu(`\\bbis (?:einschließlich |einschl |inklusive |inkl |zum |am )?(${wort})\\b`).exec(t);
   const rest = G(/\brest der woche\b|\brestliche[nr]? woche\b|\bende der woche\b|\bbis auf weiteres\b|\bbis samstag\b/).test(t);
   const rel = w => w === "heute" ? hi : w === "morgen" ? hi + 1 : w === "übermorgen" ? hi + 2 : index(w);
   if (ab || bis || rest){
     const von = ab ? rel(ab[1]) : Math.max(0, hi), ende = bis ? index(bis[1]) : 5;
     if (von > 5) ausserhalb = true;
     for (let k = Math.max(0, von); k <= ende; k++) tage.add(k);
-    t = t.replace(aNeu(`\\b(?:ab|seit|bis) (${wort}|heute|morgen|übermorgen)\\b`, "g"), " ");
+    t = t.replace(aNeu(`\\b(?:ab|seit|bis) (?:einschließlich |einschl |inklusive |inkl |zum |am )?(${wort}|heute|morgen|übermorgen)\\b`, "g"), " ");
   }
-  if (G(/\bganze[nr]? woche\b|\bkomplette[nr]? woche\b|\bdie woche\b|\balle tage\b|\bjeden tag\b|\bganze[nr]? woche\b|\bwoche lang\b/).test(t)) A_TAGE.forEach((_, k) => tage.add(k));
+  if (G(/\bganze[nr]? woche\b|\bkomplette[nr]? woche\b|\bdie woche\b|\bdiese[nr]? woche\b|\balle tage\b|\bjeden tag\b|\bganze[nr]? woche\b|\bwoche lang\b/).test(t)) A_TAGE.forEach((_, k) => tage.add(k));
   if (G(/\bwochenende\b/).test(t)) tage.add(5);
   const einzel = aNeu(`\\b(${wort})\\b`, "g");
   while ((r = einzel.exec(t))) tage.add(index(r[1]));
   if (G(/\bheute\b/).test(t)) nimm(hi);
+  // „morgen und übermorgen“: beide — \bmorgen\b findet sich nicht in „übermorgen“
   if (G(/\bübermorgen\b/).test(t)) nimm(hi + 2);
-  else if (G(/\bmorgen\b/).test(t)) nimm(hi + 1);
+  if (G(/\bmorgen\b/).test(t)) nimm(hi + 1);
   if (G(/\bgestern\b/).test(t)) nimm(hi - 1);
   const datum = /\b(\d{1,2})\.(\d{1,2})\./g;
   while ((r = datum.exec(t))){ const d = new Date(mo); d.setMonth(+r[2] - 1, +r[1]); nimm(Math.round((d - mo) / 864e5)); }
@@ -7011,6 +7069,12 @@ function aZeit(t){
   t = t.replace(G(/\b\d{1,2}\.\d{1,2}\.(\d{2,4})?/g), " ").replace(G(/\bam \d{1,2}\.(?!\d)/g), " ");     // Datum ist keine Uhrzeit
   t = t.replace(G(/\bhalb (\d{1,2})\b/g), (_, h) => `${h - 1}:30`).replace(G(/\b(ab|bis|um|gegen) mittags?\b/g), "$1 12");
   t = t.replace(G(/(\d) ?h\b/g), "$1 stunden").replace(G(/(\d{1,2}) uhr (\d{2})\b/g), "$1:$2");
+  // „bis Ladenschluss“, „ab Öffnung“: die Zeiten der Filiale
+  if (hatZeit(state.bis)) t = t.replace(G(/\bbis (?:zum )?(?:laden)?schluss\b/g), "bis " + state.bis);
+  if (hatZeit(state.von)) t = t.replace(G(/\bab (?:der )?(?:laden)?öffnung\b/g), "ab " + state.von);
+  // „bis 8 abends“ ist 20 Uhr, „zwischen 14 und 20“ eine Spanne
+  t = t.replace(G(/\b(\d{1,2})(?:[:.](\d{2}))? ?(?:uhr )?(?:abends|nachmittags|am abend|am nachmittag)\b/g), (_, h, m) => `${+h < 12 ? +h + 12 : +h}:${m || "00"}`);
+  t = t.replace(G(/\bzwischen (\d{1,2})(?:[:.](\d{2}))? ?(?:uhr )?und (\d{1,2})(?:[:.](\d{2}))?/g), (_, a, am, b, bm) => `${a}:${am || "00"}-${b}:${bm || "00"}`);
   const z = "(\\d{1,2})(?:[:.](\\d{2}))?";
   const min = (h, m) => (+h) * 60 + (m ? +m : 0);
   const nachmittag = m => m >= 60 && m < 5 * 60 ? m + 12 * 60 : m;          // „bis 3“ meint 15 Uhr
@@ -7025,6 +7089,12 @@ function aZeit(t){
     t = t.replace(d[0], " ");
   }
   const richtung = G(/\b(später|früher|eher|länger|kürzer)\b/).exec(t);
+  let schicht = null;
+  { const re = G(/\b(früh|spät)(?:schicht|dienst)?\b/g); let r;
+    while (!schicht && (r = re.exec(t))){
+      const davor = t.slice(Math.max(0, r.index - 30), r.index);
+      if (!G(/\b(statt|hat|habe|haben|hatte|zum|zur|zu|wie)\b(?:\s+\S+){0,2}\s*$/).test(davor)) schicht = r[1] === "früh" ? "frueh" : "spaet";
+    } }
   const r = aNeu(`(?:von )?\\b${z} ?(?:uhr)? ?(?:-|bis) ?${z}`).exec(t);
   if (r && +r[1] < 24 && +r[3] <= 24){
     let von = min(r[1], r[2]), bis = min(r[3], r[4]);
@@ -7038,11 +7108,12 @@ function aZeit(t){
   if (bis) raus.nurBis = nachmittag(min(bis[1], bis[2]));
   if (ab){ if (ende && !bis) raus.nurBis = nachmittag(min(ab[1], ab[2])); else raus.nurAb = nachmittag(min(ab[1], ab[2])); }
   if (raus.nurAb === undefined && raus.nurBis === undefined){
-    if (G(/\bnur vormittags?\b|\bvormittags\b/).test(t)) raus.nurBis = 13 * 60;
-    if (G(/\bnur nachmittags?\b|\bnachmittags\b/).test(t)) raus.nurAb = 13 * 60;
+    if (G(/\bvormittags?\b/).test(t)) raus.nurBis = 13 * 60;
+    if (G(/\bnachmittags?\b/).test(t)) raus.nurAb = 13 * 60;
   }
   if (raus.nurAb !== undefined || raus.nurBis !== undefined)
     return {nurAb: raus.nurAb === undefined ? null : raus.nurAb, nurBis: raus.nurBis === undefined ? null : raus.nurBis};
+  if (schicht && !richtung) return {schicht};
   if (richtung){
     const anfang = G(/\b(kommt|kommen|fängt|anfangen|anfängt|beginnt|beginnen|startet|da sein)\b/).test(t);
     const schluss = ende || G(/\b(bleibt|bleiben|länger|kürzer)\b/).test(t);
@@ -7051,65 +7122,120 @@ function aZeit(t){
   return dauer !== null ? {dauer} : {};
 }
 
-const aHatZeit = z => !!z && (z.von !== undefined || (z.nurAb !== null && z.nurAb !== undefined) || (z.nurBis !== null && z.nurBis !== undefined) || !!z.relativ);
+const aHatZeit = z => !!z && (z.von !== undefined || (z.nurAb !== null && z.nurAb !== undefined) || (z.nurBis !== null && z.nurBis !== undefined) || !!z.relativ || !!z.schicht);
 
 function aGrund(t){
   if (G(/\bkrank|krankgeschrieben|krankmeldung|krankenschein|erkältet|grippe|fieber|migräne|\barzt\b|attest|liegt flach|magen|verletzt|\bau\b|übergeben|gesundheitlich/).test(t)) return "krank";
   if (G(/\burlaub|\bferien\b|frei genommen|freigenommen/).test(t)) return "urlaub";
-  if (G(/berufsschule|\bschule\b|blockunterricht/).test(t)) return "schule";
-  if (G(/kann nicht|kann (?:\S+ ){0,4}nicht|können nicht|fällt (?:\S+ ){0,3}aus|\bausfall\b|\bausfallen\b|nicht da\b|verhindert|\btermin\b|kommt nicht|kommt (?:\S+ ){0,3}nicht|\bfehlt\b|abgesagt|sagt ab|schafft es nicht|ist raus\b|nicht kommen|nicht arbeiten|\babsage\b/).test(t)) return "nicht";
+  if (G(/berufsschule|\bschule\b|blockunterricht|\bbs\b/).test(t)) return "schule";
+  if (G(/kann nicht|kann (?:\S+ ){0,4}nicht|können nicht|fällt (?:\S+ ){0,3}aus|\bausfall\b|\bausfallen\b|nicht da\b|verhindert|\btermin\b|kommt nicht|kommt (?:\S+ ){0,3}nicht|\bfehlt\b|abgesagt|sagt ab|schafft es nicht|ist raus\b|nicht kommen|nicht arbeiten|\babsage\b|nicht (kann|kommt|könnte)\b|abgemeldet|meldet sich ab|vorstellungsgespräch|beerdigung|hochzeit|\bumzug\b|\bamt\b|behörde|\bgericht\b|\bkita\b/).test(t)) return "nicht";
   return null;
 }
 
 /* Den Text lesen: Angaben und Absicht. Ändert nichts.
-   → {absicht, punkte, personen, mehrdeutig, tage, tagInfo, zeit, grund, teil, pronomen, nurAngaben, notiz, norm} */
-function assistentVerstehen(text, mo){
-  let roh = String(text || "").toLowerCase().replace(G(/[–—]/g), "-").replace(G(/[,;!?()"„“”'…]/g), " ").replace(G(/\s+/g), " ").trim();
-  const notiz = (G(/\b(?:notiz|notiere|notier|vermerk)\b[^:]*:\s*(.+)$/i).exec(String(text || "").trim()) || [])[1] || null;
+   o.ohneTraining: nur die festen Regeln — so misst das Training, was der Assistent von sich aus versteht.
+   → {absicht, punkte, personen, helfer, mehrdeutig, tage, tagInfo, zeit, grund, teil, pronomen, nurAngaben, notiz, nummer, norm,
+      kandidaten, gelernt, woerter, stellen} */
+function assistentVerstehen(text, mo, o){
+  o = o || {};
+  const roh0 = String(text || "").trim();
+  let roh = roh0.toLowerCase().replace(G(/[–—]/g), "-").replace(G(/[,;!?()"„“”'…]/g), " ")
+    .replace(/([a-zäöüß])\s*\/\s*([a-zäöüß])/g, "$1 und $2").replace(/\//g, " ")          // „Eva/Hans“ sind zwei
+    .replace(G(/\s+/g), " ").trim();
+  // „Samstagnachmittag“, „Freitagabend“: Tag und Tageszeit getrennt — „Montagmorgen“ ist Montag früh, nicht morgen
+  roh = roh.replace(aNeu("\\b(montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag)(morgen|früh|vormittag|mittag|nachmittag|abend|nacht)(s?)\\b", "g"),
+    (_, tag, zeit, s) => `${tag} ${zeit === "morgen" ? "früh" : zeit + s}`)
+    .replace(aNeu(`\\b(${A_TAGWORT}) morgen\\b`, "g"), "$1 früh");
+  // Notiz: „Notiz Freitag: Aktionsware“ oder ohne Doppelpunkt „Notiz Do Kühlung defekt“
+  const nt = G(/\b(?:notiz|notiere|notier|vermerk)\b[^:]*:\s*(.+)$/i).exec(roh0)
+    || aNeu(`\\b(?:notiz|notiere|notier|vermerk)\\b(?: für| am| zum)? ?(?:den |am )?(?:${A_TAGWORT}|heute|morgen|übermorgen)\\.?\\b:? (.+)$`, "i").exec(roh0);
+  const notiz = nt && nt[1].trim() ? nt[1].trim() : null;
   const gruss = G(/^(hallo|hi|hey|moin|servus|guten (morgen|tag|abend)|danke|dankeschön|vielen dank|super|top|prima|perfekt|alles klar|passt|okay|ok)\b/).test(roh);
   roh = roh.replace(G(/\bguten (morgen|tag|abend)\b/g), " ").replace(G(/\bmoin moin\b/g), " ");
-  // Wörter trennen: „mo-mi“ → „mo - mi“, Punkt am Wortende weg („Mo.“), Doppelpunkt nach Wörtern weg
+  // Wörter trennen: „mo-mi“ → „mo - mi“, Punkt am Wortende weg („Mo.“), Doppelpunkt nach Wörtern weg; Mundart angleichen
   const woerter = roh.replace(G(/([a-zäöüß])-([a-zäöüß])/g), "$1 - $2").split(" ").filter(Boolean)
-    .map(w => G(/^[a-zäöüß]+[.:]$/).test(w) ? w.slice(0, -1) : w);
+    .map(w => G(/^[a-zäöüß]+[.:]$/).test(w) ? w.slice(0, -1) : w)
+    .flatMap(w => A_MUNDART.has(w) ? A_MUNDART.get(w).split(" ").filter(Boolean) : [w]);
   const leute = aPersonen(woerter);
   const norm = " " + woerter.map((w, n) => leute.stellen.has(n) ? w : aKanon(w)).join(" ") + " ";
   const ohneNamen = " " + woerter.map((w, n) => leute.stellen.has(n) ? "" : aKanon(w)).join(" ").replace(G(/\s+/g), " ") + " ";
   const tagInfo = aTage(ohneNamen, mo), tage = tagInfo.tage;
   const zeit = aZeit(ohneNamen);
   const grund = aGrund(ohneNamen);
+  // „Eva ist morgen früh krank“: mit einem Grund ist „früh“ die Tageszeit, keine Frühschicht
+  if (grund && zeit.schicht) delete zeit.schicht;
   const t = ohneNamen;
   const teil = G(/\bganze[rn]? tag\b|\bden ganzen tag\b|\bkomplett\b|\bganztags\b|\bgar nicht\b/).test(t) ? "ganz"
     : G(/\bkommt später\b|\bspäter kommen\b|\berst später\b/).test(t) ? "spaeter" : G(/\bgeht früher\b|\bfrüher gehen\b|\bfrüher weg\b/).test(t) ? "frueher" : null;
   const pronomen = G(/\b(sie|er|ihn|ihm|ihr|ihre|seine|dieselbe|derselbe|die gleiche|der gleiche)\b/).test(t);
-  const zurueck = G(/\bdoch nicht\b|\bwieder gesund\b|\bwieder da\b|\bwieder fit\b|\bkommt doch\b|\bkann doch\b|rückgängig|zurücknehmen|\bnimm\b.*\b(raus|zurück|weg)\b|\bstreich|\bvergiss\b|\blösch|war falsch|\birrtum\b|stimmt nicht|war ein fehler|\bzurück damit\b|\bmach das weg\b/).test(t);
+  const zurueck = G(/\bdoch nicht\b|\bwieder gesund\b|\bwieder da\b|\bwieder fit\b|\bkommt doch\b|\bkann doch\b|rückgängig|zurücknehmen|\bnimm\b.*\b(raus|zurück|weg)\b|\bstreich|\bvergiss\b|\blösch|war falsch|\birrtum\b|stimmt nicht|war ein fehler|\bzurück damit\b|\bmach das (wieder )?weg\b|\bvertan\b|falsch eingegeben|falsch eingetragen/).test(t);
+  const hatLeute = leute.personen.length || leute.mehrdeutig.length;
+  const hatTag = tage.length > 0;
+  const verb = G(/\b(arbeitet|arbeiten|kommt|kommen|bleibt|bleiben|geht|gehen|fängt|anfangen|schluss|feierabend|länger|früher|später|kürzer|macht|machen)\b/).test(t);
 
   // Punkte je Absicht: Wörter und Angaben
   const p = {};
   const plus = (a, n) => { p[a] = (p[a] || 0) + n; };
-  const hatLeute = leute.personen.length || leute.mehrdeutig.length;
-  if (G(/\bhilfe\b|was kannst du|wie geht das|wie funktionier|\bbeispiele?\b|was kann ich (fragen|schreiben|sagen)/).test(t)) plus("hilfe", 10);
+  // Hilfe — mit einem Namen ist „Hilfe, Eva kommt heute nicht“ ein Hilferuf zur Sache, keine Frage nach der Bedienung
+  if (G(/\bhilfe\b|was kannst du|wie geht das|wie funktionier|\bbeispiele?\b|was (kann|darf) ich (dich |hier |alles )?(fragen|schreiben|sagen)/).test(t)) plus("hilfe", hatLeute ? 2 : 10);
+  else if (!hatLeute && !hatTag && G(/^ ?was (heißt|bedeutet)\b/).test(t)) plus("hilfe", 10);
+  // Fragen zur Bedienung („Wie trage ich Urlaub ein?“) verlieren gegen ein Anliegen, das sich gleich erledigen lässt
+  else if (!hatLeute && !hatTag && G(/^ ?wie (kann|muss|soll|mache|trage|benutze|bediene|nutze|ändere|lösche)\b/).test(t)) plus("hilfe", 7.5);
   if (zurueck) plus("zurueck", 9);
   if (G(/\bwarum\b|\bwieso\b|\bweshalb\b|\bwozu\b|aus welchem grund|\berklär/).test(t)) plus("erklaeren", 9);
-  if (notiz !== null || G(/\bnotiz\b/).test(t)) plus("notiz", 9);
-  if (G(/was fehlt|was ist (noch )?offen|noch zu tun|\bprobleme?\b|passt (der plan|alles|das so)|stimmt (der plan|alles)|alles (ok|okay|in ordnung|gut)\b|\bwo (ist|sind|gibt)\b.*(lücke|rot|problem)|\bwas ist rot\b|\bnoch lücken?\b|gibt es (noch )?(lücken?|probleme?)/).test(t) && !hatLeute) plus("offen", 8);
-  if (G(/tausch|\bwechseln\b.*\bmit\b|\bstatt\b/).test(t)) plus("tausch", leute.personen.length >= 2 ? 9 : 6);
-  if (G(/\bwer (arbeitet|macht|kommt|steht im plan)|\bwer hat (?:\S+ ){0,3}(dienst|schicht|frühschicht|spätschicht)\b|\bwer ist (?:\S+ ){0,3}(da|dran|eingeplant|eingeteilt|im laden)\b|wie viele (leute|personen)|\bbesetzung\b|\bwann (arbeitet|kommt|ist|hat|muss|fängt)\b|\bwie (arbeitet|ist .* eingeplant)\b|\barbeitet .* (heute|morgen)\b.*\?/).test(String(text || "").toLowerCase().replace(G(/[^a-zäöüß0-9?]+/g), " ")) || G(/\bwer arbeitet\b|\bwann arbeitet\b|\bwann kommt\b|\bwann muss\b/).test(t)) plus("wer", 8);
-  if (G(/\bwer kann\b|\bwer (hat|hätte) (?:\S+ ){0,4}zeit\b|\bwer könnte\b|\bwer springt\b|ersetz|vertret|einspring|übernehm|übernimm|\bersatz\b|aushelfen|\bbrauche? (jemand|wen|einen|eine|ersatz)|jemand(en)? (finden|suchen|für)|lücke (füllen|schließen|stopfen)|\bwer noch\b.*\bkann\b/).test(t)) plus("ersatz", 8);
-  if (G(/\bstundenkonto\b|\bkonto\b|\büberstunden\b|\bminusstunden\b|wie viele? stunden|\bstunden hat\b|\bstunden von\b|\bkonten\b/).test(t)) plus("konto", 8);
+  if (notiz !== null || G(/\bnotiz\b|\bnotier/).test(t)) plus("notiz", 9);
+  if (!hatLeute && G(/was fehlt|was ist (noch )?offen|^ ?was offen\b|\bnoch (was|etwas) offen\b|noch zu tun|noch (was|etwas) (zu tun|zu machen|machen|erledigen)|noch erledigen|\bprobleme?\b|passt (der plan|alles|das so)|stimmt (der plan|alles)|alles (ok|okay|in ordnung|gut|grün|besetzt)\b|\bplan (ok|okay|fertig|in ordnung)\b|\b(ist|sind) (der plan|alles) (?:\S+ ){0,4}(ok|okay|fertig|in ordnung|besetzt)\b|\bwo (ist|sind|gibt)\b.*(lücke|rot|problem)|\bwo hakt|\bwas ist rot\b|\bnoch lücken?\b|gibt es (noch )?(lücken?|probleme?)|was (soll|muss) ich (jetzt|noch)\b|\bmuss ich noch\b/).test(t)) plus("offen", 8);
+  // Tausch zweier Personen — oder eine Person wechselt den Tag („Dirk Do statt Mi“, „Dirk Mi auf Do verschieben“)
+  const tagWechsel = leute.personen.length === 1 && tage.length === 2 && !aHatZeit(zeit) && !grund
+    && G(/\bstatt\b|\bauf\b|\bgegen\b|tausch|verschieb|verleg|\bwechsel/).test(t);
+  if (tagWechsel) plus("tausch", 9);
+  else if (G(/tausch|\bwechseln\b.*\bmit\b|\bstatt\b/).test(t)) plus("tausch", leute.personen.length >= 2 ? 9 : 6);
+  const ja = !grund && leute.stellen.has(1);
+  if (G(/\bwer (arbeitet|macht|kommt|steht im plan)|\bwer hat (?:\S+ ){0,3}(dienst|schicht|frühschicht|spätschicht)\b|\bwer ist (?:\S+ ){0,3}(da|dran|eingeplant|eingeteilt|im laden)\b|wie viele (leute|personen)|\bbesetzung\b|\bwann (arbeitet|kommt|ist|hat|muss|fängt)\b|\bwie (arbeitet|ist .* eingeplant)\b|\barbeitet .* (heute|morgen)\b.*\?/).test(roh0.toLowerCase().replace(G(/[^a-zäöüß0-9?]+/g), " "))
+      || G(/\bwer arbeitet\b|\bwann arbeitet\b|\bwann kommt\b|\bwann muss\b|\bwer schlie(ß|ss)t\b|\bwer macht (?:\S+ ){0,2}(auf|zu)\b|\bzeig\S* .*\b(schicht|zeiten|dienst)/).test(t)
+      || (!grund && G(/\bob\b.*\b(arbeitet|da ist|kommt|eingeplant)\b/).test(t))
+      || aNeu(`^ ?wer (?:am |an )?(?:${A_TAGWORT}|heute|morgen|übermorgen) $`).test(t)
+      || (ja && ["arbeitet", "kommt"].includes(woerter[0]))
+      || (ja && woerter[0] === "ist" && G(/\b(da|dran|eingeplant|eingeteilt|im laden|im dienst)\b/).test(t))) plus("wer", 8);
+  // „den Plan übernehmen“ ist der Abschluss, kein Einspringen
+  const planUebernehmen = G(/\bübernehme?n?\b.*\b(plan|entwurf)\b|\b(plan|entwurf)\b(?: \S+){0,3} übernehme?n?\b/).test(t);
+  if (!planUebernehmen && G(/\bwer kann\b|\bwer (hat|hätte) (?:\S+ ){0,6}zeit\b|\bwer könnte\b|\bwer springt\b|ersetz|vertret|einspring|übernehm|übernimm|\bersatz\b|aushelfen|\b(brauche?n?|bräuchte|benötige|benötigen|suche|suchen) (?:\S+ ){0,3}(jemand|wen\b|einen\b|eine\b|ersatz)|jemand(en)? (finden|suchen|für)|\b(kann|könnte) jemand\b|\b(hat|hätte) (noch )?jemand (?:\S+ ){0,4}zeit\b|lücke (füllen|schließen|stopfen)|\bwer noch\b.*\bkann\b/).test(t)) plus("ersatz", 8);
+  if (G(/\bstundenkonto\b|\bkonto\b|\büberstunden\b|\bminusstunden\b|wie viele? stunden|\bstunden hat\b|\bstunden von\b|\bkonten\b|wie viel (darf|kann|soll) (?:\S+ ){0,3}arbeiten/).test(t)
+      || (hatLeute && !aHatZeit(zeit) && zeit.dauer === undefined && G(/\bstunden\b|\bstd\b/).test(t))) plus("konto", 8);
   // „Hans kann auch nicht“ setzt etwas fort — das ist ein Nein zu einem Vorschlag, kein neuer Ausfall
-  if (G(/\b(keiner|keine|niemand|nein|nö|nee)\b|leider nicht|\bgeht nicht\b|klappt nicht|können (?:\S+ ){0,2}nicht|\bauch nicht\b|will nicht|wollen nicht|hat abgesagt|haben abgesagt/).test(t))
+  if (G(/\b(keiner|keine|niemand|nein|nö|nee)\b|leider nicht|\bgeht nicht\b|klappt nicht|können (?:\S+ ){0,2}nicht|\bauch nicht\b|will nicht|wollen nicht|hat abgesagt|haben abgesagt|lieber nicht/).test(t))
     plus("nein", G(/\bauch nicht\b/).test(t) ? 9 : hatLeute && grund && !G(/\bkeiner\b|\bniemand\b/).test(t) ? 3 : 7);
+  if (hatLeute && G(/^ ?ohne\b/).test(t)) plus("nein", 8);                    // „ohne Dirk bitte“
   // „Über mehrere Tage umplanen“ — der Optimierer verteilt die Woche neu
   if (G(/\bumplan|neu verteil/).test(t) && !grund) plus("umplanen", 8);
   // „Vorschläge für Mittwoch“, „Weiter: Dienstag“, „Was ist mit Freitag?“ — Schritt für Schritt durch einen Ausfall
   const vorschlagWort = G(/\bvorschl|\blösung(en)?\b|^ ?weiter\b|\bnächste[nrs]? (tag|schicht)\b/).test(t);
   const wasIstMit = G(/\bwas (ist|machen wir|tun wir) mit\b/).test(t);
   if ((vorschlagWort || wasIstMit) && !G(/\bandere/).test(t)) plus("vorschlag", 6.5);
+  // „Lücke Fr abends?“, „Was bedeutet die Lücke am Freitag?“ — zeigen, was fehlt, und wie es ginge
+  if (hatTag && !hatLeute && G(/\blücke|\bloch\b/).test(t)) plus("vorschlag", 7);
+  if (G(/\bwie geht es\b(?: \S+){0,3} weiter\b/).test(t)) plus("vorschlag", 8);
   if (G(/\bsonst\b|andere[nrs]? (möglichkeit|lösung|weg|idee|vorschl)|\balternativ|jemand anders|jemand anderes|\bwer noch\b|\bwer sonst\b|\bnoch (jemand|wer|was|eine|einen)\b|\bweitere\b|was (geht|ginge) noch|wie (geht|ginge) es|anders lösen|\banders\b/).test(t)) plus("sonst", 7);
   if (grund) plus("ausfall", hatLeute ? 8 : 6);
-  if (G(/\bfrei\b|freigeben|soll nicht arbeiten|nicht einplanen|rausnehmen|aus dem plan/).test(t) && zeit.von === undefined && grund !== "urlaub") plus("frei", 7);
-  if (aHatZeit(zeit)) plus("zeit", 6 + (G(/\b(arbeitet|arbeiten|kommt|kommen|bleibt|bleiben|geht|gehen|fängt|anfangen|schluss|feierabend|länger|früher|später|kürzer)\b/).test(t) ? 1 : 0));
-  if (G(/\bübernehmen\b.*\b(plan|entwurf)\b|\bspeichern\b|\bfertig\b|\bverwerfen\b/).test(t) && !hatLeute) plus("abschluss", 7);
+  if ((G(/\bfrei\b|freigeben|soll nicht arbeiten|nicht einplanen|rausnehmen|aus dem plan/).test(t) || (hatLeute && G(/\braus\b/).test(t) && !G(/\bwieder\b|\bnimm\b/).test(t)))
+      && zeit.von === undefined && grund !== "urlaub") plus("frei", 7);
+  // Eine Schicht als Ziel („Eva Fr Spätschicht“) zählt mit Namen mehr als ein „statt“
+  if (aHatZeit(zeit)) plus("zeit", 6 + (verb ? 1 : 0) + (zeit.schicht && hatLeute ? 3 : 0));
+  if (G(/\bspeicher|\bübernehmen\b.*\b(plan|entwurf)\b|\bverwerfen\b/).test(t) && !hatLeute) plus("abschluss", 8);
+  else if (G(/\bfertig\b/).test(t) && !hatLeute) plus("abschluss", 6);
+  // Kasse, Pausen, Aufgaben eines Tages (seit 18.11.2026 auch im Gespräch)
+  if (G(/\bkasse|kassenwechsel|kassier/).test(t) && G(/ruhig|wechsel|weniger|ablös|zu viele|wie viele|personen|leute|\bwer (sitzt|ist) an/).test(t)) plus("kasse", 9);
+  else if (G(/\bpausen?\b/).test(t) && G(/verschieb|\bneu\b|anders|\blegen\b|überschneid|tausch|später|früher/).test(t)) plus("pausen", 8.5);
+  const aufgabeGenannt = aufgabenWorte().some(w => G(new RegExp("\\b" + w)).test(t));
+  if ((G(/\baufgaben?\b/).test(t) && G(/\bneu\b|verschieb|verteil|\blegen\b|zu spät|zu früh|\bfrist/).test(t))
+      || (aufgabeGenannt && G(/zu spät|zu früh|\bfrist|verschieb|\bneu\b/).test(t))) plus("aufgaben", 9);
+  // Einen gezeigten Vorschlag nehmen: „nimm den zweiten“, „Vorschlag 2“, „nimm Hans“, „Hans macht das“
+  const nr = G(/\b(?:vorschlag|lösung|möglichkeit|weg|option|variante|nummer|nr|karte) ?(\d|eins|zwei|drei)\b/).exec(t)
+    || G(/\b(erste[nrs]?|zweite[nrs]?|dritte[nrs]?)\b/).exec(t) || G(/^ ?(\d)\.? $/).exec(t);
+  const nummer = nr ? A_ORDNUNG[nr[1]] || null : null;
+  if (nummer && !zurueck && (woerter.length <= 4 || G(/\bnimm\b|\bnehmen?\b|\bwähl|\bpasst\b|\bmach (den|die|das)\b|\bvorschlag|\blösung|möglichkeit|option|variante/).test(t))) plus("waehlen", 9);
+  else if (leute.personen.length === 1 && !grund && !hatTag && !aHatZeit(zeit)
+      && G(/\bnimm\b|\bnehmen?\b|\b(den|die|das) mit\b|\bmacht (das|es)\b|\bübernimmt (das|es)\b|\bsoll (einspringen|kommen|das machen|es machen|ran)\b|^ ?lieber\b(?! nicht)/).test(t)) plus("waehlen", 9);
   // Ein Ersatz-Satz mit Grund („Wer kann für Eva einspringen, sie ist krank“) bleibt eine Frage nach Ersatz
   if (p.ersatz && p.ausfall) p.ausfall -= 3;
   // „kann nicht“ als Antwort auf Vorschläge ist ein Nein, kein neuer Ausfall — das entscheidet der Zusammenhang
@@ -7117,14 +7243,36 @@ function assistentVerstehen(text, mo){
   if (p.konto && zeit.relativ) p.konto = 0;
   let absicht = null, punkte = 0;
   Object.keys(p).forEach(a => { if (p[a] > punkte){ punkte = p[a]; absicht = a; } });
+
+  // Wer springt für wen ein? „Kann Hans für Eva einspringen“, „Hans soll Eva vertreten“, „Gina übernimmt Carlas Schicht“
+  let personen = leute.personen, helfer = [];
+  if (leute.orte.length >= 2 && G(/einspring|vertret|ersetz|übernehm|übernimm|\brein\b|aushelf/).test(t)){
+    const fuer = leute.orte.find(x => woerter[x.pos - 1] === "für") || leute.orte.find(x => x.gen)
+      || (G(/vertret|ersetz/).test(t) ? leute.orte[leute.orte.length - 1] : null);
+    if (fuer){ personen = [fuer.name]; helfer = leute.personen.filter(n => n !== fuer.name); }
+  }
   // Nur Angaben, sonst nichts: „und am Freitag?“, „Hans auch“, „Dienstag“
   const restText = (" " + woerter.map((w, n) => leute.stellen.has(n) ? "" : aKanon(w)).join(" ") + " ")
     .replace(G(/\d{1,2}([:.]\d{2})?|\d{1,2}\.\d{1,2}\./g), " ")
     .replace(aNeu(`\\b(${A_TAGE.map(x => x.join("|")).join("|")}|heute|morgen|übermorgen|und|auch|am|an|dann|bitte|für|den|die|der|das|noch|was ist mit|wie sieht es|aus|mit|ist|uhr|bis|ab|von|um|genauso|ebenfalls|gleiche|dasselbe|ganze[rn]? tag|ganze[rn]? woche|kommt später|geht früher|stunden?|minuten|eine|halbe|zwei|drei|\\-|\\?)\\b`, "g"), " ").trim();
   const nurAngaben = !restText && !!(hatLeute || tage.length || aHatZeit(zeit) || zeit.dauer !== undefined || teil);
   if (gruss && !absicht && !nurAngaben) absicht = "gruss";
-  return {absicht, punkte, personen: leute.personen, mehrdeutig: leute.mehrdeutig, tage, tagInfo, zeit, grund, teil, pronomen, nurAngaben, notiz, norm,
-          nurWasIstMit: wasIstMit && !vorschlagWort};
+  // Tage in der Reihenfolge des Satzes — „Do statt Mi“ und „Mi auf Do“ unterscheiden sich nur darin
+  const tagFolge = [];
+  woerter.forEach((w, n) => { if (leute.stellen.has(n)) return; const i = A_TAGE.findIndex(([l, kz]) => w === kz || aKanon(w) === l); if (i >= 0 && !tagFolge.includes(i)) tagFolge.push(i); });
+  const v = {absicht, punkte, personen, helfer, mehrdeutig: leute.mehrdeutig, tage, tagFolge, tagInfo, zeit, grund, teil, pronomen, nurAngaben, notiz, nummer, norm,
+    nurWasIstMit: wasIstMit && !vorschlagWort, kandidaten: Object.keys(p).filter(a => p[a] > 0).sort((a, b) => p[b] - p[a]),
+    woerter, stellen: [...leute.stellen], gelernt: null};
+  if (!o.ohneTraining) trainingAnwenden(v);
+  return v;
+}
+
+// Wörter der aktiven Wochenaufgaben („frischfleisch“, „kühlware“) — „Frischfleisch Freitag zu spät“ meint die Aufgabe
+function aufgabenWorte(){
+  const s = new Set();
+  WAREN.forEach(a => { if ((state.aufgaben || {})[a.id] && state.aufgaben[a.id].aktiv) a.name.toLowerCase().split(G(/[^a-zäöüß]+/)).forEach(w => {
+    if (w.length >= 4 && !A_STOPP.has(w) && !["gelbe", "mappe", "aufbau", "bestellung", "programm"].includes(w)) s.add(w); }); });
+  return [...s];
 }
 
 /* ---- Lösungsarten: welche Art von Lösung in dieser Filiale meist gewählt wird ----
@@ -7188,19 +7336,41 @@ const ASSISTENT_HILFE = "Schreib, wie du es sagst, z. B. „Eva ist morgen krank
   + "„Vorschläge für Freitag“, „Was fehlt noch?“ — und „Doch nicht“, wenn etwas zurück soll.";
 const ASSISTENT_START = ["Jemand fällt aus", "Wer kann einspringen?", "Was fehlt noch?", "Was kannst du?"];
 
-function assistent(text, sl, kurz, eintrag){
+/* Einen Vorschlag einschalten wie ein Tipp auf seine Karte: die Änderung, an der er hängt, kommt mit —
+   und je Zelle bzw. je Ausfall bleibt nur eine Karte des Assistenten an. */
+function karteEinschalten(eintrag, a){
+  a.aktiv = true;
+  (a.mit || (a.fuer ? [a.fuer] : [])).forEach(id => { const f = eintrag.aenderungen.find(x => x.id === id); if (f) f.aktiv = true; });
+  eintrag.aenderungen.forEach(x => { if (x !== a && x.quelle === "assistent" && x.aktiv
+    && ((x.name && x.name === a.name && x.ti === a.ti && x.typ !== "abwesend" && a.typ !== "abwesend")
+     || (a.typ === "loesung" && x.typ === "loesung" && x.ti === a.ti && x.fuer === a.fuer))) x.aktiv = false; });
+}
+
+/* vorgabe: Absicht und Angaben stehen schon fest — aus „Falsch verstanden?“ oder einem Knopf „Meinst du …?“.
+   Dann wird nicht mehr gedeutet, nur noch geantwortet. */
+function assistent(text, sl, kurz, eintrag, vorgabe){
   const mo = montagDer(kurz.mo);
+  // „Neues Thema“: das Gespräch fängt von vorn an — was im Entwurf eingeschaltet ist, bleibt
+  if (!vorgabe && G(/^ ?(neues|anderes) thema\b/).test(String(text || "").toLowerCase())){
+    eintrag.kontext = {};
+    return {antwort: "Gern — worum geht es jetzt?", karten: [], still: [], knoepfe: ASSISTENT_START.slice(0, 3), aus: [], verstanden: {absicht: "neu"}};
+  }
   const pr = entwurfPruefen(sl, kurz, eintrag), plan = pr.plan;
   const k = eintrag.kontext = eintrag.kontext || {};
   const v = assistentVerstehen(text, mo);
+  if (vorgabe){
+    ["absicht", "personen", "helfer", "tage", "zeit", "grund", "nummer"].forEach(x => { if (vorgabe[x] !== undefined && vorgabe[x] !== null) v[x] = vorgabe[x]; });
+    v.nurAngaben = false; v.nurWasIstMit = false;
+    if (vorgabe.personen) v.mehrdeutig = [];
+  }
   // „Was ist mit Freitag?“ heißt nur mitten im Schritt-für-Schritt „Vorschläge für Freitag“ — sonst Nachfrage zum Letzten
   if (v.absicht === "vorschlag" && v.nurWasIstMit && !(k.schritte || []).length) v.absicht = null;
   const vor = name => name.split(G(/\s+/))[0];
   const heuteTi = (() => { const h = new Date(); h.setHours(12, 0, 0, 0); return Math.round((h - mo) / 864e5); })();
 
   // ---- Rahmen: neue Absicht, Antwort auf eine Rückfrage oder Fortsetzung des Letzten ----
-  let f = {absicht: v.absicht, personen: v.personen, tage: v.tage, zeit: v.zeit, grund: v.grund, teil: v.teil, notiz: v.notiz};
-  const angaben = alt => ({absicht: alt.absicht,
+  let f = {absicht: v.absicht, personen: v.personen, helfer: v.helfer || [], tage: v.tage, zeit: v.zeit, grund: v.grund, teil: v.teil, notiz: v.notiz};
+  const angaben = alt => ({absicht: alt.absicht, helfer: v.helfer && v.helfer.length ? v.helfer : alt.helfer || [],
     personen: v.personen.length ? v.personen : alt.personen || [],
     tage: v.tage.length ? v.tage : alt.tage || [],
     zeit: aHatZeit(v.zeit) ? v.zeit
@@ -7232,6 +7402,7 @@ function assistent(text, sl, kurz, eintrag){
   };
   // still: Änderungen, die nicht als eigene Karte erscheinen — der Knopf „Im Plan anzeigen“ schaltet sie ein
   const antwort = (text, karten, knoepfe, still) => { merk(); k.karten = (karten || []).concat(still || []).map(a => a.id);
+    if ((karten || []).length) k.zuletzt = karten.map(a => a.id);
     return {antwort: text, karten: karten || [], still: still || [], knoepfe: (knoepfe || []).filter(Boolean), aus: [], verstanden: f}; };
   const zeigen = liste => liste.length ? {text: "Im Plan anzeigen", zeigen: liste.map(a => a.id)} : null;
   const frage = (text, knoepfe, art) => {
@@ -7344,13 +7515,24 @@ function assistent(text, sl, kurz, eintrag){
     if (!g || !g.luecke.length) return antwort(`${vorweg}${kopf}: ${s.aus ? `Ohne ${vor(s.name)} fehlt nichts` : "Es fehlt nichts"} — niemand muss einspringen.`, [], [weiter], still);
     k.luecke = g.luecke;
     const lage = `${kopf}${s.aus ? ` ohne ${vor(s.name)}` : ""} — ${spannenText(g.luecke)} ${g.gruende.length > 1 ? "fehlen" : "fehlt"}: ${g.gruende.join(", ")}.`;
+    const bev = bevorzugen(g.wege);
     const wege = g.wege.slice(versatz, versatz + 3);
     k.kandidaten = [...new Set(wege.flatMap(w => w.zeilen.map(z => z.name)))];
     // Ohne vollständige Lösung am Tag: über mehrere Tage umplanen anbieten (nur bei einem Ausfall)
     const umplanen = s.aus && !g.wege.some(w => w.voll) ? "Über mehrere Tage umplanen" : null;
     if (!wege.length) return antwort(`${vorweg}${versatz ? `Keine weiteren Vorschläge für ${tagName(s.ti)}. ` : lage + " "}${keinWeg(s.ti, !!s.aus)}`, [], [umplanen, weiter], still);
-    return antwort(`${vorweg}${lage} ${versatz ? "Weitere Vorschläge" : "Vorschläge"}:`, wegKarten(wege, fuer, s.aus ? [s.aus] : s.aend),
+    return antwort(`${vorweg}${lage} ${bev}${versatz ? "Weitere Vorschläge" : "Vorschläge"}:`, wegKarten(wege, fuer, s.aus ? [s.aus] : s.aend),
       [weiter, "Keiner davon passt", g.wege.length > versatz + 3 ? "Andere Vorschläge" : null, umplanen], still);
+  };
+
+  /* „Kann Hans für Eva einspringen?“: Wege mit Hans zuerst. Sortiert die Liste um und sagt, wenn es mit
+     den Gewünschten nicht geht. */
+  const bevorzugen = wege => {
+    const wer = f.helfer || [];
+    if (!wer.length || !wege.length) return "";
+    const mit = wege.filter(w => w.zeilen.some(z => wer.includes(z.name)));
+    wege.splice(0, wege.length, ...mit, ...wege.filter(w => !mit.includes(w)));
+    return mit.length ? "" : `Mit ${wer.map(vor).join(" und ")} geht es nicht ohne Regelverstoß. `;
   };
 
   /* Ein Ausfall: die Person fehlt an den Tagen. Erste Option: im Plan anzeigen. Zweite: Vorschläge
@@ -7399,8 +7581,77 @@ function assistent(text, sl, kurz, eintrag){
     return antwort(text + fo.text, [], [zeigen(karten), schritte.length ? `Vorschläge für ${schrittName(schritte[0])}` : null], karten);
   };
 
+  // Gezeigte Vorschläge (letzte Antwort mit Karten) — für „nimm den zweiten“, „nimm Hans“
+  const gezeigt = (k.zuletzt || []).map(id => eintrag.aenderungen.find(a => a.id === id)).filter(Boolean);
+  const werIn = a => a.weg ? a.weg.zeilen.map(z => z.name) : a.name ? [a.name] : [];
+  let wahl = null;
+  if (f.absicht === "waehlen"){
+    wahl = v.nummer ? gezeigt[v.nummer - 1] || null : f.personen.length ? gezeigt.find(a => werIn(a).includes(f.personen[0])) || null : null;
+    // „Fritz soll einspringen“ ohne passenden Vorschlag: Ersatz suchen, Wege mit Fritz zuerst
+    if (!wahl && !v.nummer && f.personen.length){ f.helfer = f.personen; f.personen = []; v.personen = []; f.absicht = "ersatz"; }
+  }
+
   switch (f.absicht){
-  case "hilfe": return antwort(ASSISTENT_HILFE, [], ASSISTENT_START.slice(0, 3));
+  case "hilfe": {
+    // „Wie trage ich Urlaub ein?“ — Hilfe zu genau diesem Anliegen
+    const thema = (v.kandidaten || []).map(anliegenVon).find(a => a && a.absicht !== "hilfe");
+    if (thema) return antwort(`${thema.titel}: ${thema.hilfe ? thema.hilfe + " " : ""}Schreib zum Beispiel „${anliegenBeispiel(thema, v.grund)}“.`);
+    return antwort(ASSISTENT_HILFE, [], ASSISTENT_START.slice(0, 3));
+  }
+
+  case "waehlen": {
+    if (!gezeigt.length) return antwort("Gerade ist kein Vorschlag zu sehen. Schreib, wer ausfällt oder für welchen Tag du jemanden suchst.", [], ASSISTENT_START.slice(0, 2));
+    if (!wahl) return frage(v.nummer ? `Es gibt nur ${gezeigt.length} ${gezeigt.length === 1 ? "Vorschlag" : "Vorschläge"} — welchen meinst du?` : "Welchen Vorschlag meinst du?",
+      gezeigt.slice(0, 3).map((a, n) => ({text: `${n + 1}. ${a.text}`, zeigen: [a.id].concat(a.mit || (a.fuer ? [a.fuer] : []))})));
+    const erg = antwort(`Im Plan: ${wahl.text}${wahl.weg ? " · " + wahl.weg.passt : ""}.`, [], ["Doch nicht"]);
+    erg.an = [wahl.id];
+    k.karten = [wahl.id].concat(wahl.mit || (wahl.fuer ? [wahl.fuer] : []));
+    return erg;
+  }
+
+  case "kasse": {
+    // Kasse ruhiger: andere Pausen, weniger Wechsel und Personen an der Kasse — Schichten und Aufgaben bleiben
+    const voll = planLaden(plan), ab = Math.max(0, Math.min(5, heuteTi));
+    const tage = (f.tage.length ? f.tage : [0, 1, 2, 3, 4, 5].filter(ti => ti >= ab)).filter(ti => !plan.tage[ti].feiertag);
+    if (!tage.length) return antwort("In dieser Woche ist kein Tag mehr offen.");
+    const funde = tage.map(ti => kasseRuhiger(voll, ti)).filter(Boolean);
+    if (!funde.length){
+      const z = tage.length === 1 ? kasseZahlen(voll, tage[0]) : null;
+      return antwort(z ? `${tagName(tage[0])}: ${z.wechsel} Kassenwechsel, ${z.personen} ${z.personen === 1 ? "Person" : "Personen"} an der Kasse — mit anderen Pausen geht es nicht ruhiger.`
+        : "Mit anderen Pausen wird die Kasse an keinem dieser Tage ruhiger.");
+    }
+    return antwort("Mit anders gelegten Pausen — Schichten und Aufgaben bleiben:",
+      funde.map(x => karte({typ: "pausen", ruhiger: true, ti: x.ti}, kasseRuhigerText(x))));
+  }
+
+  case "pausen": {
+    // Pausen, die sich überschneiden, verschieben — sonst wie „Kasse ruhiger“
+    const luecken = pausenLuecken(plan), voll = planLaden(plan);
+    const tage = (f.tage.length ? f.tage : luecken.map(x => x.ti)).filter(ti => !plan.tage[ti].feiertag);
+    if (!tage.length) return frage("Für welchen Tag?", tagKnoepfe());
+    const karten = [], gut = [];
+    tage.forEach(ti => {
+      const l = luecken.find(x => x.ti === ti);
+      if (l) return karten.push(karte({typ: "pausen", ti}, pausenLueckeText(plan, l).replace(/ — Pausen überschneiden sich\.$/, "") + " — Pausen verschieben"));
+      const x = kasseRuhiger(voll, ti);
+      if (x) karten.push(karte({typ: "pausen", ruhiger: true, ti}, kasseRuhigerText(x)));
+      else gut.push(ti);
+    });
+    if (!karten.length) return antwort(`${tageText(gut)}: Die Pausen liegen gut — Kasse und Aufgaben sind besetzt.`);
+    return antwort("Pausen neu gelegt — Schichten bleiben:", karten);
+  }
+
+  case "aufgaben": {
+    // Aufgaben außerhalb ihres Zeitfensters neu legen — nur die betroffenen wandern
+    const aussen = aufgabenAusserhalb(plan);
+    const tage = f.tage.length ? f.tage : aussen.map(x => x.ti);
+    if (!tage.length) return antwort("Alle Aufgaben liegen in ihrem Zeitfenster.");
+    const karten = [], gut = [];
+    tage.forEach(ti => { const x = aussen.find(y => y.ti === ti); if (x) karten.push(karte({typ: "aufgaben", ti}, aufgabenAusserhalbText(x))); else gut.push(ti); });
+    if (!karten.length) return antwort(`${tageText(gut)}: Alle Aufgaben liegen in ihrem Zeitfenster.`);
+    return antwort("Aufgaben neu legen — nur die betroffenen wandern:", karten);
+  }
+
   case "gruss": return antwort("Gern. Was soll sich am Plan ändern?", [], ASSISTENT_START.slice(0, 3));
   case "abschluss": return antwort("Das machst du oben: „Übernehmen“ macht den Entwurf zum gültigen Plan, „Entwurf verwerfen“ lässt alles, wie es war.");
   case "offen":
@@ -7573,10 +7824,14 @@ function assistent(text, sl, kurz, eintrag){
     if (!v.personen.length && pr.luecken[ti] && !aHatZeit(f.zeit)){
       k.problem = null; k.luecke = pr.luecken[ti]; k.ausgeschlossen = [];
       const wege = lueckenWege(ti, []);
+      const bev = bevorzugen(wege);
       k.kandidaten = [...new Set(wege.flatMap(w => w.zeilen.map(z => z.name)))];
-      if (wege.length) return antwort(`${tagName(ti)}: ${spannenText(pr.luecken[ti])} ${fehltText(plan, ti, pr.luecken[ti])}. Vorschläge:`,
+      if (wege.length) return antwort(`${tagName(ti)}: ${spannenText(pr.luecken[ti])} ${fehltText(plan, ti, pr.luecken[ti])}. ${bev}Vorschläge:`,
         wegKarten(wege.slice(0, 3)), ["Keiner davon passt"]);
     }
+    // „Fritz soll einspringen“, aber am Tag fehlt nichts
+    if (!v.personen.length && f.helfer.length && !pr.luecken[ti] && !aHatZeit(f.zeit))
+      return antwort(`Am ${tagName(ti)} fehlt niemand — ${f.helfer.map(vor).join(" und ")} muss nicht einspringen.`);
     // „Wer kann Eva ersetzen?“ — der Ausfall dieser Person, mit allen Wegen
     const fehlt = f.personen.find(name => schichtenVon(plan, name, ti).length);
     if (fehlt) return ausfallAntwort([fehlt], f.tage.filter(x => schichtenVon(plan, fehlt, x).length), f.grund || "nicht", true);
@@ -7607,6 +7862,20 @@ function assistent(text, sl, kurz, eintrag){
   }
 
   case "tausch": {
+    // „Dirk Do statt Mi“: die Schicht wandert an den anderen Tag
+    if (f.personen.length === 1 && f.tage.length === 2){
+      // „Mi auf Do“, „Samstag gegen Montag“: vom ersten auf den zweiten Tag — „Do statt Mi“ umgekehrt
+      const name = f.personen[0], folge = (v.tagFolge || []).filter(ti => f.tage.includes(ti));
+      let [alt, neu] = folge.length === 2 ? folge : f.tage;
+      if (G(/\bstatt\b/).test(v.norm)) [alt, neu] = [neu, alt];
+      const sch = schichtenVon(plan, name, alt)[0], dort = schichtenVon(plan, name, neu)[0];
+      if (!sch) return frage(dort ? `${vor(name)} hat am ${tagName(alt)} keine Schicht, aber am ${tagName(neu)}. Umgekehrt?`
+        : `${vor(name)} hat an beiden Tagen frei. Mit Uhrzeit geht es: „${vor(name)} ${tagName(neu)} 8–14“.`, dort ? [`${vor(name)} ${TAGE[alt][1]} statt ${TAGE[neu][1]}`] : []);
+      if (dort) return antwort(`${vor(name)} arbeitet an beiden Tagen — welche Zeit soll wohin? Zum Beispiel „${vor(name)} ${tagName(neu)} 8–14“.`);
+      const karten = [karte({typ: "frei", name, ti: alt}, `${name} ${tagName(alt)} frei`),
+        karte({typ: "schicht", name, ti: neu, von: sch.von, bis: sch.bis}, `${name} ${tagName(neu)} ${hhmm(sch.von)}–${hhmm(sch.bis)}`)];
+      return aenderungAntwort(`${vor(name)} arbeitet ${tagName(neu)} statt ${tagName(alt)}: ${hhmm(sch.von)}–${hhmm(sch.bis)}.`, karten);
+    }
     if (f.personen.length < 2) return frage(f.personen.length ? `Mit wem soll ${vor(f.personen[0])} tauschen?` : "Wer soll mit wem tauschen?", leuteKnoepfe(f.tage));
     if (!f.tage.length && k.ti !== undefined && fortsetzung) f.tage = [k.ti];
     if (!f.tage.length) return frage(`An welchem Tag tauschen ${vor(f.personen[0])} und ${vor(f.personen[1])}?`, tagKnoepfe());
@@ -7655,7 +7924,24 @@ function assistent(text, sl, kurz, eintrag){
       return {antwort: `Was soll für ${n} gelten?`, karten: [], aus: [], verstanden: f, rueckfrage: true,
         knoepfe: [`${n} fällt aus`, `${n} bekommt frei`, `Wann arbeitet ${n}?`, `Warum ist ${n} eingeplant?`]};
     }
-    return {antwort: "Das habe ich nicht verstanden. Worum geht es?", karten: [], aus: [], verstanden: f, knoepfe: ASSISTENT_START};
+    /* Nicht verstanden: die wahrscheinlichsten Anliegen als Knöpfe. Ein Tipp darauf beantwortet die Frage
+       und ist zugleich ein Trainingsbeispiel für diesen Satz (k.unklar). „Etwas anderes …“ öffnet die Auswahl. */
+    k.unklar = text;
+    const opt = [];
+    const s = (k.schritte || [])[k.schrittNr];
+    // Zuerst das Thema von eben: weiter im Schritt für Schritt — oder dasselbe Anliegen für dieselbe Person
+    const l = k.letzte || {};
+    if (s) opt.push({text: `Weiter: ${schrittName(s)}`, rahmen: {absicht: "vorschlag", tage: [s.ti]}});
+    else if (anliegenVon(l.absicht) && (l.personen || []).length)
+      opt.push({text: [anliegenVon(l.absicht).titel].concat(l.personen.map(vor), (l.tage || []).map(tagName)).join(" · "),
+        rahmen: {absicht: l.absicht, personen: l.personen, tage: l.tage || []}});
+    (v.kandidaten || []).forEach(a => {
+      const an = anliegenVon(a);
+      if (an && opt.length < 3 && !opt.some(o => o.rahmen.absicht === a))
+        opt.push({text: [an.titel].concat(f.personen.map(vor), f.tage.map(tagName)).join(" · "), rahmen: {absicht: a, personen: f.personen, tage: f.tage}});
+    });
+    return {antwort: opt.length ? "Nicht sicher verstanden — meinst du eins davon?" : "Das habe ich nicht verstanden. Worum geht es?", karten: [], aus: [], verstanden: f,
+      knoepfe: opt.concat(ASSISTENT_START.slice(0, Math.max(0, (opt.length ? 3 : 4) - opt.length))).concat([{text: "Etwas anderes …", korrigieren: true}])};
   }
   }
 
@@ -7674,17 +7960,27 @@ function assistent(text, sl, kurz, eintrag){
       erste ? [180, 120, 60].map(d => "bis " + hhmm(erste.bis - d)).filter((x, n) => erste.bis - (3 - n) * 60 > erste.von + 60) : [], "zeit");
     return frage(`Welche Zeit soll für ${vor(name)} am ${tagName(f.tage[0])} gelten? Zum Beispiel „8–14“, „ab 10“ oder „eine Stunde länger“.`);
   }
-  if (z.von === undefined && aHatZeit(z) && !f.tage.some(ti => schichtenVon(plan, name, ti).length))
+  if (z.von === undefined && !z.schicht && aHatZeit(z) && !f.tage.some(ti => schichtenVon(plan, name, ti).length))
     return antwort(`${name} hat am ${tageText(f.tage)} keine Schicht, die sich verlängern oder verkürzen ließe. Mit Uhrzeit von–bis geht es: „${vor(name)} ${tagName(f.tage[0])} 8–14“.`);
   if (z.relativ && z.relativ.min === null) return frage(`Wie viel ${z.relativ.art}?`, ["30 Minuten", "1 Stunde", "2 Stunden"], "dauer");
   if (z.relativ && !z.relativ.seite && (z.relativ.art === "früher" || z.relativ.art === "später"))
     return frage(`${vor(name)} kommt ${z.relativ.art} — oder geht ${z.relativ.art}?`, [`Kommt ${z.relativ.art}`, `Geht ${z.relativ.art}`], "seite");
   if (z.von !== undefined && !(z.bis > z.von)) return antwort("Das Ende muss nach dem Beginn liegen.");
-  const karten = [], ohne = [];
+  const karten = [], ohne = [], schon = [];
   f.tage.filter(ti => !plan.tage[ti].feiertag).forEach(ti => {
     const s = schichtenVon(plan, name, ti)[0];
     let von, bis;
     if (z.von !== undefined){ von = z.von; bis = z.bis; }
+    else if (z.schicht){
+      // Frühschicht: vom frühesten Beginn des Tages bis zum Schichtwechsel; Spätschicht: vom Wechsel bis zum spätesten Ende
+      const alle = plan.tage[ti].schichten;
+      if (!alle.length){ ohne.push(ti); return; }
+      const anfang = Math.min(...alle.map(x => x.von)), ende = Math.max(...alle.map(x => x.bis));
+      const wechsel = hatZeit(state.wechsel) ? minuten(state.wechsel) : null;
+      if (s && (z.schicht === "spaet" ? s.bis >= ende : s.von <= anfang)){ schon.push(`${tagName(ti)} ${hhmm(s.von)}–${hhmm(s.bis)}`); return; }
+      if (z.schicht === "spaet"){ bis = ende; von = wechsel && wechsel < ende - 120 ? wechsel : Math.max(...alle.map(x => x.von)); }
+      else { von = anfang; bis = wechsel && wechsel > anfang + 120 ? wechsel : Math.min(...alle.map(x => x.bis)); }
+    }
     else if (!s){ ohne.push(ti); return; }
     else if (z.relativ){
       const seite = z.relativ.seite || "bis", d = (z.relativ.art === "später" || z.relativ.art === "länger" ? 1 : -1) * z.relativ.min;
@@ -7692,6 +7988,7 @@ function assistent(text, sl, kurz, eintrag){
     } else { von = z.nurAb !== null && z.nurAb !== undefined ? z.nurAb : s.von; bis = z.nurBis !== null && z.nurBis !== undefined ? z.nurBis : s.bis; }
     if (bis > von) karten.push(karte({typ: "schicht", name, ti, von, bis}, `${name} ${tagName(ti)} ${hhmm(von)}–${hhmm(bis)}`));
   });
+  if (!karten.length && schon.length) return antwort(`${vor(name)} hat schon ${z.schicht === "spaet" ? "Spätschicht" : "Frühschicht"}: ${schon.join(", ")}.`);
   if (!karten.length) return antwort(`${name} hat am ${tageText(ohne.length ? ohne : f.tage)} keine Schicht, die sich verlängern oder verkürzen ließe. Mit Uhrzeit von–bis geht es: „${vor(name)} ${tagName(f.tage[0])} 8–14“.`);
   return aenderungAntwort(`${name}: ${karten.map(c => `${tagName(c.ti)} ${hhmm(c.von)}–${hhmm(c.bis)}`).join(", ")}; die Pause legt der Planer nach Gesetz.`, karten);
 }
@@ -7946,6 +8243,240 @@ function planFreigeben(sl){
   neu.freigegeben = neu.erstellt;
   delete state.planEntwurf[sl];
   return neu;
+}
+
+// ==== kern/20-training.js ====
+/* ---- Training des Assistenten (seit 18.11.2026) -----------------------------
+   Der Assistent lernt aus Beispielen — ohne KI-Dienst, alles bleibt auf dem Gerät.
+
+   Ein Beispiel ist ein Satz und das, was gemeint war: Anliegen (Absicht) und Angaben. Namen
+   ersetzt das Training beim Speichern durch {Person}: Es merkt sich, wie jemand fragt — nie,
+   wer krank war (state.training.beispiele). Beispiele entstehen auf drei Wegen:
+     1. „Falsch verstanden?“ unter einer Antwort — richtigstellen, der Assistent antwortet neu,
+     2. ein Tipp auf „Meinst du …?“, wenn er unsicher war,
+     3. die Seite „Assistent trainieren“: Sätze ausprobieren, bestätigen oder richtigstellen.
+   Sofort: Versteht der Assistent einen Satz nicht — oder wurde genau dieser Satz schon
+   richtiggestellt —, gilt das Anliegen des ähnlichsten Beispiels (Wortvergleich, trainingAehnlich).
+   Dauerhaft: Die Beispiele lassen sich kopieren und an Claude geben; daraus werden feste Regeln
+   und Testsätze (training-einlesen.js, Tests/training.test.js). */
+
+const TRAINING_GRENZE = 400;      // so viele Beispiele höchstens — zuerst gehen alte Bestätigungen
+const TRAINING_GLEICH = 0.92;     // ab hier derselbe Satz: das Beispiel geht den festen Regeln vor
+const TRAINING_AEHNLICH = 0.55;   // ab hier hilft ein Beispiel, wenn die festen Regeln nichts verstehen
+const TRAINING_KANDIDAT = 0.35;   // ab hier kommt sein Anliegen unter „Meinst du …?“
+
+/* Die Anliegen, die der Assistent kennt — Reihenfolge der Auswahl „Was wolltest du?“.
+   angaben: was dort abgefragt wird; hilfe: ein Satz für die Hilfe zu genau diesem Anliegen. */
+const ANLIEGEN = [
+  {absicht: "ausfall",   titel: "Jemand fällt aus",       bsp: "Eva ist morgen krank",                 angaben: ["personen", "tage", "grund"]},
+  {absicht: "ersatz",    titel: "Ersatz suchen",          bsp: "Wer kann für Eva einspringen?",        angaben: ["personen", "tage", "zeit"]},
+  {absicht: "zeit",      titel: "Andere Arbeitszeit",     bsp: "Hans Mittwoch 8–14",                   angaben: ["personen", "tage", "zeit"]},
+  {absicht: "frei",      titel: "Frei geben",             bsp: "Fritz hat Freitag frei",               angaben: ["personen", "tage"]},
+  {absicht: "tausch",    titel: "Tauschen",               bsp: "Eva und Hans tauschen Mittwoch",       angaben: ["personen", "tage"],
+    hilfe: "Zwei Personen tauschen ihre Schichten — oder eine Person wechselt den Tag („Dirk Do statt Mi“)."},
+  {absicht: "vorschlag", titel: "Vorschläge für einen Tag", bsp: "Vorschläge für Freitag",             angaben: ["tage"]},
+  {absicht: "waehlen",   titel: "Einen Vorschlag nehmen", bsp: "Nimm den zweiten",                     angaben: ["personen"]},
+  {absicht: "sonst",     titel: "Andere Vorschläge",      bsp: "Gibt es eine andere Lösung?"},
+  {absicht: "nein",      titel: "Die Vorgeschlagenen können nicht", bsp: "Keiner von denen kann",      angaben: ["personen"]},
+  {absicht: "umplanen",  titel: "Über mehrere Tage umplanen", bsp: "Über mehrere Tage umplanen",
+    hilfe: "Lässt sich ein Ausfall am Tag nicht lösen, verteilt der Planer die Woche neu — so wenig wie möglich anders."},
+  {absicht: "kasse",     titel: "Kasse ruhiger",          bsp: "Kasse am Mittwoch ruhiger",            angaben: ["tage"],
+    hilfe: "Andere Pausen, damit weniger Personen an die Kasse müssen und seltener gewechselt wird. Schichten und Aufgaben bleiben."},
+  {absicht: "pausen",    titel: "Pausen verschieben",     bsp: "Pausen am Donnerstag neu legen",       angaben: ["tage"],
+    hilfe: "Überschneiden sich Pausen, sind Kasse oder eine Aufgabe kurz leer — der Planer legt sie neu, die Schichten bleiben."},
+  {absicht: "aufgaben",  titel: "Aufgaben neu legen",     bsp: "Frischfleisch Freitag zu spät",        angaben: ["tage"],
+    hilfe: "Liegt eine Aufgabe außerhalb ihrer Frist, wandert sie in ihr Zeitfenster."},
+  {absicht: "wer",       titel: "Wer arbeitet wann?",     bsp: "Wer arbeitet Samstag?",                angaben: ["personen", "tage"]},
+  {absicht: "konto",     titel: "Stunden und Konto",      bsp: "Wie viele Stunden hat Eva?",           angaben: ["personen"]},
+  {absicht: "erklaeren", titel: "Warum so geplant?",      bsp: "Warum arbeitet Dirk am Dienstag?",     angaben: ["personen", "tage"]},
+  {absicht: "offen",     titel: "Was ist noch offen?",    bsp: "Was fehlt noch?"},
+  {absicht: "zurueck",   titel: "Zurücknehmen",           bsp: "Doch nicht",                           angaben: ["personen", "tage"]},
+  {absicht: "notiz",     titel: "Notiz für einen Tag",    bsp: "Notiz Freitag: Aktionsware aufbauen",  angaben: ["tage"]},
+  {absicht: "abschluss", titel: "Übernehmen oder verwerfen", bsp: "Wie speichere ich das?",
+    hilfe: "Das geht oben: „Übernehmen“ macht den Entwurf zum gültigen Plan, „Entwurf verwerfen“ lässt alles, wie es war."},
+  {absicht: "hilfe",     titel: "Hilfe",                  bsp: "Was kannst du?"},
+  {absicht: "gruss",     titel: "Gruß oder Dank",         bsp: "Danke"}
+];
+const anliegenVon = absicht => ANLIEGEN.find(a => a.absicht === absicht) || null;
+const GRUND_WAHL = [["krank", "Krank"], ["urlaub", "Urlaub"], ["schule", "Berufsschule"], ["nicht", "Kann nicht"]];
+
+// Beispielsatz mit Vornamen des eigenen Personals statt der erfundenen („Eva“ → erste Person der Filiale)
+// grund: beim Ausfall das passende Beispiel („Wie trage ich Urlaub ein?“ → „Hans hat Mi–Fr Urlaub“)
+function anliegenBeispiel(a, grund){
+  const vor = state.mitarbeiter.map(m => m.name.split(/\s+/)[0]).filter((n, i, l) => n && l.indexOf(n) === i);
+  const ersatz = {};
+  ["Eva", "Hans", "Fritz", "Dirk"].forEach((n, i) => { if (vor[i]) ersatz[n] = vor[i]; });
+  const bsp = a.absicht === "ausfall" && grund ? {urlaub: "Hans hat Mi–Fr Urlaub", schule: "Hans hat Donnerstag Berufsschule", nicht: "Hans kann Freitag nicht"}[grund] || a.bsp : a.bsp;
+  return bsp.replace(/\b(Eva|Hans|Fritz|Dirk)\b/g, n => ersatz[n] || n);
+}
+
+/* Merkmale eines gelesenen Satzes für den Vergleich: Namen werden {person}, Tage {tag}, Zahlen {zahl},
+   alles andere die bekannte Form des Worts (Tippfehler, Umlaute, Endungen angeglichen). */
+function trainingMerkmale(v){
+  const stellen = new Set(v.stellen || []);
+  const tage = new Set(A_TAGE.flat().concat(["heute", "morgen", "übermorgen", "sonntag", "sonnabend"]));
+  return (v.woerter || []).map((w, n) => stellen.has(n) ? "{person}" : G(/^\d/).test(w) ? "{zahl}" : tage.has(w) ? "{tag}" : aKanon(w))
+    .filter(w => w && w !== "-" && w !== "?");
+}
+
+// Ähnlichkeit zweier Sätze (0–1): gewichtete Überdeckung der Wörter und Wortpaare. Platzhalter und Füllwörter zählen wenig.
+function trainingAehnlich(a, b){
+  const gewicht = w => w[0] === "{" ? 0.4 : A_STOPP.has(w) ? 0.3 : 1;
+  const menge = m => {
+    const r = new Map();
+    m.forEach((w, n) => {
+      r.set(w, Math.max(r.get(w) || 0, gewicht(w)));
+      if (n) r.set(m[n - 1] + " " + w, 0.2 + 0.5 * Math.min(gewicht(m[n - 1]), gewicht(w)));
+    });
+    return r;
+  };
+  const x = menge(a), y = menge(b);
+  let schnitt = 0, vereint = 0;
+  new Set([...x.keys(), ...y.keys()]).forEach(k => { const p = x.get(k) || 0, q = y.get(k) || 0; schnitt += Math.min(p, q); vereint += Math.max(p, q); });
+  return vereint ? schnitt / vereint : 0;
+}
+
+/* Gelerntes anwenden (aus assistentVerstehen): Derselbe Satz, der schon richtiggestellt wurde, geht den
+   festen Regeln vor; ein ähnlicher hilft nur, wo die Regeln nichts verstehen. Weniger ähnliche Beispiele
+   schlagen ihr Anliegen für „Meinst du …?“ vor. */
+function trainingAnwenden(v){
+  const liste = ((state && state.training) || {}).beispiele || [];
+  if (!liste.length) return v;
+  const m = trainingMerkmale(v);
+  if (!m.length) return v;
+  const treffer = liste.filter(b => b.absicht && b.merkmale).map(b => ({b, wert: trainingAehnlich(m, b.merkmale)}))
+    .filter(x => x.wert >= TRAINING_KANDIDAT).sort((x, y) => y.wert - x.wert);
+  if (!treffer.length) return v;
+  const best = treffer[0];
+  if ((best.wert >= TRAINING_GLEICH && best.b.absicht !== v.absicht) || (!v.absicht && !v.nurAngaben && best.wert >= TRAINING_AEHNLICH)){
+    v.gelernt = {id: best.b.id, aehnlich: Math.round(best.wert * 100) / 100, vorher: v.absicht};
+    v.absicht = best.b.absicht;
+    v.nurAngaben = false;
+    const a = best.b.angaben || {};
+    if (a.grund && !v.grund) v.grund = a.grund;
+    if (a.nummer && !v.nummer) v.nummer = a.nummer;
+  }
+  treffer.forEach(x => { if (!v.kandidaten.includes(x.b.absicht)) v.kandidaten.push(x.b.absicht); });
+  return v;
+}
+
+/* Namen aus einem Text nehmen: jedes Wort, an dem der Assistent eine Person erkennt — auch Kurzform, Genitiv,
+   vertippt — und alles, was einem Namen des Personals ähnelt, wird {Person}, {Person 2} …
+   Bei einer Notiz wird ihr Text {Text}. → {satz, platz: {Name: Platzhalter}} */
+function trainingAnonym(text, notiz){
+  text = String(text || "");
+  if (notiz) text = text.replace(notiz, "{Text}");
+  const teile = state.mitarbeiter.flatMap(m => m.name.toLowerCase().split(/\s+/).map(t => ({t, name: m.name}))).filter(x => x.t.length >= 3);
+  const platz = {};
+  const zeichen = name => platz[name] || (platz[name] = Object.keys(platz).length ? `{Person ${Object.keys(platz).length + 1}}` : "{Person}");
+  let anrede = false, vorher = null;
+  const satz = text.replace(/[A-Za-zÄÖÜäöüß]+/g, (wort, an, ganz) => {
+    if (ganz[an - 1] === "{") return wort;                     // schon ein Platzhalter
+    const w = wort.toLowerCase(), nachAnrede = anrede, davor = vorher;
+    anrede = w === "frau" || w === "herr" || w === "herrn"; vorher = null;
+    // Vor- und Nachname hintereinander („Dirk Aushilfe“) — auch wenn der Nachname ein gewöhnliches Wort ist
+    if (davor && davor.toLowerCase().split(/\s+/).slice(1).includes(w)){ vorher = davor; return zeichen(davor); }
+    const bekannt = A_WORTE.has(w) || A_STOPP.has(w) || A_MUNDART.has(w) || A_TAGE.some(([l, k]) => w === l || w === k);
+    const l = aPersonen(nachAnrede ? ["frau", w] : [w]);
+    let name = l.personen[0] || (l.mehrdeutig[0] || [])[0] || null;
+    // „Frau Müller“: nach der Anrede steht immer ein Name — auch von jemandem, der nicht zum Personal gehört
+    if (!name && nachAnrede) return "{Name}";
+    if (!name && !bekannt && w.length >= 4){
+      // vertippt oder verkürzt: Abstand höchstens 2 oder gleicher Anfang
+      const nah = teile.find(x => aAbstand(w, x.t) <= (x.t.length >= 6 ? 2 : 1) || (w.length >= 4 && x.t.startsWith(w)) || (w.endsWith("s") && x.t === w.slice(0, -1)));
+      if (nah) name = nah.name;
+    }
+    vorher = name;
+    return name ? zeichen(name) : wort;
+  });
+  return {satz, platz};
+}
+
+// Angaben eines Beispiels ohne Namen: Personen als ihr Platzhalter im Satz
+function trainingAngaben(angaben, platz){
+  const a = angaben || {}, raus = {};
+  const zu = l => (l || []).map(n => platz[n]).filter(Boolean);
+  if ((a.personen || []).length) raus.personen = zu(a.personen);
+  if ((a.helfer || []).length) raus.helfer = zu(a.helfer);
+  if ((a.tage || []).length) raus.tage = a.tage.slice();
+  if (a.grund) raus.grund = a.grund;
+  if (a.nummer) raus.nummer = a.nummer;
+  if (a.zeit && aHatZeit(a.zeit)) raus.zeit = Object.assign({}, a.zeit);
+  return raus;
+}
+
+/* Ein Beispiel merken. b: {text, absicht, angaben, quelle, vorher, wunsch} — text, wie er geschrieben wurde,
+   absicht null bei „Etwas anderes“ (dann steht im Wunsch, was erwartet war). Derselbe Satz ersetzt ein älteres Beispiel. */
+function trainingLernen(b, mo){
+  mo = mo || aktuellerMontag();
+  const v = assistentVerstehen(b.text, mo, {ohneTraining: true});
+  const merkmale = trainingMerkmale(v);
+  if (!merkmale.length) return null;
+  const {satz, platz} = trainingAnonym(b.text, v.notiz);
+  const heute = new Date();
+  const ein = {id: "t" + heute.getTime().toString(36) + Math.random().toString(36).slice(2, 5), satz, merkmale,
+    absicht: b.absicht || null, angaben: trainingAngaben(b.angaben, platz), quelle: b.quelle || "korrektur",
+    vorher: b.vorher !== undefined ? b.vorher : v.absicht, wunsch: b.wunsch ? trainingAnonym(b.wunsch).satz : null,
+    wt: (heute.getDay() + 6) % 7, am: isoVon(heute)};
+  state.training = state.training || {beispiele: []};
+  const l = state.training.beispiele = (state.training.beispiele || []).filter(x => x.merkmale.join(" ") !== merkmale.join(" "));
+  l.push(ein);
+  while (l.length > TRAINING_GRENZE){ const i = l.findIndex(x => x.quelle === "bestaetigt"); l.splice(i >= 0 ? i : 0, 1); }
+  return ein;
+}
+
+// Platzhalter wieder durch Vornamen ersetzen — zum Prüfen, ob die Regeln den Satz verstehen
+function trainingEinsetzen(satz){
+  const vor = state.mitarbeiter.map(m => m.name.split(/\s+/)[0]).filter((n, i, l) => n && l.indexOf(n) === i);
+  return String(satz).replace(/\{Person(?: (\d+))?\}/g, (_, n) => vor[(n ? +n : 1) - 1] || "Jemand").replace(/\{Text\}/g, "Text");
+}
+
+/* Wie gut versteht der Assistent die eigenen Beispiele — von sich aus (feste Regeln) und mit dem Gelernten?
+   → {gesamt, regeln, mit, offen: [Beispiele, die die festen Regeln noch nicht verstehen]} */
+function trainingPruefen(mo){
+  mo = mo || aktuellerMontag();
+  const l = (((state.training || {}).beispiele) || []).filter(b => b.absicht);
+  const offen = [];
+  let regeln = 0, mit = 0;
+  l.forEach(b => {
+    const text = trainingEinsetzen(b.satz);
+    if (assistentVerstehen(text, mo, {ohneTraining: true}).absicht === b.absicht) regeln++; else offen.push(b);
+    if (assistentVerstehen(text, mo).absicht === b.absicht) mit++;
+  });
+  return {gesamt: l.length, regeln, mit, offen};
+}
+
+/* Zum Weitergeben: nur Sätze ohne Namen — mit Anliegen, Angaben und Wunsch. Namen werden beim Kopieren
+   noch einmal gegen das heutige Personal geprüft. */
+function trainingExport(){
+  const l = (((state.training || {}).beispiele) || []).map(b => ({satz: trainingAnonym(b.satz).satz, absicht: b.absicht, angaben: b.angaben,
+    quelle: b.quelle, vorher: b.vorher, wunsch: b.wunsch ? trainingAnonym(b.wunsch).satz : null, wt: b.wt, am: b.am}));
+  return JSON.stringify({art: "filialplaner-training", stand: isoVon(new Date()), beispiele: l}, null, 1);
+}
+
+// Kurz, was verstanden wurde: „Jemand fällt aus · Eva · Mittwoch · krank“
+function trainingVerstandenText(v){
+  const a = anliegenVon(v.absicht);
+  if (!a) return v.nurAngaben ? "Nur Angaben — setzt das Gespräch fort" : "Nicht verstanden";
+  const z = v.zeit || {};
+  const zeit = z.von !== undefined ? `${hhmm(z.von)}–${hhmm(z.bis)}` : z.nurAb ? `ab ${hhmm(z.nurAb)}` : z.nurBis ? `bis ${hhmm(z.nurBis)}`
+    : z.schicht ? (z.schicht === "spaet" ? "Spätschicht" : "Frühschicht") : z.relativ ? `${z.relativ.min ? z.relativ.min + " min " : ""}${z.relativ.art}` : "";
+  return [a.titel].concat(v.personen.map(n => n.split(/\s+/)[0]), (v.helfer || []).map(n => "mit " + n.split(/\s+/)[0]),
+    v.tage.map(tagName), zeit ? [zeit] : [], v.grund ? [(GRUND_WAHL.find(g => g[0] === v.grund) || [, v.grund])[1]] : [],
+    v.nummer ? [`Nr. ${v.nummer}`] : []).join(" · ");
+}
+
+/* Worum es im Gespräch gerade geht — eine Zeile über dem Eingabefeld, damit man es sieht und
+   mit „Neues Thema“ von vorn anfangen kann: „Jemand fällt aus · Eva · Mittwoch“ */
+function assistentThema(eintrag){
+  const k = (eintrag && eintrag.kontext) || {};
+  const s = (k.schritte || [])[k.schrittNr] || null;
+  const l = k.letzte || {};
+  const a = anliegenVon(s && s.aus ? "ausfall" : l.absicht);
+  const person = s ? s.name : (l.personen || [])[0] || null;
+  const ti = s ? s.ti : (l.tage || [])[0] !== undefined ? l.tage[0] : null;
+  const teile = [a ? a.titel : null, person ? person.split(/\s+/)[0] : null, ti !== null && ti !== undefined ? tagName(ti) : null].filter(Boolean);
+  return teile.length >= 2 ? teile.join(" · ") : null;
 }
 
 // ==== app/20-zustand.js ====
@@ -8685,6 +9216,7 @@ const NAV = [
     {ziel: "analyse",      sym: "zahlen",  titel: "Analyse"},
     {ziel: "archiv",       sym: "archiv",  titel: "Archiv"},
     {ziel: "papierkorb",   sym: "papierkorb", titel: "Papierkorb"},
+    {ziel: "training",     sym: "funke",  titel: "Assistent trainieren"},
     {ziel: "sicherung",    sym: "schild",  titel: "Sicherung"}]}
 ];
 const NAV_PUNKTE = NAV.reduce((a, g) => a.concat(g.punkte), []);
@@ -8881,6 +9413,7 @@ function render(){
   else if (ansicht === "entwurf")     v.appendChild(planEntwurfAnsicht());
   else if (ansicht === "archiv")      v.appendChild(archivAnsicht());
   else if (ansicht === "papierkorb")  v.appendChild(papierkorbAnsicht());
+  else if (ansicht === "training")    v.appendChild(trainingAnsicht());
   else if (ansicht === "sicherung")   v.appendChild(sicherungsAnsicht());
   else if (ansicht === "termine")     v.appendChild(termineAnsicht());
   else if (ansicht === "ereignisse")  v.appendChild(ereignisAnsicht());
@@ -12650,19 +13183,28 @@ function notizBearbeiten(eintrag, ti, plan, fertig){
    nächste betroffene Schicht, Schritt für Schritt. */
 // Die Eingabe des Assistenten — damit andere Teile der Seite ihm eine Frage stellen können
 let assistentFrage = null;
+// Der Stand vor der letzten Antwort — „Falsch verstanden?“ nimmt sie damit zurück (nur solange die Seite offen ist)
+let assistentVorher = null;
 
 function assistentKarte(sl, kurz, eintrag, fertig){
   eintrag.chat = eintrag.chat || [];
-  const k = el(`<section class="karte assistent"><h3>Assistent</h3>
+  const thema = assistentThema(eintrag);
+  const k = el(`<section class="karte assistent"><div class="karte-kopf"><h3>Assistent</h3>
+      <button class="btn ghost small" data-training type="button">Trainieren</button></div>
+    ${thema ? `<div class="as-thema"><span>Thema: ${esc(thema)}</span><button class="btn ghost small" data-neu type="button">Neues Thema</button></div>` : ""}
     <form class="chat-eingabe"><input type="text" placeholder="Was soll sich am Plan ändern?" aria-label="Was soll sich am Plan ändern?" autocomplete="off">
       <button class="btn" type="submit" title="senden" aria-label="senden">${symbol("senden")}</button></form>
     <div class="as-antwort"></div></section>`);
-  const senden = text => {
+  // rahmen: Absicht und Angaben stehen fest (Richtigstellung, „Meinst du …?“)
+  const senden = (text, rahmen) => {
     text = String(text || "").trim();
     if (!text) return;
-    const erg = assistent(text, sl, kurz, eintrag);
+    assistentVorher = {sl, chatLaenge: eintrag.chat.length, aenderungen: JSON.parse(JSON.stringify(eintrag.aenderungen)),
+      kontext: JSON.parse(JSON.stringify(eintrag.kontext || {}))};
+    const erg = assistent(text, sl, kurz, eintrag, rahmen);
     erg.karten.concat(erg.still || []).forEach(a => { if (!eintrag.aenderungen.includes(a)) eintrag.aenderungen.push(a); });
     (erg.aus || []).forEach(id => aenderungAus(eintrag, id));
+    (erg.an || []).forEach(id => { const a = eintrag.aenderungen.find(x => x.id === id); if (a) karteEinschalten(eintrag, a); });
     eintrag.chat.push({wer: "du", text}, {wer: "assistent", text: erg.antwort, karten: erg.karten.map(a => a.id),
       still: (erg.still || []).map(a => a.id), knoepfe: erg.knoepfe || []});
     eintrag.stand = entwurfStand(sl);          // ändert sich die Lage, beginnt das Gespräch neu (entwurfHolen)
@@ -12683,19 +13225,8 @@ function assistentKarte(sl, kurz, eintrag, fertig){
     const kn = el(`<button class="chatkarte${a.aktiv ? " an" : ""}" type="button" aria-pressed="${a.aktiv}">${esc(a.text)}
       ${a.weg && a.weg.passt ? `<span class="chat-weg">${esc(a.weg.passt)}</span>` : ""}
       <span>${a.aktiv ? "✓ Im Plan · zurücknehmen" : "Im Plan anzeigen"}</span></button>`);
-    kn.onclick = () => {
-      if (a.aktiv) aenderungAus(eintrag, a.id);
-      else {
-        a.aktiv = true;
-        // gehört die Lösung zu einer Änderung aus demselben Gespräch (Ausfall, Tausch …), kommt sie mit — alle Teile
-        (a.mit || (a.fuer ? [a.fuer] : [])).forEach(id => { const f = eintrag.aenderungen.find(x => x.id === id); if (f) f.aktiv = true; });
-        // je Zelle bzw. je Ausfall nur eine Karte des Assistenten
-        eintrag.aenderungen.forEach(x => { if (x !== a && x.quelle === "assistent" && x.aktiv
-          && ((x.name && x.name === a.name && x.ti === a.ti && x.typ !== "abwesend" && a.typ !== "abwesend")
-           || (a.typ === "loesung" && x.typ === "loesung" && x.ti === a.ti && x.fuer === a.fuer))) x.aktiv = false; });
-      }
-      fertig();
-    };
+    // gehört die Lösung zu einer Änderung aus demselben Gespräch (Ausfall, Tausch …), kommt sie mit — je Zelle bzw. Ausfall eine Karte
+    kn.onclick = () => { if (a.aktiv) aenderungAus(eintrag, a.id); else karteEinschalten(eintrag, a); fertig(); };
     return kn;
   };
   // Das Gespräch als Paare aus Eingabe und Antwort (ein alter Begrüßungstext ohne Eingabe zählt nicht)
@@ -12704,6 +13235,20 @@ function assistentKarte(sl, kurz, eintrag, fertig){
     if (n.wer === "du") paare.push({frage: n.text, antwort: null});
     else if (paare.length && !paare[paare.length - 1].antwort) paare[paare.length - 1].antwort = n;
   });
+  /* „Falsch verstanden?“: auswählen, was gemeint war — die Antwort wird zurückgenommen und neu gegeben,
+     der Satz ist ab jetzt gelernt. „Etwas anderes …“ merkt sich nur den Wunsch. */
+  const richtigstellen = paar => {
+    const mo = montagDer(kurz.mo), v = assistentVerstehen(paar.frage, mo);
+    korrekturDialog({text: paar.frage, v, fertig: e => {
+      trainingLernen({text: paar.frage, absicht: e.absicht, angaben: e.angaben, wunsch: e.wunsch, quelle: "korrektur", vorher: v.absicht}, mo);
+      const vorher = assistentVorher && assistentVorher.sl === sl && assistentVorher.chatLaenge === eintrag.chat.length - 2 ? assistentVorher : null;
+      if (vorher){ eintrag.aenderungen = vorher.aenderungen; eintrag.kontext = vorher.kontext; }
+      eintrag.chat.splice(-2, 2);
+      if (e.absicht) return senden(paar.frage, Object.assign({absicht: e.absicht}, e.angaben));
+      eintrag.chat.push({wer: "du", text: paar.frage}, {wer: "assistent", text: `Das kann ich noch nicht — notiert fürs Training: „${e.wunsch}“.`, karten: [], still: [], knoepfe: []});
+      fertig();
+    }});
+  };
   const block = (paar, letztes) => {
     const b = el(`<div class="as-paar"><p class="as-frage">${esc(paar.frage)}</p><p class="as-text">${esc(paar.antwort ? paar.antwort.text : "")}</p></div>`);
     ((paar.antwort && paar.antwort.karten) || []).forEach(id => { const kn = karte(id); if (kn) b.appendChild(kn); });
@@ -12721,9 +13266,29 @@ function assistentKarte(sl, kurz, eintrag, fertig){
           reihe.appendChild(kn);
           return;
         }
+        // „Meinst du …?“: der Tipp beantwortet die Frage und lehrt den Assistenten den unklaren Satz
+        if (t && typeof t === "object" && t.rahmen){
+          const kn = el(`<button class="btn ghost small" type="button">${esc(t.text)}</button>`);
+          kn.onclick = () => {
+            const kx = eintrag.kontext || {};
+            if (kx.unklar){ trainingLernen({text: kx.unklar, absicht: t.rahmen.absicht, angaben: t.rahmen, quelle: "rueckfrage", vorher: null}, montagDer(kurz.mo)); kx.unklar = null; }
+            senden(t.text, t.rahmen);
+          };
+          reihe.appendChild(kn);
+          return;
+        }
+        if (t && typeof t === "object" && t.korrigieren){
+          const kn = el(`<button class="btn ghost small" type="button">${esc(t.text)}</button>`); kn.onclick = () => richtigstellen(paar); reihe.appendChild(kn);
+          return;
+        }
         const kn = el(`<button class="btn ghost small" type="button">${esc(t)}</button>`); kn.onclick = () => senden(t); reihe.appendChild(kn);
       });
       b.appendChild(reihe);
+    }
+    if (letztes && paar.antwort){
+      const f = el(`<button class="as-falsch" type="button">Falsch verstanden?</button>`);
+      f.onclick = () => richtigstellen(paar);
+      b.appendChild(f);
     }
     return b;
   };
@@ -12738,8 +13303,211 @@ function assistentKarte(sl, kurz, eintrag, fertig){
   }
   const feld = k.querySelector("input");
   k.querySelector("form").onsubmit = e => { e.preventDefault(); senden(feld.value); };
+  k.querySelector("[data-training]").onclick = () => { sichern(); geheZu("training"); };
+  const neuKnopf = k.querySelector("[data-neu]");
+  if (neuKnopf) neuKnopf.onclick = () => { eintrag.kontext = {}; fertig(); };
   assistentFrage = senden;
   return k;
+}
+
+// ==== app/48-training.js ====
+/* Assistent trainieren (seit 18.11.2026): richtigstellen, ausprobieren, weitergeben.
+
+   Die Auswahl „Was wolltest du?“ gibt es zweimal mit demselben Dialog: unter jeder Antwort des
+   Assistenten („Falsch verstanden?“) und auf der Seite „Assistent trainieren“. Gespeichert wird
+   ein Beispiel ohne Namen (trainingLernen in kern/20-training.js). */
+
+/* Dialog „Was wolltest du?“. o: {text, v (was verstanden wurde), titel, fertig(ergebnis)} —
+   ergebnis: {absicht | null, angaben, wunsch}. Personen und Tage sind vorausgewählt, wie verstanden. */
+function korrekturDialog(o){
+  const v = o.v || {personen: [], tage: [], zeit: {}};
+  let wahl = null;
+  const personen = new Set(v.personen || []), helfer = new Set(v.helfer || []), tage = new Set(v.tage || []);
+  let grund = v.grund || null, nummer = v.nummer || null;
+  const z = v.zeit || {};
+  const zeitText = z.von !== undefined ? `${hhmm(z.von)}–${hhmm(z.bis)}` : z.nurAb ? `ab ${hhmm(z.nurAb)}` : z.nurBis ? `bis ${hhmm(z.nurBis)}` : "";
+  const inhalt = el(`<div class="korrektur">
+    <h3>${esc(o.titel || "Was wolltest du?")}</h3>
+    <p class="hint">„${esc(o.text)}“ — verstanden als: ${esc(trainingVerstandenText(v))}</p>
+    <div class="ko-wahl" role="group" aria-label="Anliegen"></div>
+    <div class="ko-angaben"></div>
+    <p class="err" data-fehler></p>
+    <div class="dialog-knoepfe"><button class="btn" data-speichern type="button">Speichern</button>
+      <button class="btn ghost" data-abbrechen type="button">Abbrechen</button></div></div>`);
+  const box = inhalt.querySelector(".ko-wahl"), angaben = inhalt.querySelector(".ko-angaben");
+  const chip = (text, an, klick) => { const b = el(`<button class="btn ghost small ko-chip${an ? " an" : ""}" type="button" aria-pressed="${!!an}">${esc(text)}</button>`); b.onclick = klick; return b; };
+  const zeichneWahl = () => {
+    box.innerHTML = "";
+    ANLIEGEN.forEach(a => box.appendChild(chip(a.titel, wahl === a.absicht, () => { wahl = a.absicht; zeichneWahl(); zeichneAngaben(); })));
+    box.appendChild(chip("Etwas anderes …", wahl === "anders", () => { wahl = "anders"; zeichneWahl(); zeichneAngaben(); }));
+  };
+  const reihe = (titel, inhaltEl) => { const r = el(`<div class="ko-reihe"><span class="ko-titel">${esc(titel)}</span></div>`); r.appendChild(inhaltEl); return r; };
+  const zeichneAngaben = () => {
+    angaben.innerHTML = "";
+    if (!wahl) return;
+    if (wahl === "anders"){
+      angaben.appendChild(el(`<label class="f">Was hättest du erwartet?<textarea rows="3" data-wunsch placeholder="z. B. „Er soll mir zeigen, wer am Freitag noch Stunden frei hat.“"></textarea></label>`));
+      return;
+    }
+    const a = anliegenVon(wahl), was = a.angaben || [];
+    if (was.includes("personen") && state.mitarbeiter.length){
+      const w = el(`<div class="ko-chips"></div>`);
+      state.mitarbeiter.forEach(m => w.appendChild(chip(m.name.split(/\s+/)[0], personen.has(m.name), function(){
+        if (personen.has(m.name)) personen.delete(m.name); else personen.add(m.name);
+        this.classList.toggle("an"); this.setAttribute("aria-pressed", personen.has(m.name)); })));
+      angaben.appendChild(reihe(wahl === "ersatz" ? "Wer fällt aus?" : wahl === "waehlen" ? "Mit wem?" : "Wer?", w));
+    }
+    if (wahl === "ersatz" && state.mitarbeiter.length){
+      const w = el(`<div class="ko-chips"></div>`);
+      state.mitarbeiter.forEach(m => w.appendChild(chip(m.name.split(/\s+/)[0], helfer.has(m.name), function(){
+        if (helfer.has(m.name)) helfer.delete(m.name); else helfer.add(m.name);
+        this.classList.toggle("an"); this.setAttribute("aria-pressed", helfer.has(m.name)); })));
+      angaben.appendChild(reihe("Wer soll einspringen? (wenn genannt)", w));
+    }
+    if (was.includes("tage")){
+      const w = el(`<div class="ko-chips"></div>`);
+      TAGE.forEach(([k, kurzName], ti) => w.appendChild(chip(kurzName, tage.has(ti), function(){
+        if (tage.has(ti)) tage.delete(ti); else tage.add(ti);
+        this.classList.toggle("an"); this.setAttribute("aria-pressed", tage.has(ti)); })));
+      angaben.appendChild(reihe("Tag", w));
+    }
+    if (was.includes("zeit")) angaben.appendChild(el(`<label class="f">Zeit<input type="text" data-zeit value="${esc(zeitText)}" placeholder="z. B. 8–14, ab 10, bis 16" autocomplete="off"></label>`));
+    if (was.includes("grund")){
+      const w = el(`<div class="ko-chips"></div>`);
+      GRUND_WAHL.forEach(([g, name]) => w.appendChild(chip(name, grund === g, () => { grund = grund === g ? null : g; zeichneAngaben(); })));
+      angaben.appendChild(reihe("Grund", w));
+    }
+    if (wahl === "waehlen"){
+      const w = el(`<div class="ko-chips"></div>`);
+      [1, 2, 3].forEach(n => w.appendChild(chip(`Vorschlag ${n}`, nummer === n, () => { nummer = nummer === n ? null : n; zeichneAngaben(); })));
+      angaben.appendChild(reihe("Oder die Nummer", w));
+    }
+  };
+  zeichneWahl();
+  const d = dialogZeigen(inhalt);
+  inhalt.querySelector("[data-abbrechen]").onclick = () => d.remove();
+  inhalt.querySelector("[data-speichern]").onclick = () => {
+    const fehler = inhalt.querySelector("[data-fehler]");
+    if (!wahl){ fehler.textContent = "Bitte auswählen, was du wolltest."; return; }
+    if (wahl === "anders"){
+      const wunsch = inhalt.querySelector("[data-wunsch]").value.trim();
+      if (!wunsch){ fehler.textContent = "Bitte kurz schreiben, was du erwartet hättest."; return; }
+      d.remove(); o.fertig({absicht: null, angaben: {}, wunsch});
+      return;
+    }
+    const feld = inhalt.querySelector("[data-zeit]");
+    const zeit = feld && feld.value.trim() ? aZeit(" " + feld.value.trim().toLowerCase() + " ") : {};
+    if (feld && feld.value.trim() && !aHatZeit(zeit)){ fehler.textContent = "Die Zeit verstehe ich nicht — z. B. „8–14“, „ab 10“ oder „bis 16“."; return; }
+    d.remove();
+    o.fertig({absicht: wahl, angaben: {personen: [...personen], helfer: wahl === "ersatz" ? [...helfer] : [], tage: [...tage].sort((x, y) => x - y),
+      zeit, grund: wahl === "ausfall" ? grund : null, nummer: wahl === "waehlen" ? nummer : null}});
+  };
+}
+
+const TRAINING_QUELLE = {korrektur: "richtiggestellt", rueckfrage: "Rückfrage", uebung: "geübt", bestaetigt: "bestätigt"};
+let trainingProbe = null;         // der zuletzt ausprobierte Satz: {text, v}
+let trainingAlle = false;         // alle gelernten Sätze zeigen, nicht nur die neuesten
+
+function trainingAnsicht(){
+  const mo = aktuellerMontag();
+  const p = el(`<div class="panel training"></div>`);
+  p.appendChild(seitenKopf({eyebrow: "Assistent", titel: "Assistent trainieren",
+    lede: "Hier lernt der Assistent, wie du schreibst. Was er falsch versteht, stellst du richtig — ab dann versteht er es. Alles bleibt auf diesem Gerät, Namen werden nicht gespeichert."}));
+  const neu = () => { sichern(); const y = window.scrollY; render(); window.scrollTo(0, y); };
+
+  // ---- Ausprobieren ----
+  const probe = el(rubrikHtml("Ausprobieren", `<form class="chat-eingabe"><input type="text" placeholder="Schreib einen Satz, wie im Laden" aria-label="Satz zum Ausprobieren" autocomplete="off">
+      <button class="btn" type="submit" title="prüfen" aria-label="prüfen">${symbol("senden")}</button></form><div class="tr-ergebnis"></div>`, "",
+    "Der Satz ändert keinen Plan. Du siehst, was der Assistent versteht — „Richtig“ merkt sich den Satz als geprüft, „Korrigieren“ bringt ihm bei, was gemeint war."));
+  const ergebnis = probe.querySelector(".tr-ergebnis");
+  const zeigeProbe = () => {
+    ergebnis.innerHTML = "";
+    if (!trainingProbe) return;
+    const v = trainingProbe.v;
+    const k = el(`<div class="tr-karte"><p class="as-frage">${esc(trainingProbe.text)}</p>
+      <p><b>${esc(trainingVerstandenText(v))}</b>${v.gelernt ? ` <span class="pille">gelernt</span>` : ""}</p>
+      <div class="knopfreihe"><button class="btn small" data-ok type="button">✓ Richtig</button>
+      <button class="btn ghost small" data-falsch type="button">Korrigieren</button></div></div>`);
+    k.querySelector("[data-ok]").onclick = () => {
+      if (!v.absicht){ korrigieren(); return; }
+      trainingLernen({text: trainingProbe.text, absicht: v.absicht, angaben: v, quelle: "bestaetigt"}, mo);
+      trainingProbe = null; neu();
+    };
+    const korrigieren = () => korrekturDialog({text: trainingProbe.text, v, fertig: e => {
+      trainingLernen({text: trainingProbe.text, absicht: e.absicht, angaben: e.angaben, wunsch: e.wunsch, quelle: "uebung", vorher: v.absicht}, mo);
+      trainingProbe = null; neu();
+    }});
+    k.querySelector("[data-falsch]").onclick = korrigieren;
+    ergebnis.appendChild(k);
+  };
+  probe.querySelector("form").onsubmit = e => {
+    e.preventDefault();
+    const text = probe.querySelector("input").value.trim();
+    if (!text) return;
+    trainingProbe = {text, v: assistentVerstehen(text, mo)};
+    probe.querySelector("input").value = "";
+    zeigeProbe();
+  };
+  zeigeProbe();
+  p.appendChild(probe);
+
+  // ---- Gelernt ----
+  const liste = (((state.training || {}).beispiele) || []).slice().reverse();
+  const stand = liste.length ? trainingPruefen(mo) : null;
+  const offenIds = new Set(stand ? stand.offen.map(b => b.id) : []);
+  const gelernt = el(rubrikHtml("Gelernt", "", "", "„von sich aus“: Der Assistent versteht den Satz schon mit seinen festen Regeln. „nur gelernt“: Er versteht ihn nur durch das Training — diese Sätze baut Claude beim nächsten Mal fest ein."));
+  if (!liste.length) gelernt.appendChild(el(`<p class="empty">Noch nichts gelernt. Probier oben einen Satz aus — oder tippe im Assistenten auf „Falsch verstanden?“.</p>`));
+  else {
+    gelernt.appendChild(el(`<div class="tr-stand"><span class="pille">${stand.gesamt} ${stand.gesamt === 1 ? "Satz" : "Sätze"}</span>
+      <span class="pille gruen">${stand.regeln} von sich aus</span>${stand.gesamt - stand.regeln ? `<span class="pille rot">${stand.gesamt - stand.regeln} nur gelernt</span>` : ""}
+      ${liste.length - stand.gesamt ? `<span class="pille">${liste.length - stand.gesamt} Wünsche</span>` : ""}</div>`));
+    const sichtbar = trainingAlle ? liste : liste.slice(0, 20);
+    sichtbar.forEach(b => {
+      const a = anliegenVon(b.absicht);
+      const an = b.angaben || {};
+      const teile = [a ? a.titel : "Etwas anderes"].concat(an.personen || [], (an.helfer || []).map(x => "mit " + x),
+        (an.tage || []).map(tagName), an.grund ? [(GRUND_WAHL.find(g => g[0] === an.grund) || [, an.grund])[1]] : [], an.nummer ? [`Nr. ${an.nummer}`] : []);
+      const z = el(`<div class="tr-zeile"><div><p class="tr-satz">„${esc(b.satz)}“</p>
+          <p class="hint">${esc(teile.join(" · "))} · ${esc(TRAINING_QUELLE[b.quelle] || b.quelle)}${b.wunsch ? ` · Wunsch: ${esc(b.wunsch)}` : ""}</p></div>
+        ${b.absicht ? `<span class="pille ${offenIds.has(b.id) ? "rot" : "gruen"}">${offenIds.has(b.id) ? "nur gelernt" : "von sich aus"}</span>` : ""}
+        <button class="btn ghost small" type="button" title="Satz vergessen" aria-label="Satz vergessen">✕</button></div>`);
+      z.querySelector("button").onclick = () => {
+        state.training.beispiele = state.training.beispiele.filter(x => x.id !== b.id);
+        neu();
+      };
+      gelernt.appendChild(z);
+    });
+    if (liste.length > 20){
+      const mehr = el(`<button class="btn ghost small" type="button">${trainingAlle ? "Nur die neuesten zeigen" : `Alle ${liste.length} zeigen`}</button>`);
+      mehr.onclick = () => { trainingAlle = !trainingAlle; neu(); };
+      gelernt.appendChild(mehr);
+    }
+  }
+  p.appendChild(gelernt);
+
+  // ---- Weitergeben ----
+  const weiter = el(rubrikHtml("Weitergeben", `<div class="linkbox"><textarea readonly rows="4">${esc(trainingExport())}</textarea>
+      <div class="knopfreihe"><button class="btn small" data-kopieren type="button">Kopieren</button>
+      <button class="btn ghost small" data-loeschen type="button"${liste.length ? "" : " disabled"}>Alles vergessen</button></div><span class="hint"></span></div>`, "",
+    "Die Sätze ohne Namen — statt eines Namens steht {Person}. In den Chat mit Claude einfügen: Claude baut sie als feste Regeln und Testsätze ein, dann versteht der Assistent sie auch ohne Training — auf jedem Gerät."));
+  const feld = weiter.querySelector("textarea");
+  feld.onfocus = () => feld.select();
+  weiter.querySelector("[data-kopieren]").onclick = async () => {
+    feld.focus(); feld.select();
+    let ok = false;
+    try { await navigator.clipboard.writeText(feld.value); ok = true; } catch(e){ try { ok = document.execCommand("copy"); } catch(e2){} }
+    weiter.querySelector(".hint").textContent = ok ? " Kopiert." : " Der Text ist markiert — bitte kopieren (⌘C bzw. lange drücken).";
+  };
+  weiter.querySelector("[data-loeschen]").onclick = () => {
+    if (!confirm("Alles Gelernte vergessen? Das lässt sich nicht rückgängig machen.")) return;
+    state.training = {beispiele: []}; neu();
+  };
+  p.appendChild(weiter);
+
+  // ---- Was der Assistent kann ----
+  p.appendChild(el(rubrikHtml("Was der Assistent kann", `<ul class="tr-kann">${ANLIEGEN.filter(a => a.absicht !== "gruss").map(a =>
+    `<li><b>${esc(a.titel)}</b><span>„${esc(anliegenBeispiel(a))}“</span></li>`).join("")}</ul>`)));
+  return p;
 }
 
 // ==== app/50-ausgabe.js ====
