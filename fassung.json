@@ -1,6 +1,6 @@
 {
-  "fassung": "2026-11-17-4",
+  "fassung": "2026-11-18-1",
   "datei": "filialplaner.html",
-  "pruefsumme": "e09f62c36909aa3ccef5c9cedbb273ff3d7d734875b8a07722e13c3dfa198e93",
-  "hinweis": "Tagesansicht, Kasse je Viertelstunde, feste Kassenkraft, Assistent Schritt für Schritt, Azubis ohne Konto, PÄ und Kontoauszug, Empfehlungen mit Überstunden"
+  "pruefsumme": "460ae36d454dac6c4ae1e3c5bbf5c6d388db8453a16460791317ea5f55ca6614",
+  "hinweis": "Kasse auf Hauptkasse, Aufgaben bei wenigen Personen, Frischware-Fristen, Überstunden bis 50 %, Empfehlungen mit Möglichkeiten, Lösungen nur auf Anfrage, PÄ/Kontoauszug als Funktion, Regelprüfung (Ruhezeit nach vorn, Heiligabend, Berufsschule, 48 h, Minijob, Standardwoche sperrt)"
 }
